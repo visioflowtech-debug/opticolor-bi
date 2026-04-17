@@ -804,5 +804,246 @@ GROUP BY
     M.poblacion_2011, M.area_km2, M.latitud, M.longitud;
 GO
 
+-- ===============================================
+-- 6. TABLAS DE SEGURIDAD Y AUDITORÍA
+-- ===============================================
+
+-- Catálogo de Roles (Jerarquía de permisos)
+CREATE TABLE [dbo].[Seguridad_Roles](
+	[id_rol] [int] NOT NULL,
+	[nombre_rol] [nvarchar](50) NOT NULL,
+	[descripcion] [nvarchar](255) NULL,
+	[nivel_jerarquico] [int] NULL,
+	[esta_activo] [bit] NULL DEFAULT 1,
+	[fecha_creacion] [datetime2](7) NULL,
+	PRIMARY KEY CLUSTERED ([id_rol] ASC)
+) ON [PRIMARY]
+GO
+
+-- Catálogo de Permisos (Módulo + Acción)
+CREATE TABLE [dbo].[Seguridad_Permisos](
+	[id_permiso] [int] IDENTITY(1,1) NOT NULL,
+	[nombre_permiso] [nvarchar](100) NOT NULL,
+	[descripcion] [nvarchar](255) NULL,
+	[modulo] [nvarchar](50) NULL,
+	[accion] [nvarchar](50) NULL,
+	[esta_activo] [bit] NULL DEFAULT 1,
+	[fecha_creacion] [datetime2](7) NULL,
+	PRIMARY KEY CLUSTERED ([id_permiso] ASC)
+) ON [PRIMARY]
+GO
+
+-- Relación N:N Roles ↔ Permisos
+CREATE TABLE [dbo].[Seguridad_Roles_Permisos](
+	[id_rol] [int] NOT NULL,
+	[id_permiso] [int] NOT NULL,
+	[fecha_asignacion] [datetime2](7) NULL,
+	PRIMARY KEY CLUSTERED ([id_rol], [id_permiso]),
+	FOREIGN KEY ([id_rol]) REFERENCES [dbo].[Seguridad_Roles]([id_rol]),
+	FOREIGN KEY ([id_permiso]) REFERENCES [dbo].[Seguridad_Permisos]([id_permiso])
+) ON [PRIMARY]
+GO
+
+-- Usuarios del Portal
+CREATE TABLE [dbo].[Seguridad_Usuarios](
+	[id_usuario] [int] IDENTITY(1,1) NOT NULL,
+	[email] [nvarchar](100) NOT NULL UNIQUE,
+	[nombre_completo] [nvarchar](150) NULL,
+	[password_hash] [nvarchar](255) NOT NULL,
+	[esta_activo] [bit] NULL DEFAULT 1,
+	[ultima_sesion] [datetime2](7) NULL,
+	[fecha_creacion] [datetime2](7) NULL,
+	[usuario_creacion] [nvarchar](100) NULL,
+	[fecha_modificacion] [datetime2](7) NULL,
+	[usuario_modificacion] [nvarchar](100) NULL,
+	PRIMARY KEY CLUSTERED ([id_usuario] ASC)
+) ON [PRIMARY]
+GO
+
+-- Relación N:N Usuarios ↔ Roles (con vigencia)
+CREATE TABLE [dbo].[Seguridad_Usuarios_Roles](
+	[id_usuario] [int] NOT NULL,
+	[id_rol] [int] NOT NULL,
+	[fecha_asignacion] [datetime2](7) NULL,
+	[fecha_revocacion] [datetime2](7) NULL,
+	[esta_vigente] [bit] NULL DEFAULT 1,
+	PRIMARY KEY CLUSTERED ([id_usuario], [id_rol]),
+	FOREIGN KEY ([id_usuario]) REFERENCES [dbo].[Seguridad_Usuarios]([id_usuario]),
+	FOREIGN KEY ([id_rol]) REFERENCES [dbo].[Seguridad_Roles]([id_rol])
+) ON [PRIMARY]
+GO
+
+-- Asignación de Sucursales por Usuario (RLS Data)
+CREATE TABLE [dbo].[Seguridad_Usuarios_Sucursales](
+	[id_usuario] [int] NOT NULL,
+	[id_sucursal] [int] NOT NULL,
+	[fecha_asignacion] [datetime2](7) NULL,
+	[esta_vigente] [bit] NULL DEFAULT 1,
+	PRIMARY KEY CLUSTERED ([id_usuario], [id_sucursal]),
+	FOREIGN KEY ([id_usuario]) REFERENCES [dbo].[Seguridad_Usuarios]([id_usuario]),
+	FOREIGN KEY ([id_sucursal]) REFERENCES [dbo].[Maestro_Sucursales]([id_sucursal])
+) ON [PRIMARY]
+GO
+
+-- Sesiones Activas (Tracking de logins)
+CREATE TABLE [dbo].[Seguridad_Sesiones](
+	[id_sesion] [nvarchar](255) NOT NULL,
+	[id_usuario] [int] NOT NULL,
+	[token_jwt] [nvarchar](max) NULL,
+	[ip_origen] [nvarchar](50) NULL,
+	[user_agent] [nvarchar](255) NULL,
+	[fecha_inicio] [datetime2](7) NULL,
+	[fecha_expiracion] [datetime2](7) NULL,
+	[esta_activa] [bit] NULL DEFAULT 1,
+	PRIMARY KEY CLUSTERED ([id_sesion] ASC),
+	FOREIGN KEY ([id_usuario]) REFERENCES [dbo].[Seguridad_Usuarios]([id_usuario])
+) ON [PRIMARY]
+GO
+
+-- Auditoría Inmutable (Log de acciones)
+CREATE TABLE [dbo].[Seguridad_Auditoria](
+	[id_auditoria] [bigint] IDENTITY(1,1) NOT NULL,
+	[id_usuario] [int] NULL,
+	[email_usuario] [nvarchar](100) NULL,
+	[accion] [nvarchar](100) NOT NULL,
+	[tabla_afectada] [nvarchar](100) NULL,
+	[registro_id] [nvarchar](50) NULL,
+	[valores_anteriores] [nvarchar](max) NULL,
+	[valores_nuevos] [nvarchar](max) NULL,
+	[resultado] [nvarchar](20) NULL,
+	[mensaje_error] [nvarchar](max) NULL,
+	[ip_origen] [nvarchar](50) NULL,
+	[fecha_accion] [datetime2](7) NULL DEFAULT GETUTCDATE(),
+	PRIMARY KEY CLUSTERED ([id_auditoria] ASC)
+) ON [PRIMARY]
+GO
+
+-- Catálogo de Módulos (Para asignación de permisos granulares)
+CREATE TABLE [dbo].[Param_Modulos](
+	[id_modulo] [int] IDENTITY(1,1) NOT NULL,
+	[nombre_modulo] [nvarchar](100) NOT NULL,
+	[descripcion] [nvarchar](255) NULL,
+	[icono] [nvarchar](50) NULL,
+	[ruta_portal] [nvarchar](255) NULL,
+	[orden_visualizacion] [int] NULL,
+	[esta_activo] [bit] NULL DEFAULT 1,
+	PRIMARY KEY CLUSTERED ([id_modulo] ASC)
+) ON [PRIMARY]
+GO
+
+-- ===============================================
+-- VISTAS DE SEGURIDAD
+-- ===============================================
+
+-- Vista: Usuario + Roles + Sucursales (para NextAuth)
+CREATE VIEW [dbo].[Vw_Usuario_Accesos] AS
+SELECT
+    U.id_usuario,
+    U.email,
+    U.nombre_completo,
+    U.esta_activo,
+    R.id_rol,
+    R.nombre_rol,
+    R.nivel_jerarquico,
+    S.id_sucursal,
+    S.nombre_sucursal,
+    STRING_AGG(P.nombre_permiso, ',') WITHIN GROUP (ORDER BY P.nombre_permiso) AS permisos
+FROM [dbo].[Seguridad_Usuarios] U
+LEFT JOIN [dbo].[Seguridad_Usuarios_Roles] UR ON U.id_usuario = UR.id_usuario AND UR.esta_vigente = 1
+LEFT JOIN [dbo].[Seguridad_Roles] R ON UR.id_rol = R.id_rol AND R.esta_activo = 1
+LEFT JOIN [dbo].[Seguridad_Usuarios_Sucursales] US ON U.id_usuario = US.id_usuario AND US.esta_vigente = 1
+LEFT JOIN [dbo].[Maestro_Sucursales] S ON US.id_sucursal = S.id_sucursal
+LEFT JOIN [dbo].[Seguridad_Roles_Permisos] RP ON R.id_rol = RP.id_rol
+LEFT JOIN [dbo].[Seguridad_Permisos] P ON RP.id_permiso = P.id_permiso AND P.esta_activo = 1
+WHERE U.esta_activo = 1
+GROUP BY U.id_usuario, U.email, U.nombre_completo, U.esta_activo,
+         R.id_rol, R.nombre_rol, R.nivel_jerarquico, S.id_sucursal, S.nombre_sucursal;
+GO
+
+-- Vista: RLS para Portal (Filtra sucursales por usuario)
+CREATE VIEW [dbo].[Vw_RLS_Sucursales] AS
+SELECT DISTINCT
+    U.id_usuario,
+    U.email,
+    S.id_sucursal,
+    S.nombre_sucursal,
+    S.municipio_raw,
+    M.nombre_municipio,
+    E.id_estado,
+    E.nombre_estado,
+    E.region_administrativa
+FROM [dbo].[Seguridad_Usuarios] U
+LEFT JOIN [dbo].[Seguridad_Usuarios_Sucursales] US ON U.id_usuario = US.id_usuario AND US.esta_vigente = 1
+LEFT JOIN [dbo].[Maestro_Sucursales] S ON US.id_sucursal = S.id_sucursal
+LEFT JOIN [dbo].[Param_Venezuela_Municipios] M ON UPPER(S.municipio_raw) = UPPER(M.nombre_municipio)
+LEFT JOIN [dbo].[Param_Venezuela_Estados] E ON M.id_estado = E.id_estado
+WHERE U.esta_activo = 1;
+GO
+
+-- ===============================================
+-- DATOS INICIALES DE SEGURIDAD
+-- ===============================================
+
+-- Insertar Roles (Jerarquía)
+INSERT INTO [dbo].[Seguridad_Roles]
+([id_rol], [nombre_rol], [descripcion], [nivel_jerarquico], [esta_activo])
+VALUES
+(1, 'SUPER_ADMIN', 'Acceso total — VisioFlow', 1, 1),
+(2, 'ADMIN', 'Gerencia Nacional — Todas las sucursales', 2, 1),
+(3, 'GERENTE_ZONA', 'Jefe de Zona Regional', 3, 1),
+(4, 'SUPERVISOR', 'Supervisor de Sucursal', 4, 1),
+(5, 'CONSULTOR', 'Asesor/Optometrista — Lectura', 5, 1),
+(6, 'ETL_SERVICE', 'Cuenta de servicio ETL (escritura)', 6, 1),
+(7, 'PORTAL_SERVICE', 'Cuenta de servicio Portal (lectura)', 7, 1);
+GO
+
+-- Insertar Permisos por Módulo
+INSERT INTO [dbo].[Seguridad_Permisos]
+([nombre_permiso], [descripcion], [modulo], [accion], [esta_activo])
+VALUES
+('VER_INFORME_1', 'Ver Resumen Comercial', 'DASHBOARD', 'READ', 1),
+('VER_INFORME_2', 'Ver Eficiencia de Órdenes', 'DASHBOARD', 'READ', 1),
+('VER_INFORME_3', 'Ver Control de Cartera', 'DASHBOARD', 'READ', 1),
+('VER_INFORME_4', 'Ver Desempeño Clínico', 'DASHBOARD', 'READ', 1),
+('VER_INFORME_5', 'Ver Inventario', 'DASHBOARD', 'READ', 1),
+('ADMIN_USUARIOS', 'Gestionar usuarios', 'ADMIN', 'WRITE', 1),
+('EXPORTAR_DATOS', 'Exportar datos a PDF/Excel', 'EXPORT', 'WRITE', 1);
+GO
+
+-- Asignar Permisos a Roles
+INSERT INTO [dbo].[Seguridad_Roles_Permisos]
+([id_rol], [id_permiso], [fecha_asignacion])
+SELECT 1, id_permiso, GETUTCDATE() FROM [dbo].[Seguridad_Permisos]; -- SUPER_ADMIN todos
+
+INSERT INTO [dbo].[Seguridad_Roles_Permisos]
+([id_rol], [id_permiso], [fecha_asignacion])
+SELECT 2, id_permiso, GETUTCDATE() FROM [dbo].[Seguridad_Permisos] WHERE nombre_permiso LIKE 'VER_INFORME_%' OR nombre_permiso = 'ADMIN_USUARIOS'; -- ADMIN
+
+INSERT INTO [dbo].[Seguridad_Roles_Permisos]
+([id_rol], [id_permiso], [fecha_asignacion])
+SELECT 3, id_permiso, GETUTCDATE() FROM [dbo].[Seguridad_Permisos] WHERE nombre_permiso IN ('VER_INFORME_1','VER_INFORME_3','VER_INFORME_4','VER_INFORME_5'); -- GERENTE_ZONA
+
+INSERT INTO [dbo].[Seguridad_Roles_Permisos]
+([id_rol], [id_permiso], [fecha_asignacion])
+SELECT 4, id_permiso, GETUTCDATE() FROM [dbo].[Seguridad_Permisos] WHERE nombre_permiso IN ('VER_INFORME_1','VER_INFORME_3','VER_INFORME_4','VER_INFORME_5'); -- SUPERVISOR
+
+INSERT INTO [dbo].[Seguridad_Roles_Permisos]
+([id_rol], [id_permiso], [fecha_asignacion])
+SELECT 5, id_permiso, GETUTCDATE() FROM [dbo].[Seguridad_Permisos] WHERE nombre_permiso IN ('VER_INFORME_1','VER_INFORME_4','VER_INFORME_5'); -- CONSULTOR
+
+GO
+
+-- Insertar Módulos del Portal
+INSERT INTO [dbo].[Param_Modulos]
+([nombre_modulo], [descripcion], [icono], [ruta_portal], [orden_visualizacion], [esta_activo])
+VALUES
+('Dashboard 1: Resumen Comercial', 'Visión ejecutiva de ventas', '📊', '/dashboard/resumen-comercial', 1, 1),
+('Dashboard 2: Eficiencia de Órdenes', 'Monitoreo operacional', '⚙️', '/dashboard/eficiencia-ordenes', 2, 1),
+('Dashboard 3: Control de Cartera', 'Análisis financiero', '💰', '/dashboard/control-cartera', 3, 1),
+('Dashboard 4: Desempeño Clínico', 'Métricas clínicas', '👁️', '/dashboard/desempeño-clinico', 4, 1),
+('Dashboard 5: Inventario', 'Stock y desplazamiento', '📦', '/dashboard/inventario', 5, 1),
+('Panel de Administración', 'Gestión de usuarios y roles', '⚙️', '/admin/usuarios', 6, 1);
+GO
+
 /****** Script completado ******/
-/*** Estado: ✅ LISTO PARA COMPILAR EN AZURE SQL ***/
+/*** Estado: ✅ LISTO PARA COMPILAR EN AZURE SQL - CON TABLAS DE SEGURIDAD ***/
