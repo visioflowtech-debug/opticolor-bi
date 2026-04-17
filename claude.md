@@ -1,171 +1,171 @@
 # 🎯 Opticolor BI — Ecosistema de Inteligencia de Datos Venezuela
 
-## Identidad del Proyecto
+## Identidad
 
 | Campo | Valor |
 |-------|-------|
-| **Cliente** | OPTI-COLOR #2, C.A. — Venezuela |
-| **Contacto Cliente** | Eduardo Martínez (Emartinez@grupoopticolor.com), Reinaldo José Rangel (Director General) |
-| **Proveedor** | VisioFlow — Gerardo Argueta (visioflow.tech@gmail.com) |
-| **Período** | 14 abril 2026 — 26 mayo 2026 (6 semanas) |
-| **Estado** | En Desarrollo (Semana 1-2) |
-| **Repositorio** | https://github.com/visioflowtech/opticolor-bi |
-| **Propuesta Comercial** | Versión 1.2 (06/04/2026) |
+| Cliente | OPTI-COLOR #2, C.A. — Venezuela |
+| Contactos | Eduardo Martínez, Reinaldo José Rangel |
+| Proveedor | VisioFlow — Gerardo Argueta |
+| Período | 14 abril 2026 — 26 mayo 2026 (6 semanas) |
+| Estado | Semana 1-2: Contexto + Seguridad completado ✅ |
+| Repositorio | https://github.com/visioflowtech/opticolor-bi |
 
 ---
 
-## Stack Tecnológico
+## Stack: Gesvision API → ETL Python → Azure SQL → Power BI + Portal Next.js
 
-**Flujo completo:** Gesvision API → ETL Python → Azure SQL → Power BI + Portal Next.js
-
-| Capa | Tecnología | Propósito |
-|------|-----------|----------|
-| 1. Fuente | Gesvision API | Sistema transaccional óptica |
-| 2. ETL | Python + Azure Container Apps | Extracción, transformación, carga (18 módulos, 8x/día) |
-| 3. Datos | Azure SQL Database (Tier Basic) | Data warehouse centralizado (23+8 tablas) |
-| 4A. BI Ejecutiva | Power BI Service | 5 informes para gerencia (2 usuarios con licencia) |
-| 4B. BI Portal | Next.js 14 + TypeScript | Portal propio sin licencia (5+ usuarios) |
-
-**Autenticación:** NextAuth.js (credenciales locales, no OAuth)  
-**RBAC:** 6 roles jerárquicos desde SUPER_ADMIN hasta CONSULTOR  
-**Monitoreo:** Telegram Bot (notificaciones ETL en tiempo real)
+| Capa | Tech | Propósito |
+|------|------|----------|
+| 1 | Gesvision API | Sistema transaccional óptica |
+| 2 | Python + Azure | ETL (18 módulos, 8x/día) |
+| 3 | Azure SQL | Data warehouse (31 tablas: 23 base + 8 seguridad) |
+| 4A | Power BI | 5 informes (2 usuarios licencia) |
+| 4B | Next.js 14 | Portal sin licencia (5+ usuarios) |
 
 ---
 
-## Estructura de Carpetas
+## ⭐ FUENTES DE VERDAD (LEER PRIMERO CADA SESIÓN)
+
+### 1. PROYECTO OPTICOLOR.pdf — TRACKER PRINCIPAL
+- Estado actual por semana (tipo Notion)
+- Tareas completadas ✅, en progreso ↻, pendientes —
+- **ÚSALO PARA:** Saber qué está done, qué sigue
+
+### 2. claude.md (ESTE ARCHIVO) — CONTEXTO PERMANENTE
+- Arquitectura, convenciones, tablas, roles
+- Variables env, schedule CRON, 5 informes
+- **ÚSALO PARA:** No perder contexto sesión a sesión
+
+### 3. HOJA DE RUTA — PLAN 6 SEMANAS
+- Fases, dependencias, bloqueadores
+- **ÚSALO PARA:** Entender qué bloquea qué
+
+### 4. Optilux panama Documento Técnico DB v2.0 — VISTAS REFERENCIA
+- ✅ YA TIENE vistas Dim_*, Fact_* que funcionan en Panamá
+- ✅ COPIAREMOS Y ADAPTAREMOS a Venezuela
+- **ÚSALO PARA:** Estructura vistas, cálculos, nomenclatura
+
+### 5-7. Propuesta Comercial, Contrato, Docs — REFERENCIAS
+- KPIs, segmentos, T&C legales
+
+---
+
+## SQL: Estructura Base Lista para Compilar
+
+### 31 Tablas (23 base + 8 seguridad)
+
+**Maestros (8):** Sucursales, Empleados, Clientes, Categorias, Marcas, Productos, Proveedores, Metodos_Pago
+
+**Transaccionales (6):** Ventas_Cabecera, Ventas_Pedidos, Finanzas_Cobros, Finanzas_Tesoreria, Clinica_Examenes, Marketing_Citas
+
+**Operacionales (4):** Operaciones_Ordenes_Cristales, Operaciones_Inventario, Operaciones_Pedidos_Laboratorio, Operaciones_Recepciones_Lab
+
+**Geografía (3):** Param_Venezuela_Estados (24), Param_Venezuela_Municipios (256), Param_Venezuela_Parroquias (preparada)
+
+**Seguridad (8) ✨ NUEVAS:**
+- Seguridad_Usuarios (bcrypt hash)
+- Seguridad_Roles (7 roles: SUPER_ADMIN → PORTAL_SERVICE)
+- Seguridad_Permisos (VER_INFORME_*, ADMIN_USUARIOS, EXPORTAR_DATOS)
+- Seguridad_Roles_Permisos, Seguridad_Usuarios_Roles (relaciones)
+- Seguridad_Usuarios_Sucursales (RLS data)
+- Seguridad_Sesiones (JWT tracking)
+- Seguridad_Auditoria (log inmutable)
+- Param_Modulos (catálogo módulos)
+
+**Control ETL (2):** Etl_Control_Ejecucion, Etl_Checkpoints
+
+### Vistas (5)
+
+**Seguridad:**
+- Vw_Usuario_Accesos (usuario + roles + sucursales para NextAuth)
+- Vw_RLS_Sucursales (filtra data automáticamente por usuario)
+
+**Geografía:**
+- Dim_Sucursales, Dim_Estados_Venezuela, Dim_Municipios_Venezuela
+
+### ITERACIÓN SOBRE LA MARCHA
+
+✅ Estructura base lista para compilar
+⏳ Vistas Dim_*, Fact_* para BI se crean Semana 2-3 (copiar Panamá + adaptar)
+✅ Permisos compilar SQL YA, feedback BI ayuda refinar vistas
+
+---
+
+## RBAC: 7 Roles Jerárquicos
 
 ```
-c:\opticolor-bi\
-├── .claude/
-│   ├── settings.json
-│   └── agents/                  ← NUEVO: 8 agentes especializados
-├── docs/                        ← Documentación de referencia (7 PDFs)
-├── etl/                         ← Python ETL (2,983 líneas, 18 módulos)
-├── portal/                      ← Next.js (vacío, a crear)
-├── sql/                         ← T-SQL (23 tablas existentes + 8 nuevas seguridad)
-├── claude.md                    ← ESTE ARCHIVO (fuente de verdad)
-├── README.md
-└── ADAPTACION_OPTICOLOR.md
+1. SUPER_ADMIN    → Gerardo (VisioFlow) — Acceso total
+2. ADMIN          → Eduardo/Reinaldo (Gerencia) — Todos informes
+3. GERENTE_ZONA   → Jefe zona — Su región
+4. SUPERVISOR     → Jefe sucursal — Su sucursal
+5. CONSULTOR      → Asesor/optometrista — Solo lectura
+6. ETL_SERVICE    → Cuenta SQL ETL (escritura)
+7. PORTAL_SERVICE → Cuenta SQL Portal (lectura)
 ```
 
----
-
-## ETL: Módulos y Schedule
-
-**Archivo:** `etl/function_app.py` (2,983 líneas)
-
-**18 módulos en secuencia:**
-1. sync_dimensions — Sucursales, Empleados, Clientes, Categorías, Marcas, Productos, Proveedores, Métodos Pago
-2. sync_invoices_incremental — Ventas con checkpoint
-3. sync_collections — Cobros
-4. sync_treasury — Tesorería
-5. sync_orders — Pedidos de venta
-6. sync_brands_full — Marcas (carga completa)
-7. sync_products — Productos (completa)
-8. sync_categories — Categorías
-9. sync_glasses_orders — Órdenes de cristales (Rx óptica)
-10. sync_inventory — Stock
-11. sync_laboratory_orders — Pedidos laboratorio
-12. sync_received_delivery_notes — Recepciones
-13. sync_exams — Exámenes clínicos
-14. sync_appointments — Citas
-15-18. Módulos operacionales adicionales
-
-**CRON:** `"0 50 0,2,12,14,16,18,20,22 * * *"` → 8 veces/día (07:50, 09:50, ... 21:50 UTC-5)
-
-**Modo:** INCREMENTAL (checkpoints en `Etl_Checkpoints`)
-
-**Notificaciones Telegram:** ✅ Iniciado, ✅ Completado, ❌ Error
+**RLS:** Vista Vw_RLS_Sucursales filtra automáticamente por usuario
 
 ---
 
-## Portal Web: RBAC y RLS
+## ETL: 18 Módulos, 8x/día, Telegram Monitoreo
 
-**Autenticación:** NextAuth.js credenciales → tabla `Seguridad_Usuarios` (bcrypt password_hash)
+**Schedule CRON:** `"0 50 0,2,12,14,16,18,20,22 * * *"` → 07:50-21:50 UTC-5
 
-**6 Roles:**
-```
-1. SUPER_ADMIN     → Gerardo (VisioFlow) — Acceso total
-2. ADMIN           → Eduardo/Reinaldo (Gerencia Nacional) — Todos informes, todas sucursales
-3. GERENTE_ZONA    → Jefes de zona — Informes 1,3,4,5 + su zona
-4. SUPERVISOR      → Jefe sucursal — Informes 1,3,4,5 + su sucursal
-5. CONSULTOR       → Asesor/optometrista — Solo lectura + su sucursal
-6. ETL_SERVICE     → Cuenta servicio ETL (SQL escritor)
-7. PORTAL_SERVICE  → Cuenta servicio Portal (SQL lector)
-```
+**Modo:** INCREMENTAL (checkpoints en Etl_Checkpoints)
 
-**RLS:** Vista `Vw_RLS_Sucursales` filtra datos automáticamente por usuario
-
-**Permisos granulares:** VER_INFORME_1, VER_INFORME_2, ..., ADMIN_USUARIOS, EXPORTAR_DATOS
+**Notificaciones:** ✅ Iniciado, ✅ Completado, ❌ Error (Telegram)
 
 ---
 
-## Power BI: 5 Informes
+## Power BI: 5 Informes (Copiar Optilux, adaptar)
 
-**Todos incluyen segmentos comerciales:** Luxury / Intermedias / Be Diferent
+1. **Resumen Comercial** — Venta, Cobrados, Ticket, Run Rate, OTIF
+2. **Eficiencia Órdenes** — Órdenes, En proceso, Días entrega
+3. **Control Cartera** — Facturado, Recaudado, Saldo
+4. **Desempeño Clínico** — Exámenes, % Conversión, Productividad
+5. **Inventario** — Stock, Capital, Unidades por segmento, UPT
 
-1. **Resumen Comercial** — Venta, Cobros, Ticket, Run Rate, OTIF, Clientes Nuevos
-2. **Eficiencia de Órdenes** — Órdenes hoy/mes, En proceso, Días entrega, Crítico
-3. **Control de Cartera** — Facturado, Recaudado, Saldo, Cartera por sucursal
-4. **Desempeño Clínico** — Exámenes, % Conversión, Productividad, Demográfica
-5. **Inventario** — Stock, Capital invertido, Unidades por segmento, Eficiencia
-
----
-
-## Tablas SQL
-
-**23 existentes:**
-- Maestro_* (8 dimensiones)
-- Ventas_* (2 transaccionales)
-- Operaciones_* (4 laboratorio/inventario)
-- Clinica_*, Marketing_* (2 clínica)
-- Finanzas_* (2 cobros/tesorería)
-- Etl_* (2 control)
-- Param_Venezuela_* (3 geografía: Estados, Municipios, Parroquias)
-
-**8 NUEVAS de seguridad (a crear):**
-- Seguridad_Usuarios, Seguridad_Roles, Seguridad_Permisos, Seguridad_Roles_Permisos
-- Seguridad_Usuarios_Roles, Seguridad_Usuarios_Sucursales, Seguridad_Sesiones, Seguridad_Auditoria
-- Param_Modulos (catálogo de módulos para permisos)
+**Segmentos:** Luxury / Intermedias / Be Diferent (+ Lentes Contacto)
 
 ---
 
-## Variables de Entorno
+## Agentes Especializados (`.claude/agents/`)
 
-**ETL:** `GESVISION_*`, `SQL_AZURE_CONNECTION_STRING`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`
-
-**Portal:** `DATABASE_URL`, `NEXTAUTH_SECRET`
-
-**NUNCA commitar:** `.env*`, `local.settings.json`, archivos con secretos
-
----
-
-## Bloqueos Activos
-
-1. ⏳ Pago inicial ($900) — Gerencia próxima confirmación
-2. ⏳ Licencias Power BI Service — Eduardo confirma cantidad
-3. 🔄 Estructura usuarios/roles — Implementando SQL esta semana
-4. ⏳ Portal Next.js — Inicia Semana 2
+- `sql-datamodel.md` → DDL, vistas, nomenclatura, RLS
+- `security.md` → RBAC, NextAuth, auditoría
+- `etl-azure.md` → Python, Azure, CRON, Telegram
+- `portal-nextjs.md` → Next.js, API routes, Tailwind
+- `powerbi.md` → DAX, KPIs, segmentos
+- `qa.md` → Testing, criterios aceptación
+- `optica-negocio.md` → Glosario, reglas negocio
+- `azure-cloud.md` → Infrastructure, CI/CD
 
 ---
 
-## Instrucciones Críticas para Claude
+## Variables de Entorno (NO Commitar)
 
-✅ **SIEMPRE:**
-- Leer `PROYECTO OPTICOLOR.pdf` antes de iniciar feature
-- Revisar `HOJA DE RUTA` para estado actual
+**ETL:** GESVISION_*, SQL_AZURE_CONNECTION_STRING, TELEGRAM_*
+**Portal:** DATABASE_URL, NEXTAUTH_SECRET
+
+---
+
+## Instrucciones Críticas
+
+✅ SIEMPRE:
+- Leer PROYECTO OPTICOLOR.pdf + HOJA DE RUTA antes de empezar
+- Consultar Optilux schema para vistas referencia
 - Mantener nomenclatura SQL (Maestro_*, Seguridad_*, etc.)
-- Agregar auditoría (fecha_carga_etl, usuario_creacion, etc.)
-- Documentar cambios en ADAPTACION_OPTICOLOR.md
+- Agregar auditoría (fecha_carga_etl, usuario_creacion)
 
-❌ **NUNCA:**
-- Inventar URLs — usar doc referencias reales
-- Crear tablas sin consultar schema referencia Panamá
-- Commitear secretos (.env, passwords, tokens)
-- Cambiar nombres SQL sin actualizar vistas Dim_*/Fact_*
+❌ NUNCA:
+- Inventar URLs
+- Modificar SQL sin revisar Optilux referencia
+- Commitear .env, passwords, secretos
+- Cambiar nomenclatura sin actualizar vistas
 
 ---
 
 **Última actualización:** 17 de abril de 2026  
-**Versión:** 1.0  
-**Estado:** Listo para Desarrollo
+**Versión:** 1.1  
+**Estado:** Listo para Compilar SQL + Semana 2
