@@ -21,11 +21,15 @@ app = func.FunctionApp()
 @app.timer_trigger(schedule="0 50 0,2,12,14,16,18,20,22 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
-    logging.info("--- [INICIO] CICLO ETL OPTILUX (CASCADA) ---")
+    logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
     etl = GesvisionEtl()
     reporte = []
     start_global = time.time()
+    inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     MAX_DURATION_MINS = 24  # Límite de seguridad Azure
+
+    # Notificación de inicio
+    etl.notificar_telegram(f"✅ ETL Opticolor iniciado — {inicio_ts}")
     
     def check_time_limit():
         """Verifica si se excedió el tiempo límite global."""
@@ -36,41 +40,6 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         return False
 
     try:
-        # --- 1. ZOHO BOOKS (PRIORIDAD ACTUAL) ---
-        try:
-            logging.info("--- [INICIO] MÓDULO: ZOHO_AUTH ---")
-            etl._refresh_zoho_token()
-            reporte.append({'modulo': 'ZOHO_AUTH', 'status': '✅ (Token Renovado)'})
-            
-            if not check_time_limit():
-                reporte.append(etl.ejecutar_modulo('ZOHO_GASTOS', etl.sync_zoho_expenses))
-        except Exception as e:
-            logging.error(f"Fallo crítico en Zoho: {e}")
-            reporte.append({'modulo': 'ZOHO_AUTH', 'status': '❌ (Fallo de Autenticación)'})
-
-        # --- GHL PRIORITY EXECUTION (Safety First) ---
-        GHL_SAFE_LIMIT = MAX_DURATION_MINS - 5
-        ghl_modules = [
-            ('GHL_AUTH', lambda: etl._refresh_ghl_token()),
-            ('GHL_CALENDARIOS', etl.sync_ghl_calendars),
-            ('GHL_CONTACTOS', lambda: etl.sync_ghl_contacts(start_global, GHL_SAFE_LIMIT)),
-            ('GHL_OPPORTUNITIES', lambda: etl.sync_ghl_opportunities(start_global, max_mins=GHL_SAFE_LIMIT)),
-            ('GHL_CITAS', lambda: etl.sync_ghl_appointments(start_global, max_mins=GHL_SAFE_LIMIT))
-        ]
-
-        for mod_name, mod_func in ghl_modules:
-            if check_time_limit(): break
-            
-            if mod_name == 'GHL_AUTH':
-                try:
-                    logging.info("--- [INICIO] MÓDULO: GHL_AUTH ---")
-                    mod_func()
-                    reporte.append({'modulo': 'GHL_AUTH', 'status': '✅ Conexión Ok'})
-                except Exception as e:
-                    reporte.append({'modulo': 'GHL_AUTH', 'status': '❌ Fallo'})
-            else:
-                reporte.append(etl.ejecutar_modulo(mod_name, mod_func))
-
         # --- GESVISION (Remaining Modules) ---
         remaining_modules = [
             ('SUCURSALES', etl.sync_dimensions),
@@ -131,12 +100,6 @@ class GesvisionEtl:
         LOAD_MODE_LAB       = 'INCREMENTAL'  # Pedidos de laboratorio.
         LOAD_MODE_RECEPCIONES = 'INCREMENTAL' # Carga inicial de recepciones.
         LOAD_MODE_GLASSES_ORDERS = 'INCREMENTAL' # Carga de órdenes de cristales (Historical/Incremental).
-        LOAD_MODE_ZOHO_GASTOS = 'INCREMENTAL'
-        
-        # --- GHL LOAD MODES ---
-        LOAD_MODE_GHL_CONTACTS = 'INCREMENTAL'
-        LOAD_MODE_GHL_OPPORTUNITIES = 'INCREMENTAL'
-        LOAD_MODE_GHL_CITAS = 'INCREMENTAL'
 
         # --- CONSTANTES DE MAPEO CENTRALIZADO PARA MANTENIBILIDAD ---
         # --- CONSTANTES DE MAPEO ACTUALIZADAS ---
@@ -279,90 +242,13 @@ class GesvisionEtl:
             'oi_tipo_lente': 'oi_tipo_lente', 'oi_material': 'oi_material',
             'oi_esfera': 'oi_esfera', 'oi_cilindro': 'oi_cilindro', 'oi_eje': 'oi_eje', 'oi_adicion': 'oi_adicion', 'oi_altura': 'oi_altura'
         }
-        
-        # --- GHL MAPPINGS ---
-        MAP_GHL_CONTACTS = {
-            'id': 'id_contacto_ghl', 
-            'locationId': 'location_id',   # <-- Agregado
-            'firstName': 'nombre', 
-            'lastName': 'apellido',
-            'email': 'email', 
-            'phone': 'telefono', 
-            'source': 'origen_source',
-            'dateAdded': 'fecha_creacion_ghl',
-            'type': 'tipo_contacto',        # <-- Corregido
-            'dateUpdated': 'fecha_actualizacion_ghl', 
-            'dateOfBirth': 'fecha_nacimiento',
-            'city': 'ciudad', 
-            'state': 'estado', 
-            'country': 'pais',
-            'utm_source': 'utm_source', 
-            'utm_medium': 'utm_medium',
-            'tags_concatenados': 'tags_concatenados', # <-- Corregido
-            'genero': 'genero', 
-            'profesion': 'profesion', 
-            'sucursal_nombre': 'sucursal_nombre', 
-            'doctor_asignado': 'doctor_asignado', 
-            'estatus_paciente': 'estatus_paciente'
-        }
-        MAP_GHL_OPPORTUNITIES = {
-            'id': 'id_oportunidad_ghl', 
-            'contactId': 'id_contacto_ghl',
-            'name': 'nombre_oportunidad', 
-            'monetaryValue': 'monto_valor',
-            'status': 'estado_oportunidad', 
-            'pipelineId': 'id_pipeline',
-            'pipelineStageId': 'id_etapa_pipeline', 
-            'createdAt': 'fecha_creacion',
-            'updatedAt': 'fecha_actualizacion', 
-            'lastStatusChangeAt': 'fecha_ultimo_cambio_estado', 
-            'lastStageChangeAt': 'fecha_ultimo_cambio_etapa',
-            'source': 'origen_oportunidad'
-        }
-        MAP_GHL_CITAS = {
-            'id': 'id_cita_ghl', 
-            'contactId': 'id_contacto_ghl',
-            'calendarId': 'id_calendario', 
-            'title': 'titulo_cita',
-            'appointmentStatus': 'estado_cita', # 'confirmed', 'showed', etc.
-            'startTime': 'fecha_inicio',
-            'endTime': 'fecha_fin',
-            'assignedUserId': 'id_usuario_asignado',
-            'groupId': 'id_grupo_calendario',
-            'dateAdded': 'fecha_creacion',
-            'notes': 'notas_cita'
-        }
-        MAP_GHL_CALENDARS = {'id': 'id_calendario', 'name': 'nombre_calendario', 'description': 'descripcion'}
-
-        # 4. Mapeo: Asegurar que last_modified_time esté presente para la lógica incremental.
-        MAP_ZOHO_GASTOS = {
-            'expense_id': 'id_gasto_zoho', 
-            'date': 'fecha_gasto', 
-            'amount': 'monto', 
-            'vendor_name': 'proveedor', 
-            'account_name': 'cuenta_contable', 
-            'status': 'estatus_pago',
-            'description': 'descripcion',  # <-- Agregado por solicitud
-            'last_modified_time': 'last_modified_time'
-        }
 
         def __init__(self):
             # --- Gesvision API ---
-            self.base_url = "https://app.gesvision.com/gesmo/rest/api"
+            self.base_url = os.getenv("GESVISION_BASE_URL", "https://app.gesvision.com/gesmo/rest/api")
             self.user = os.getenv("GESVISION_USER")
             self.password = os.getenv("GESVISION_PASS")
             self.token = None
-
-            # --- Zoho Books API ---
-            self.zoho_client_id = os.getenv("ZOHO_CLIENT_ID")
-            self.zoho_client_secret = os.getenv("ZOHO_CLIENT_SECRET")
-            self.zoho_access_token = None
-            self.zoho_org_id = None
-
-            # --- GoHighLevel API ---
-            self.ghl_base_url = "https://services.leadconnectorhq.com"
-            self.ghl_access_token = None
-            self.ghl_location_id = None
 
             # --- Infraestructura ---
             self.conn_str = os.getenv("SQL_AZURE_CONNECTION_STRING")
@@ -432,41 +318,49 @@ class GesvisionEtl:
         def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
             """Envía un reporte consolidado al final del ciclo."""
             try:
-                msg = f"📊 REPORTE ETL OPTILUX\n\n"
-                
-                # Iconos por módulo
-                iconos = {
-                    'ZOHO_AUTH': '🔑',
-                    'SUCURSALES': '🏢', 'EMPLEADOS': '👔', 'CATEGORIAS': '🏷️', 'METODOS_PAGO': '💳',
-                    'PROVEEDORES': '🚚', 'MARCAS_FULL': '🏷️', 'PRODUCTOS': '📦', 'CLIENTES': '👥',
-                    'CITAS': '📅', 'EXAMENES': '👁️',
-                    'PEDIDOS': '📝', 'ORDENES_CRISTALES': '眼镜', 'VENTAS': '🛒', 'COBROS': '💰', 'TESORERIA': '🏦',
-                    'PEDIDOS_LAB': '🧪', 'INVENTARIO': '📊', 'PROVEEDORES': '🚚',
-                    'RECEPCIONES_LAB': '📥',
-                    'ZOHO_GASTOS': '🧾',
-                    'GHL_CONTACTS': '👥', 'GHL_OPPORTUNITIES': '💎', 'GHL_CITAS': '📅', 'GHL_CALENDARIOS': '🗓️'
-                }
+                fin_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-                for item in reporte:
-                    mod = item['modulo']
-                    ico = iconos.get(mod, '🔹')
-                    status = item['status']
-                    
-                    # Lógica de Anomalías API
-                    if mod in self.modulos_con_fallo_api:
-                        ico = '🟠'
-                        desc_error = self.modulos_con_fallo_api[mod]
-                        linea = f"{ico} {mod}: {desc_error}"
-                    else:
-                        # Formato compacto estándar
-                        linea = f"{ico} {mod}: {status}"
-                    
-                    msg += linea + "\n"
-
-                msg += f"\n⏱️ *Tiempo Total Ciclo:* {duracion_min:.1f} min."
-                
                 if error_critico:
-                    msg += f"\n\n❌ *ERROR CRÍTICO:* La cascada se detuvo.\n{error_critico}"
+                    # Formato de error
+                    msg = f"❌ ETL Opticolor error — {fin_ts} — {error_critico}"
+                else:
+                    # Contar registros procesados
+                    total_registros = 0
+                    for item in reporte:
+                        if isinstance(item.get('resultado'), int):
+                            total_registros += item['resultado']
+
+                    # Formato de éxito con conteo
+                    msg = f"✅ ETL Opticolor completado — {fin_ts} — {total_registros} registros procesados\n\n"
+                    msg += f"📊 REPORTE DETALLADO:\n"
+
+                    # Iconos por módulo
+                    iconos = {
+                        'SUCURSALES': '🏢', 'EMPLEADOS': '👔', 'CATEGORIAS': '🏷️', 'METODOS_PAGO': '💳',
+                        'PROVEEDORES': '🚚', 'MARCAS_FULL': '🏷️', 'PRODUCTOS': '📦', 'CLIENTES': '👥',
+                        'CITAS': '📅', 'EXAMENES': '👁️',
+                        'PEDIDOS': '📝', 'ORDENES_CRISTALES': '眼镜', 'VENTAS': '🛒', 'COBROS': '💰', 'TESORERIA': '🏦',
+                        'PEDIDOS_LAB': '🧪', 'INVENTARIO': '📊',
+                        'RECEPCIONES_LAB': '📥'
+                    }
+
+                    for item in reporte:
+                        mod = item['modulo']
+                        ico = iconos.get(mod, '🔹')
+                        status = item['status']
+
+                        # Lógica de Anomalías API
+                        if mod in self.modulos_con_fallo_api:
+                            ico = '🟠'
+                            desc_error = self.modulos_con_fallo_api[mod]
+                            linea = f"{ico} {mod}: {desc_error}"
+                        else:
+                            # Formato compacto estándar
+                            linea = f"{ico} {mod}: {status}"
+
+                        msg += linea + "\n"
+
+                    msg += f"\n⏱️ *Tiempo Total Ciclo:* {duracion_min:.1f} min."
 
                 self.notificar_telegram(msg)
             except Exception as e:
@@ -543,52 +437,7 @@ class GesvisionEtl:
                 logging.error(f"Error registrando fin de {modulo}: {e}")
 
 
-        def _get_checkpoint_ghl(self, key):
-            """Versión exclusiva para GHL: Obtiene checkpoint sin requerir una conexión externa."""
-            try:
-                with pyodbc.connect(self.conn_str) as conn:
-                    cursor = conn.cursor()
-                    # Si no existe, se crea con el schema solicitado por el usuario
-                    cursor.execute("""
-                        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Etl_Checkpoints' AND xtype='U')
-                        CREATE TABLE Etl_Checkpoints (
-                            KeyName VARCHAR(100) PRIMARY KEY,
-                            LastValue NVARCHAR(MAX),
-                            updated_at DATETIME DEFAULT GETDATE()
-                        )
-                    """)
-                    cursor.execute("SELECT LastValue FROM Etl_Checkpoints WHERE KeyName = ?", key)
-                    row = cursor.fetchone()
-                    return row[0] if row else None
-            except Exception as e:
-                logging.warning(f"⚠️ Error leyendo checkpoint GHL {key}: {e}")
-                return None
 
-        def _update_checkpoint_ghl(self, key, value):
-            """Versión exclusiva para GHL: Guarda checkpoint sin requerir una conexión externa."""
-            try:
-                with pyodbc.connect(self.conn_str) as conn:
-                    cursor = conn.cursor()
-                    # Aseguramos existencia (redundante pero seguro) - SIN updated_at
-                    cursor.execute("""
-                        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Etl_Checkpoints' AND xtype='U')
-                        CREATE TABLE Etl_Checkpoints (
-                            KeyName VARCHAR(100) PRIMARY KEY,
-                            LastValue NVARCHAR(MAX)
-                        )
-                    """)
-                    cursor.execute("""
-                        MERGE Etl_Checkpoints AS target
-                        USING (SELECT ? AS KeyName, ? AS LastValue) AS source
-                        ON (target.KeyName = source.KeyName)
-                        WHEN MATCHED THEN
-                            UPDATE SET LastValue = source.LastValue
-                        WHEN NOT MATCHED THEN
-                            INSERT (KeyName, LastValue) VALUES (source.KeyName, source.LastValue);
-                    """, key, str(value))
-                    conn.commit()
-            except Exception as e:
-                logging.error(f"⚠️ Error guardando checkpoint GHL {key}: {e}")
 
         def predecesor_listo(self, modulo_padre):
             """Verifica si el módulo padre completó exitosamente."""
@@ -1334,116 +1183,7 @@ class GesvisionEtl:
             except Exception as e:
                 logging.error(f"Error actualizando checkpoint: {e}")
 
-        def _get_zoho_config_from_db(self):
-            """
-            Obtiene la configuración de Zoho (refresh_token, org_id) desde la base de datos.
-            Usa zoho_tokens.json como fallback si la base de datos falla.
-            """
-            logging.info("   [Auth] Obteniendo configuración de Zoho desde la base de datos...")
-            try:
-                with pyodbc.connect(self.conn_str) as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT refresh_token, organization_id FROM Etl_Zoho_Auth WHERE Id = 1")
-                    row = cursor.fetchone()
-                    if row and row.refresh_token and row.organization_id:
-                        logging.info("   [Auth] Configuración de Zoho obtenida de SQL Azure.")
-                        return {'refresh_token': row.refresh_token, 'organization_id': row.organization_id}
-            except Exception as e:
-                logging.warning(f"   [Auth] No se pudo leer la configuración de Zoho desde la BD: {e}. Intentando fallback a JSON.")
 
-            # --- Fallback a zoho_tokens.json ---
-            logging.warning("   [Auth] Fallback: Intentando leer zoho_tokens.json.")
-            token_path = os.path.join(os.getcwd(), 'zoho_tokens.json')
-            try:
-                with open(token_path, 'r') as f:
-                    tokens = json.load(f)
-                refresh_token = tokens.get('refresh_token')
-                org_id = tokens.get('organization_id')
-                if not refresh_token or not org_id:
-                    raise ValueError("Faltan 'refresh_token' u 'organization_id' en zoho_tokens.json")
-                logging.info("   [Auth] Configuración de Zoho obtenida desde zoho_tokens.json (fallback).")
-                return {'refresh_token': refresh_token, 'organization_id': org_id}
-            except (FileNotFoundError, json.JSONDecodeError, ValueError) as e:
-                error_msg = f"Error crítico de autenticación. Falló la BD y el archivo de fallback zoho_tokens.json: {e}"
-                logging.error(error_msg)
-                self.notificar_telegram(f"❌ ERROR ZOHO AUTH: {error_msg}")
-                raise Exception(error_msg)
-
-        def _refresh_zoho_token(self):
-            """
-            Refresca el token de acceso de Zoho Books, actualizando la base de datos y el estado de la clase.
-            Utiliza un sistema de reintentos y notifica en caso de fallo crítico.
-            """
-            logging.info("   [Auth] Iniciando proceso de refresco de token de Zoho Books...")
-
-            # 1. Obtener configuración (refresh_token y org_id) desde la fuente de verdad (DB con fallback a JSON)
-            try:
-                zoho_config = self._get_zoho_config_from_db()
-                refresh_token = zoho_config['refresh_token']
-                self.zoho_org_id = zoho_config['organization_id'] # Actualizar org_id en la instancia
-            except Exception as e:
-                # _get_zoho_config_from_db ya notifica y eleva la excepción, no es necesario duplicar.
-                raise e
-
-            # 2. Preparar y ejecutar la petición de refresco con reintentos
-            url = "https://accounts.zoho.com/oauth/v2/token"
-            # FIX: Usar self.zoho_client_id/secret que vienen de os.getenv
-            payload = {
-                'refresh_token': refresh_token,
-                'client_id': self.zoho_client_id, 
-                'client_secret': self.zoho_client_secret,
-                'grant_type': 'refresh_token'
-            }
-            for retry in range(3):
-                try:
-                    resp = self.session.post(url, data=payload, timeout=(15, 90))
-                    resp.raise_for_status()  # Lanza HTTPError para 4xx/5xx
-                    new_token_data = resp.json()
-                    new_access_token = new_token_data.get('access_token')
-
-                    if not new_access_token:
-                        raise ValueError("La respuesta de Zoho no contiene 'access_token'")
-
-                    # 3. Actualización Atómica: Base de datos, archivo de fallback y estado de la clase
-                    logging.info("   [Auth] Token de Zoho refrescado exitosamente. Actualizando persistencia...")
-
-                    # 3.1. Actualizar Base de Datos (Fuente Primaria)
-                    with pyodbc.connect(self.conn_str) as conn:
-                        cursor = conn.cursor()
-                        cursor.execute("UPDATE Etl_Zoho_Auth SET access_token = ?, last_update = GETDATE() WHERE Id = 1", new_access_token)
-                        conn.commit()
-                    logging.info("   [Auth] Base de datos actualizada con el nuevo access_token.")
-
-                    # 3.2. Actualizar/Crear archivo JSON (Fuente Secundaria/Fallback, escritura opcional)
-                    token_path = os.path.join(os.getcwd(), 'zoho_tokens.json')
-                    try:
-                        # Se usa 'w' para crear el archivo si no existe o sobrescribirlo.
-                        # Esto resuelve el error de 'r+' en un archivo inexistente.
-                        json_content = {
-                            'refresh_token': refresh_token,
-                            'organization_id': self.zoho_org_id,
-                            'access_token': new_access_token
-                        }
-                        with open(token_path, 'w') as f:
-                            json.dump(json_content, f, indent=4)
-                        logging.info("   [Auth] Archivo de respaldo zoho_tokens.json actualizado/creado.")
-                    except (IOError, OSError) as e:
-                        # Comportamiento esperado en entornos de solo lectura (Azure).
-                        logging.warning(f"   [Auth] No se pudo escribir el archivo de respaldo zoho_tokens.json (opcional, no crítico): {e}")
-
-                    # 3.3. Actualizar estado de la instancia y retornar
-                    self.zoho_access_token = new_access_token
-                    return new_access_token
-
-                except (requests.exceptions.RequestException, ValueError, pyodbc.Error) as e:
-                    wait_time = (retry + 1) * 5
-                    logging.warning(f"   [Auth] Fallo al refrescar/guardar token de Zoho (intento {retry+1}/3): {e}. Reintentando en {wait_time}s...")
-                    if retry == 2:
-                        error_msg = f"No se pudo refrescar el token de Zoho después de 3 intentos: {e}"
-                        logging.error(error_msg)
-                        self.notificar_telegram(f"❌ ERROR CRÍTICO ZOHO AUTH: {error_msg}")
-                        raise Exception(error_msg)
-                    time.sleep(wait_time)
 
         def sync_orders(self):
             """Sincroniza pedidos de venta con estrategia Híbrida (Smart Sync) y Checkpoint Explícito."""
@@ -2516,536 +2256,12 @@ class GesvisionEtl:
 
             return total_processed
 
-        def sync_zoho_expenses(self):
-            """
-            Sincroniza los gastos desde Zoho Books de forma incremental o histórica,
-            manejando paginación y grandes volúmenes de datos de forma robusta.
-            """
-            if not self.zoho_access_token or not self.zoho_org_id:
-                logging.warning("   [Zoho Gastos] Token de acceso u Org ID de Zoho no disponibles. Saltando módulo.")
-                return 0
-            
-            total_processed = 0
-            buffer = []
-            BUFFER_SIZE = 200  # Batching: Optimizado a 200 para reducir latencia y evitar timeouts en ODBC
-            
-            with pyodbc.connect(self.conn_str) as conn:
-                # Lógica de Fecha (Incremental vs Histórica)
-                date_start_param = '2025-01-01'  # Default para carga histórica
-                cutoff_date = datetime.datetime(2025, 1, 1)
 
-                if self.LOAD_MODE_ZOHO_GASTOS == 'INCREMENTAL':
-                    try:
-                        last_date_dt = self.get_last_date(conn, "Zoho_Gastos", "fecha_gasto")
 
-                        # Regla de negocio: La fecha de inicio nunca debe ser anterior a 2025.
-                        if last_date_dt < cutoff_date:
-                            logging.info(f"   [Zoho Gastos] MAX de SQL es anterior a 2025. Forzando inicio a {cutoff_date.strftime('%Y-%m-%d')}")
-                            last_date_dt = cutoff_date
 
-                        date_start_param = last_date_dt.strftime('%Y-%m-%d')
-                        logging.info(f"   [Zoho Gastos] Modo INCREMENTAL. Buscando desde: {date_start_param}")
-                    except pyodbc.ProgrammingError:
-                        logging.warning(f"   [Zoho Gastos] Tabla Zoho_Gastos no existe. Usando fecha base: {date_start_param}")
-                else:  # HISTORICAL
-                    logging.info(f"   [Zoho Gastos] Modo HISTORICAL. Iniciando carga desde: {date_start_param}")
 
-                # Configuración de Parámetros
-                headers = {"Authorization": f"Zoho-oauthtoken {self.zoho_access_token}"}
-                base_url = "https://www.zohoapis.com/books/v3/expenses"
-                base_params = {
-                    'organization_id': self.zoho_org_id,
-                    'per_page': 200,
-                    'date_start': date_start_param,
-                    'sort_column': 'date',
-                    'sort_order': 'A'
-                }
 
-                page = 1
-                while True:
-                    params = base_params.copy()
-                    params['page'] = page
-                    
-                    try:
-                        resp = self.session.get(base_url, headers=headers, params=params, timeout=(15, 90))
-                    except Exception as e:
-                         logging.error(f"   [Zoho Gastos] Error de conexión en pág {page}: {e}")
-                         break
 
-                    # Manejo de Errores: Log detallado y raise si la API falla
-                    if resp.status_code != 200:
-                        logging.error(f"   [Zoho Gastos] Error API {resp.status_code}: {resp.text}")
-                        # No raise, break para intentar salvar lo que haya
-                        break
-                    
-                    data = resp.json()
-                    expenses = data.get('expenses', [])
-                    
-                    if not expenses:
-                        logging.info(f"   [Zoho Gastos] No se encontraron más gastos en la página {page}.")
-                        break
-                        
-                    logging.info(f"   [Zoho Gastos] Procesando página {page}, {len(expenses)} gastos encontrados.")
-                    
-                    # --- PROCESAMIENTO ROBUSTO Y LIMPIEZA ---
-                    clean_batch = []
-                    for exp in expenses:
-                        # Extracción segura del monto (Priorizando bcy_total por solicitud)
-                        raw_amount = exp.get('bcy_total') or exp.get('total') or exp.get('amount') or 0
-                        
-                        # Limpieza de tipos para evitar errores de pyodbc
-                        clean_obj = {
-                            'expense_id': str(exp.get('expense_id', '')),
-                            'date': str(exp.get('date', '')),
-                            'amount': float(raw_amount),
-                            'vendor_name': str(exp.get('vendor_name', '') or ''),
-                            'account_name': str(exp.get('account_name', '') or ''),
-                            'status': str(exp.get('status', '')),
-                            'description': str(exp.get('description', '') or ''),
-                            'last_modified_time': str(exp.get('last_modified_time', ''))
-                        }
-                        clean_batch.append(clean_obj)
-
-                    buffer.extend(clean_batch)
-                    
-                    # Manejo de Datos y Memoria (Batching Optimizado)
-                    if len(buffer) >= BUFFER_SIZE:
-                        logging.info(f"   [Zoho Gastos] Buffer lleno ({len(buffer)}). Guardando en BD...")
-                        logging.info(f"   [Zoho Debug] Ejemplo de gasto a guardar: {buffer[0]}")
-                        
-                        self._process_and_save(conn, buffer, "Zoho_Gastos", "id_gasto_zoho", self.MAP_ZOHO_GASTOS)
-                        total_processed += len(buffer)
-                        buffer = []
-
-                    # Paginación Robusta: Maneja page_context como dict o list
-                    has_more = data.get('page_context', {}).get('has_more_page') if isinstance(data.get('page_context'), dict) else data.get('page_context', [{}])[0].get('has_more_page', False)
-
-                    if not has_more:
-                        break
-                        
-                    page += 1
-                    time.sleep(0.5)  # API rate limiting
-
-                # Guardar el buffer residual
-                if buffer:
-                    logging.info(f"   [Zoho Gastos] Guardando buffer residual de {len(buffer)} registros.")
-                    logging.info(f"   [Zoho Debug] Ejemplo de gasto residual: {buffer[0]}")
-                    self._process_and_save(conn, buffer, "Zoho_Gastos", "id_gasto_zoho", self.MAP_ZOHO_GASTOS)
-                    total_processed += len(buffer)
-                        
-            return total_processed
-
-        def _refresh_ghl_token(self):
-            """Refresca el token de GoHighLevel usando la tabla Etl_GHL_Auth."""
-            logging.info("--- [INICIO] MÓDULO: GHL_AUTH ---")
-            self.notificar_telegram("🔑 GHL: Iniciando validación y renovación de tokens...")
-
-            if self.ghl_access_token:
-                return
-
-            logging.info("   [GHL Auth] Iniciando refresco de token...")
-            try:
-                with pyodbc.connect(self.conn_str) as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT client_id, client_secret, refresh_token, location_id FROM Etl_GHL_Auth WHERE app_name = 'Optilux_ETL'")
-                    row = cursor.fetchone()
-                    if not row:
-                        raise Exception("No se encontraron credenciales GHL en Etl_GHL_Auth")
-                    
-                    client_id, client_secret, refresh_token, location_id = row.client_id, row.client_secret, row.refresh_token, row.location_id
-                    self.ghl_location_id = location_id
-
-                    url = f"{self.ghl_base_url}/oauth/token"
-                    payload = {
-                        'client_id': client_id,
-                        'client_secret': client_secret,
-                        'grant_type': 'refresh_token',
-                        'refresh_token': refresh_token
-                    }
-                    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
-                    
-                    resp = self.session.post(url, data=payload, headers=headers, timeout=(15, 90))
-                    if resp.status_code != 200:
-                        raise Exception(f"Error GHL Token API: {resp.text}")
-                    
-                    data = resp.json()
-                    new_access = data.get('access_token')
-                    new_refresh = data.get('refresh_token')
-                    
-                    if not new_access or not new_refresh:
-                        raise Exception("Respuesta GHL inválida (faltan tokens)")
-
-                    cursor.execute("""
-                        UPDATE Etl_GHL_Auth 
-                        SET access_token = ?, refresh_token = ?, last_update = GETDATE() 
-                        WHERE app_name = 'Optilux_ETL'
-                    """, new_access, new_refresh)
-                    conn.commit() # Commit inmediato para persistencia atómica
-                    
-                    self.ghl_access_token = new_access
-                    logging.info("✅ GHL_AUTH: Tokens persistidos correctamente en SQL.")
-
-            except Exception as e:
-                self.notificar_telegram("❌ ERROR CRÍTICO GHL: Token de refresco inválido o expirado. Se requiere intervención manual.")
-                logging.error(f"   [GHL Auth] Error crítico: {e}")
-                raise
-
-        def sync_ghl_calendars(self):
-            """Sincroniza calendarios de GHL."""
-            if not self.ghl_access_token: self._refresh_ghl_token()
-            headers = {"Authorization": f"Bearer {self.ghl_access_token}", "Version": "2021-07-28", "Accept": "application/json"}
-            
-            url = f"{self.ghl_base_url}/calendars/"
-            params = {'locationId': self.ghl_location_id}
-            
-            try:
-                resp = self.session.get(url, headers=headers, params=params, timeout=(15, 90))
-                if resp.status_code == 200:
-                    data = resp.json()
-                    items = data.get('calendars', [])
-                    if items:
-                        with pyodbc.connect(self.conn_str) as conn:
-                            self._process_and_save(conn, items, "GHL_Calendarios", "id_calendario", self.MAP_GHL_CALENDARS)
-                        return len(items)
-                else:
-                    logging.warning(f"   [GHL Calendars] Error {resp.status_code}: {resp.text}")
-            except Exception as e:
-                logging.error(f"   [GHL Calendars] Excepción: {e}")
-            return 0
-
-        def _map_ghl_custom_fields(self, contact_item):
-            """Helper para aplanar Custom Fields por ID (Re-Ingeniería ETL)."""
-            cfs = contact_item.get('customFields', [])
-            mapped = {}
-            # Mapa de IDs estricto
-            field_map = {
-                'zfo5is9ScCBVJR7kuZUV': 'genero',
-                'g5wELa7M1kQVksTjL6Xl': 'profesion',
-                'VFm0aOTrAWbmUYNKAnuT': 'sucursal_nombre',
-                'MGIZC3QsJ0wG1hKuHVP2': 'doctor_asignado',
-                'VaXKU8PDTnN9Mb5LPPGL': 'estatus_paciente'
-            }
-            
-            for cf in cfs:
-                fid = cf.get('id')
-                if fid in field_map:
-                    val = cf.get('value')
-                    # Unir listas (checkboxes)
-                    if isinstance(val, list):
-                        val = ", ".join([str(v) for v in val])
-                    mapped[field_map[fid]] = val
-            return mapped
-
-        def sync_ghl_contacts(self, start_global=None, max_duration_mins=24):
-            """Sincroniza contactos de GHL (Adjusted: Incremental Stop on First Exists)."""
-            if not self.ghl_access_token: self._refresh_ghl_token()
-            headers = {"Authorization": f"Bearer {self.ghl_access_token}", "Version": "2021-07-28", "Accept": "application/json"}
-            
-            total_processed = 0
-            
-            # --- LEER CHECKPOINTS ---
-            start_after = self._get_checkpoint_ghl('GHL_Contacts_NextAfter')
-            start_after_id = self._get_checkpoint_ghl('GHL_Contacts_NextAfterId')
-            
-            # Tratamiento de '0' como None y Blindaje
-            if start_after in ['0', 0, 'None', None, ''] : start_after = None
-            if start_after_id in ['0', 0, 'None', None, '']: start_after_id = None
-            
-            if start_after: 
-                start_after = int(start_after) if str(start_after).isdigit() else None
-            
-            # --- AUTO-HEALING HIGH-WATER MARK (Escudo de Auto-Recuperación) ---
-            # Si no hay checkpoint y estamos en modo incremental, intentamos recuperar la última fecha de la BD.
-            if not start_after and (self.LOAD_MODE_GHL_CONTACTS == 'INCREMENTAL'):
-                try:
-                    with pyodbc.connect(self.conn_str) as conn:
-                        with conn.cursor() as cursor:
-                            # SELECT TOP 1 fecha_creacion_ghl FROM GHL_Contactos ORDER BY fecha_creacion_ghl DESC
-                            cursor.execute("SELECT TOP 1 fecha_creacion_ghl FROM GHL_Contactos ORDER BY fecha_creacion_ghl DESC")
-                            row = cursor.fetchone()
-                            if row and row[0]:
-                                last_date = row[0]
-                                # Convertir datetime a timestamp ms
-                                if isinstance(last_date, str):
-                                    last_date = pd.to_datetime(last_date).to_pydatetime()
-                                start_after = int(last_date.timestamp() * 1000)
-                                logging.info(f"   [Auto-Healing] Checkpoint recuperado de BD: {last_date} -> {start_after}")
-                except Exception as e:
-                    logging.warning(f"   [Auto-Healing] Fallo al recuperar High-Water Mark: {e}")
-
-            # --- LOGICA INCREMENTAL ---
-            # Si hay checkpoints guardados, asumimos modo RESUME o HISTORICAL en curso.
-            # Si NO hay checkpoints (start_after es None) y estamos en modo INCREMENTAL, activamos 'Stop on Exists'.
-            is_incremental_mode = (self.LOAD_MODE_GHL_CONTACTS == 'INCREMENTAL')
-            
-            with pyodbc.connect(self.conn_str) as conn:
-                logging.info(f"   [GHL Contacts] Inicio (Resume: {start_after}, Incr: {is_incremental_mode})...")
-                
-                while True:
-                    # 1. Safety Timer Check
-                    if start_global and (time.time() - start_global) / 60 > max_duration_mins:
-                        logging.warning(f"   [GHL Contacts] 🛑 TIEMPO EXCEDIDO. Guardando estado.")
-                        break
-
-                    url = f"{self.ghl_base_url}/contacts/"
-                    params = {'locationId': self.ghl_location_id, 'limit': 100}
-                    if start_after: params['startAfter'] = start_after
-                    if start_after_id: params['startAfterId'] = start_after_id
-                    
-                    try:
-                        resp = self.session.get(url, headers=headers, params=params, timeout=(15, 90))
-                        if resp.status_code != 200:
-                            logging.error(f"   [GHL Contacts] Error {resp.status_code}: {resp.text}")
-                            break
-                            
-                        data = resp.json()
-                        items = data.get('contacts', [])
-                        
-                        if not items: 
-                            # Si termina la lista, limpiamos checkpoints
-                            logging.info("   [GHL Contacts] Fin de lista. Limpiando checkpoints.")
-                            self._update_checkpoint_ghl('GHL_Contacts_NextAfter', '')
-                            self._update_checkpoint_ghl('GHL_Contacts_NextAfterId', '')
-                            break
-
-                        # 2. Incremental Stop Logic (Critical Optimization)
-                        # Si estamos en modo incremental y el PRIMER item del lote ya existe,
-                        # asumimos que todo lo anterior ya fue cargado (GHL ordena por updated/created desc por defecto? 
-                        # OJO: GHL contacts default sort id dateAdded desc. 
-                        # Si bajamos desde el más reciente (sin startAfter?), el cursor va hacia atrás? No, cursor va forward.
-                        # GHL v2 con searchAfter va en orden de creación/id ascendente usualmente.
-                        # Si el objetivo es 'solo lo nuevo', el cursor debe persistir.
-                        # PERO si se quiere 'parar si ya existe', implica que estamos escaneando y encontramos algo viejo.
-                        # Si GHL entrega Ascendente (Oldest first), 'Stop on exits' funciona si barremos desde el final?
-                        # ACTUALLY: El prompt pide: "si el primer registro del lote ya existe... haz un break".
-                        # Esto asume que estamos recibiendo registros que PODRIAN ya estar.
-                        if is_incremental_mode and items:
-                            first_id = items[0].get('id')
-                            if first_id:
-                                with conn.cursor() as cursor:
-                                    cursor.execute("SELECT COUNT(1) FROM GHL_Contactos WHERE id_contacto_ghl = ?", first_id)
-                                    if cursor.fetchone()[0] > 0:
-                                        logging.info(f"   [GHL Contacts] 🛑 Registro {first_id} ya existe. Deteniendo incremental.")
-                                        break
-
-                        # --- ENRIQUECIMIENTO ---
-                        for item in items:
-                            # Agrega esta línea para capturar el ID de la sucursal
-                            item['locationId'] = self.ghl_location_id  
-
-                            # --- NORMALIZACIÓN DE TELÉFONOS Y CORREOS (Regla 2) ---
-                            raw_phone = item.get('phone')
-                            if raw_phone and isinstance(raw_phone, str):
-                                item['phone'] = raw_phone.replace('+507', '').replace(' ', '').replace('-', '')
-                            
-                            raw_email = item.get('email')
-                            if raw_email and isinstance(raw_email, str):
-                                item['email'] = raw_email.strip().lower()
-                            
-                            # --- ESTÉTICA DE NOMBRES (Regla 3) ---
-                            raw_fn = item.get('firstName')
-                            if raw_fn and isinstance(raw_fn, str):
-                                item['firstName'] = raw_fn.strip().upper()
-                            
-                            raw_ln = item.get('lastName')
-                            if raw_ln and isinstance(raw_ln, str):
-                                item['lastName'] = raw_ln.strip().upper()
-
-                            # Flattening Root
-                            # Fields: city, state, country, type, dateOfBirth, dateUpdated are usually at root or location level
-                            # Verifica si vienen en root
-                            # ... (Standard mapping takes care if keys match MAP dict)
-                            
-                            # Flattening Attribution
-                            attrs = item.get('attributions', [])
-                            if attrs and isinstance(attrs, list):
-                                first = next((a for a in attrs if a.get('isFirst') is True), None)
-                                if first:
-                                    item['utm_source'] = first.get('utmSessionSource')
-                                    item['utm_medium'] = first.get('medium')
-                            
-                            # Flattening Tags
-                            tags = item.get('tags', [])
-                            if tags and isinstance(tags, list):
-                                item['tags_concatenados'] = ", ".join([str(t) for t in tags])
-                            else:
-                                item['tags_concatenados'] = None
-                            
-                            # Flattening Custom Fields
-                            cf_data = self._map_ghl_custom_fields(item)
-                            item.update(cf_data)
-                            
-                            # Clean Nulls
-                            for k, v in item.items():
-                                if v == "" or v is None: item[k] = None
-                        
-                        self._process_and_save(conn, items, "GHL_Contactos", "id_contacto_ghl", self.MAP_GHL_CONTACTS)
-                        total_processed += len(items)
-                        
-                        # --- CURSORS ---
-                        meta = data.get('meta', {})
-                        next_start_after = meta.get('startAfter')
-                        next_start_after_id = meta.get('startAfterId')
-                        
-                        if next_start_after and next_start_after_id:
-                            self._update_checkpoint_ghl('GHL_Contacts_NextAfter', str(next_start_after))
-                            self._update_checkpoint_ghl('GHL_Contacts_NextAfterId', next_start_after_id)
-                        
-                        logging.info(f"   -> [GHL Contacts] Lote +{len(items)}. Checkpoint guardado.")
-                        
-                        if not next_start_after or not next_start_after_id or len(items) < 100:
-                            break
-                        
-                        start_after = next_start_after
-                        start_after_id = next_start_after_id
-                        time.sleep(0.1)
-                    except Exception as e:
-                        logging.error(f"   [GHL Contacts] Excepción: {e}")
-                        break
-            return total_processed
-
-        def sync_ghl_opportunities(self, start_global=None, max_mins=24):
-            """Sincroniza oportunidades con lógica de checkpoints e incremental."""
-            if not self.ghl_access_token: self._refresh_ghl_token()
-            headers = {"Authorization": f"Bearer {self.ghl_access_token}", "Version": "2021-07-28", "Accept": "application/json"}
-            
-            start_after = self._get_checkpoint_ghl('GHL_Opps_NextAfter')
-            logging.info(f"   [GHL Opps] Checkpoint inicial: '{start_after}'") # LOG INYECTADO
-            if start_after in ['0', 0, 'None', None, '']: start_after = None
-            
-            total_processed = 0
-            with pyodbc.connect(self.conn_str) as conn:
-                while True:
-                    # Check de tiempo (Azure 24 min)
-                    if start_global and (time.time() - start_global) / 60 > max_mins:
-                        logging.warning("⚠️ [GHL Opps] Tiempo límite alcanzado. Guardando estado.")
-                        break
-
-                    url = f"{self.ghl_base_url}/opportunities/search"
-                    params = {'location_id': self.ghl_location_id, 'limit': 100}
-                    if start_after: params['startAfter'] = start_after
-                    
-                    logging.info(f"   [GHL Opps] Solicitando API con params: {params}") # LOG INYECTADO
-
-                    resp = self.session.get(url, headers=headers, params=params, timeout=60)
-                    if resp.status_code != 200: 
-                        logging.error(f"   [GHL Opps] Error API Status: {resp.status_code}") # LOG ERROR
-                        break
-                    
-                    data = resp.json()
-                    items = data.get('opportunities', [])
-                    logging.info(f"   [GHL Opps] Respuesta API: {resp.status_code} - Registros: {len(items)}") # LOG INYECTADO
-
-                    if not items: break
-
-                    # Lógica Stop on Exists
-                    if self.LOAD_MODE_GHL_OPPORTUNITIES == 'INCREMENTAL' and not start_after:
-                        with conn.cursor() as cursor:
-                            cursor.execute("SELECT COUNT(1) FROM GHL_Oportunidades WHERE id_oportunidad_ghl = ?", items[0].get('id'))
-                            if cursor.fetchone()[0] > 0:
-                                logging.info("✅ Oportunidades al día.")
-                                break
-
-                    # Transformar fechas ISO
-                    for item in items:
-                        for f in ['createdAt', 'updatedAt', 'lastStatusChangeAt', 'lastStageChangeAt']:
-                            if item.get(f) and pd.notnull(item[f]):
-                                try:
-                                    item[f] = pd.to_datetime(item[f], errors='coerce').strftime('%Y-%m-%d %H:%M:%S')
-                                except: item[f] = None
-
-                    logging.info("   [GHL Opps] Iniciando MERGE en SQL...") # LOG INYECTADO
-                    try: # TRY-EXCEPT ESPECIFICO
-                        self._process_and_save(conn, items, "GHL_Oportunidades", "id_oportunidad_ghl", self.MAP_GHL_OPPORTUNITIES)
-                        logging.info("   [GHL Opps] MERGE completado.") # LOG INYECTADO
-                    except Exception as e:
-                        logging.error(f"❌ ERROR DE SQL EN GHL_OPPORTUNITIES: {e}")
-                        break
-
-                    total_processed += len(items)
-                    
-                    # Logica de Loop Infinito Fix - VALIDACION ESTRICTA
-                    new_start_after = data.get('meta', {}).get('startAfter')
-                    
-                    if not new_start_after:
-                        self._update_checkpoint_ghl('GHL_Opps_NextAfter', '')
-                        logging.info("   [GHL Opps] Fin del ciclo (cursor vacío).")
-                        break
-                    
-                    # SI EL CURSOR ES IGUAL AL ANTERIOR, ROMPER
-                    if str(new_start_after) == str(start_after):
-                         logging.warning(f"   [GHL Opps] Cursor repetido {new_start_after}. Rompiendo bucle infinito.")
-                         break
-
-                    start_after = str(new_start_after)
-                    self._update_checkpoint_ghl('GHL_Opps_NextAfter', start_after)
-            return total_processed
-
-        def sync_ghl_appointments(self, start_global=None, max_mins=24):
-            """Sincroniza citas iterando sucursal por sucursal (Versión Optimizada + Incremental por Calendario)."""
-            if not self.ghl_access_token: self._refresh_ghl_token()
-            headers = {"Authorization": f"Bearer {self.ghl_access_token}", "Version": "2021-07-28", "Accept": "application/json"}
-            
-            total = 0
-            end_ms = int((datetime.datetime.now() + datetime.timedelta(days=90)).timestamp() * 1000)
-
-            with pyodbc.connect(self.conn_str) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT id_calendario, nombre_calendario FROM GHL_Calendarios")
-                calendars = cursor.fetchall()
-                logging.info(f"   [GHL Citas] Calendarios encontrados: {len(calendars)}")
-                
-                for cal_id, cal_name in calendars:
-                    if start_global and (time.time() - start_global) / 60 > max_mins:
-                        logging.warning(f"⚠️ [GHL Citas] Tiempo límite alcanzado antes de procesar {cal_name}")
-                        break
-
-                    # --- LÓGICA INCREMENTAL POR SUCRSAl (High Water Mark Granular) ---
-                    start_dt = datetime.datetime(2025, 1, 1) # Default
-                    try:
-                        if self.LOAD_MODE_GHL_CITAS == 'INCREMENTAL':
-                            cursor.execute("SELECT MAX(fecha_creacion) FROM GHL_Citas WHERE id_calendario = ?", cal_id)
-                            row = cursor.fetchone()
-                            last_date = row[0] if row else None
-                            
-                            if last_date and isinstance(last_date, datetime.datetime) and last_date > start_dt:
-                                start_dt = last_date - datetime.timedelta(hours=2) # Safety Margin 2h
-                                logging.info(f"   [GHL Citas] {cal_name}: Buscando desde {start_dt}")
-                            else:
-                                logging.info(f"   [GHL Citas] {cal_name}: Carga completa/inicial (2025).")
-                    except Exception as e:
-                        logging.warning(f"   [GHL Citas] ⚠️ Error calculando fecha incremental para {cal_name}: {e}")
-
-                    start_ms = int(start_dt.timestamp() * 1000)
-                    
-                    logging.info(f"   [GHL Citas] --> Procesando sucursal: {cal_name}")
-                    url = f"{self.ghl_base_url}/calendars/events"
-                    params = {'locationId': self.ghl_location_id, 'calendarId': cal_id, 'startTime': start_ms, 'endTime': end_ms}
-                    
-                    try:
-                        resp = self.session.get(url, headers=headers, params=params, timeout=60)
-                        if resp.status_code == 200:
-                            events = resp.json().get('events', [])
-                            logging.info(f"   [GHL Citas] API respondió con {len(events)} eventos.")
-                            
-                            if events:
-                                for ev in events:
-                                    for f in ['startTime', 'endTime', 'dateAdded']:
-                                        if ev.get(f) and pd.notnull(ev[f]):
-                                            try:
-                                                ev[f] = pd.to_datetime(ev[f], errors='coerce').strftime('%Y-%m-%d %H:%M:%S')
-                                            except: ev[f] = None
-                                
-                                logging.info(f"   [GHL Citas] Iniciando MERGE en SQL para {cal_name}...")
-                                t_start_sql = time.time()
-                                self._process_and_save(conn, events, "GHL_Citas", "id_cita_ghl", self.MAP_GHL_CITAS)
-                                logging.info(f"   [GHL Citas] MERGE completado en {time.time() - t_start_sql:.2f} segundos")
-                                total += len(events)
-                        else:
-                            logging.error(f"   [GHL Citas] Error API en {cal_name}: {resp.status_code}")
-                    except Exception as e:
-                        logging.error(f"Error procesando calendario {cal_name}: {e}")
-            return total
         def fetch_chronological(self, conn, endpoint, table_name, pk_cols, start_date, end_date, window_minutes, rename_map):
             """Barrido de ventanas temporales para exámenes clínicos."""
             if not self.token: self.get_token()
