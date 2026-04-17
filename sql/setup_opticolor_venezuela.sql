@@ -347,20 +347,101 @@ CREATE TABLE [dbo].[Param_Venezuela_Geografia](
 ) ON [PRIMARY]
 GO
 
--- Insertar datos de geografía de Venezuela
+-- Insertar datos de geografía de Venezuela (24 estados + municipios principales)
 INSERT INTO [dbo].[Param_Venezuela_Geografia]
 ([estado], [municipio], [ciudad_principal], [latitud], [longitud])
 VALUES
+-- Distrito Capital
 ('Distrito Capital', 'Libertador', 'Caracas', 10.4806, -66.9036),
+
+-- Estado Amazonas
+('Amazonas', 'Atabapo', 'San Fernando de Atabapo', 3.8667, -67.5833),
+('Amazonas', 'Autana', 'Autana', 4.1500, -67.7833),
+('Amazonas', 'Maroa', 'Puerto Ayacucho', 5.6597, -67.6103),
+
+-- Estado Anzoátegui
+('Anzoátegui', 'Barcelona', 'Barcelona', 10.1274, -64.6801),
+('Anzoátegui', 'Puerto La Cruz', 'Puerto La Cruz', 10.2062, -64.6278),
+('Anzoátegui', 'Cantaura', 'Cantaura', 10.2806, -64.4139),
+
+-- Estado Apure
+('Apure', 'San Fernando de Apure', 'San Fernando de Apure', 7.8833, -67.4833),
+('Apure', 'Guasdualito', 'Guasdualito', 6.9833, -70.8667),
+
+-- Estado Aragua
+('Aragua', 'Maracay', 'Maracay', 10.2343, -67.5917),
+('Aragua', 'La Victoria', 'La Victoria', 10.2439, -67.3275),
+('Aragua', 'Cagua', 'Cagua', 10.3333, -67.6333),
+
+-- Estado Barinas
+('Barinas', 'Barinas', 'Barinas', 8.7667, -70.3333),
+('Barinas', 'Puerto la Cruz', 'Barinitas', 9.0667, -70.3333),
+
+-- Estado Bolívar
+('Bolívar', 'Ciudad Bolívar', 'Ciudad Bolívar', 8.1439, -63.5450),
+('Bolívar', 'Puerto Ordaz', 'Puerto Ordaz', 8.3686, -62.2508),
+('Bolívar', 'Tumeremo', 'Tumeremo', 7.3333, -61.2333),
+
+-- Estado Carabobo
+('Carabobo', 'Valencia', 'Valencia', 10.1926, -68.0065),
+('Carabobo', 'San Diego', 'San Diego', 10.3186, -68.0967),
+('Carabobo', 'Bárbula', 'Bárbula', 10.2167, -68.0500),
+
+-- Estado Cojedes
+('Cojedes', 'San Carlos', 'San Carlos', 10.4500, -68.5667),
+
+-- Estado Falcón
+('Falcón', 'Coro', 'Coro', 11.4081, -69.6761),
+('Falcón', 'Punto Fijo', 'Punto Fijo', 11.7842, -70.2031),
+
+-- Estado Guárico
+('Guárico', 'San Juan de los Morros', 'San Juan de los Morros', 9.9103, -67.3519),
+('Guárico', 'Calabozo', 'Calabozo', 8.9856, -67.4317),
+
+-- Estado Lara
+('Lara', 'Barquisimeto', 'Barquisimeto', 10.0664, -69.3227),
+('Lara', 'Quibor', 'Quibor', 10.1333, -69.5333),
+
+-- Estado Mérida
+('Mérida', 'Mérida', 'Mérida', 8.5890, -71.1560),
+('Mérida', 'Ejido', 'Ejido', 8.6333, -71.2500),
+
+-- Estado Miranda
 ('Miranda', 'Chacao', 'Chacao', 10.4909, -66.8427),
 ('Miranda', 'Baruta', 'Baruta', 10.3850, -66.8294),
-('Carabobo', 'Valencia', 'Valencia', 10.1926, -68.0065),
-('Aragua', 'Maracay', 'Maracay', 10.2343, -67.5917),
-('Zulia', 'Maracaibo', 'Maracaibo', 10.6561, -71.6122),
-('Lara', 'Barquisimeto', 'Barquisimeto', 10.0664, -69.3227),
+('Miranda', 'El Hatillo', 'El Hatillo', 10.3333, -66.7667),
+('Miranda', 'Cúa', 'Cúa', 10.4417, -66.3208),
+
+-- Estado Monagas
+('Monagas', 'Maturín', 'Maturín', 9.7500, -63.1833),
+('Monagas', 'Carúpano', 'Carúpano', 10.2833, -62.5000),
+
+-- Estado Nueva Esparta
+('Nueva Esparta', 'Porlamar', 'Porlamar', 10.9501, -63.8797),
+('Nueva Esparta', 'Juangriego', 'Juangriego', 11.0233, -63.9347),
+
+-- Estado Sucre
+('Sucre', 'Cumaná', 'Cumaná', 10.4556, -64.1736),
+('Sucre', 'Margarita', 'Pampatar', 10.9667, -63.8667),
+
+-- Estado Táchira
 ('Táchira', 'San Cristóbal', 'San Cristóbal', 7.7692, -72.2254),
-('Mérida', 'Mérida', 'Mérida', 8.5890, -71.1560),
-('Anzoátegui', 'Barcelona', 'Barcelona', 10.1274, -64.6801);
+('Táchira', 'San Antonio del Táchira', 'San Antonio del Táchira', 7.8197, -72.4256),
+
+-- Estado Trujillo
+('Trujillo', 'Trujillo', 'Trujillo', 9.3667, -70.4333),
+
+-- Estado Vargas
+('Vargas', 'La Guaira', 'La Guaira', 10.6056, -66.9400),
+('Vargas', 'Caraballeda', 'Caraballeda', 10.6122, -66.9500),
+
+-- Estado Yaracuy
+('Yaracuy', 'San Felipe', 'San Felipe', 10.3500, -68.7667),
+
+-- Estado Zulia
+('Zulia', 'Maracaibo', 'Maracaibo', 10.6561, -71.6122),
+('Zulia', 'Cabimas', 'Cabimas', 10.3831, -71.4436),
+('Zulia', 'Ciudad Ojeda', 'Ciudad Ojeda', 10.2003, -71.3806);
 GO
 
 -- ===============================================
