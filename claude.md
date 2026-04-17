@@ -8,8 +8,10 @@
 | Contactos | Eduardo Martínez, Reinaldo José Rangel |
 | Proveedor | VisioFlow — Gerardo Argueta |
 | Período | 14 abril 2026 — 26 mayo 2026 (6 semanas) |
-| Estado | Semana 1-2: Contexto + Seguridad completado ✅ |
+| Estado | Semana 1-2: Contexto + Seguridad completado ✅ → Semana 2: Portal + Vistas + ETL |
+| Tracker | https://spiky-troodon-8c7.notion.site/Ecosistema-de-Inteligencia-de-Datos-OPTICOLOR-34160202e30080dea80dc9cd5965b150 |
 | Repositorio | https://github.com/visioflowtech/opticolor-bi |
+| Informe Ejecutivo | INFORME_EJECUTIVO_SEMANA1.md (avance semanal) |
 
 ---
 
@@ -150,22 +152,45 @@
 
 ---
 
+## 🚨 Datos Pendientes de Opticolor (BLOQUEADORES SEMANA 2)
+
+Solicitados en mensaje WhatsApp del 17 abril — **Requerido HAYA para continuar sin bloqueos:**
+
+| # | Dato | Status | Uso |
+|---|------|--------|-----|
+| 1 | **Lista usuarios operacionales** (nombre, email, sucursal) | ⏳ | Crear ADMIN, SUPERVISOR, CONSULTOR en SQL |
+| 2 | **Estructura zonas/regiones geográficas** | ⏳ | Asignar usuarios → sucursales (RLS) |
+| 3 | **Sucursales activas** (nombre, ciudad, estado) | ⏳ | Maestro_Sucursales, filtros Portal |
+| 4 | **Logo PNG** (fondo transparente) | ⏳ | Portal Next.js + Power BI branding |
+| 5 | **Paleta colores / manual marca** | ⏳ | Tailwind CSS variables, diseño Portal |
+| 6 | **Credenciales Gesvision API** (usuario/pass) | ⏳ | Testing ETL, validación endpoints |
+| 7 | **Catálogos maestros** (Marcas, Productos, Categorías) | ⏳ | Insert inicial Maestro_* tablas |
+| 8 | **Feedback vistas BI adaptadas** | ⏳ | Refinar Dim_*/Fact_* para KPIs |
+
+**Alternativa branding (si Opticolor no provee):**
+- Copiar estilo visual de https://www.opticolor.com.ve/
+- Usar colores estándar óptica (azul corporativo, blanco, gris)
+
+---
+
 ## Instrucciones Críticas
 
 ✅ SIEMPRE:
-- Leer PROYECTO OPTICOLOR.pdf + HOJA DE RUTA antes de empezar
+- Leer PROYECTO OPTICOLOR.pdf + HOJA DE RUTA + INFORME_EJECUTIVO_SEMANA1.md antes de empezar
 - Consultar Optilux schema para vistas referencia
 - Mantener nomenclatura SQL (Maestro_*, Seguridad_*, etc.)
 - Agregar auditoría (fecha_carga_etl, usuario_creacion)
+- **Revisar tabla de datos pendientes antes de Semana 2**
 
 ❌ NUNCA:
 - Inventar URLs
 - Modificar SQL sin revisar Optilux referencia
 - Commitear .env, passwords, secretos
 - Cambiar nomenclatura sin actualizar vistas
+- Crear usuarios sin confirmación Opticolor
 
 ---
 
-**Última actualización:** 17 de abril de 2026  
-**Versión:** 1.1  
-**Estado:** Listo para Compilar SQL + Semana 2
+**Última actualización:** 17 de abril de 2026 (WhatsApp Opticolor)  
+**Versión:** 1.2  
+**Estado:** Semana 1 Completa — Semana 2 Esperando Datos Opticolor
