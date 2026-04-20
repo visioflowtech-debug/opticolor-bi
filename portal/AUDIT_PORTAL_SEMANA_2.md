@@ -2,6 +2,13 @@
 **Fecha:** 19 de abril de 2026  
 **Auditores:** Portal Next.js Expert, Security Expert, QA Expert  
 **Objetivo:** Evaluar si el Portal está listo como base para construcción Semana 2.2
+**Fuente de Verdad Base:** https://github.com/arhamkhnz/next-shadcn-admin-dashboard (admin template reference)
+
+---
+
+## ⭐ NOTA ARQUITECTÓNICA
+
+Este Portal se basa en la arquitectura del admin template de arhamkhnz como referencia. Las customizaciones específicas a Opticolor (NextAuth contra BD, RLS, RBAC, 5 dashboards) son implementación propia en `opticolor-bi/portal/`.
 
 ---
 
