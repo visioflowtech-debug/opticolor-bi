@@ -1,56 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../config/auth';
-import { InventarioRow, ApiResponse } from '../../lib/types';
+import { auth } from '../../../config/auth';
+import { InventarioRow, ApiResponse } from '../../../lib/types';
 
 const mockData: InventarioRow[] = [
   {
-    fecha: '2026-04-01',
-    stock_total: 15420,
-    rotacion_dias: 28,
-    obsoletos: 145,
-    faltantes: 23,
+    nombre_producto: 'Lentes Luxury Pro',
+    stock_actual: 450,
+    stock_minimo: 100,
+    rotacion_dias: 12,
+    capital_invertido: 45000,
   },
   {
-    fecha: '2026-04-02',
-    stock_total: 15280,
-    rotacion_dias: 27,
-    obsoletos: 152,
-    faltantes: 19,
+    nombre_producto: 'Lentes Intermedias Standard',
+    stock_actual: 320,
+    stock_minimo: 80,
+    rotacion_dias: 15,
+    capital_invertido: 25600,
   },
   {
-    fecha: '2026-04-03',
-    stock_total: 15350,
-    rotacion_dias: 28,
-    obsoletos: 148,
-    faltantes: 21,
+    nombre_producto: 'Lentes Be Diferent Colors',
+    stock_actual: 280,
+    stock_minimo: 60,
+    rotacion_dias: 18,
+    capital_invertido: 19600,
   },
   {
-    fecha: '2026-04-04',
-    stock_total: 15180,
-    rotacion_dias: 26,
-    obsoletos: 155,
-    faltantes: 18,
+    nombre_producto: 'Lentes Contacto Soft',
+    stock_actual: 1200,
+    stock_minimo: 300,
+    rotacion_dias: 8,
+    capital_invertido: 36000,
   },
   {
-    fecha: '2026-04-05',
-    stock_total: 15420,
-    rotacion_dias: 27,
-    obsoletos: 150,
-    faltantes: 20,
-  },
-  {
-    fecha: '2026-04-06',
-    stock_total: 15550,
-    rotacion_dias: 28,
-    obsoletos: 145,
-    faltantes: 22,
-  },
-  {
-    fecha: '2026-04-07',
-    stock_total: 15680,
-    rotacion_dias: 29,
-    obsoletos: 140,
-    faltantes: 24,
+    nombre_producto: 'Monturas Luxury',
+    stock_actual: 180,
+    stock_minimo: 40,
+    rotacion_dias: 22,
+    capital_invertido: 28000,
   },
 ];
 

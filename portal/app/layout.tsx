@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { SessionProvider } from "next-auth/react";
+import SessionWrapper from './components/SessionWrapper';
 
 export const metadata: Metadata = {
   title: "Opticolor BI - Portal de Inteligencia de Datos",
@@ -18,9 +18,9 @@ export default function RootLayout({
   return (
     <html lang="es" className="h-full antialiased">
       <body className="min-h-full flex flex-col bg-gray-50">
-        <SessionProvider>
+        <SessionWrapper>
           {children}
-        </SessionProvider>
+        </SessionWrapper>
       </body>
     </html>
   );

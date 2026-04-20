@@ -8,7 +8,7 @@
 | Contactos | Eduardo Martínez, Reinaldo José Rangel |
 | Proveedor | VisioFlow — Gerardo Argueta |
 | Período | 14 abril 2026 — 26 mayo 2026 (6 semanas) |
-| Estado | Semana 1-2: Contexto + Seguridad completado ✅ → Semana 2: Portal + Vistas + ETL |
+| Estado | Semana 2: Portal (estructura ✅) → Deploy Vercel (hoy) → Vistas + ETL |
 | Tracker | https://spiky-troodon-8c7.notion.site/Ecosistema-de-Inteligencia-de-Datos-OPTICOLOR-34160202e30080dea80dc9cd5965b150 |
 | Repositorio | https://github.com/visioflowtech/opticolor-bi |
 | Informe Ejecutivo | INFORME_EJECUTIVO_SEMANA1.md (avance semanal) |
@@ -23,7 +23,7 @@
 | 2 | Python + Azure | ETL (18 módulos, 8x/día) |
 | 3 | Azure SQL | Data warehouse (31 tablas: 23 base + 8 seguridad) |
 | 4A | Power BI | 5 informes (2 usuarios licencia) |
-| 4B | Next.js 14 | Portal sin licencia (5+ usuarios) |
+| 4B | Next.js 16 | Portal sin licencia (5+ usuarios) — Vercel |
 
 ---
 
@@ -132,6 +132,33 @@
 
 ---
 
+## Portal: Estructura Semana 2 ✅
+
+**Next.js 16.2.4 (App Router)** — Deployado en Vercel
+
+### Cambios recientes (20 abril):
+- ✅ Importes relativos corregidos (`../../../config/auth`, `../../../lib/types`)
+- ✅ SessionProvider moved to client component (`components/SessionWrapper.tsx`)
+- ✅ Mock data types fixed (ResumenComercialRow, EficienciaOrdenesRow, etc.)
+- ✅ 5 Dashboard pages + API routes compilando sin errores
+- ✅ Build exitoso (next build)
+- ⚠️ Dev mode (Turbopack) tiene issues → usando Vercel para testing visual
+
+**Estructura directorios:**
+```
+portal/
+  app/
+    api/auth/[...nextauth]/route.ts
+    api/data/{resumen-comercial, eficiencia-ordenes, control-cartera, desempenio-clinico, inventario}/route.ts
+    auth/login/page.tsx
+    dashboard/
+      page.tsx
+      {eficiencia-ordenes, control-cartera, desempenio-clinico, inventario}/page.tsx
+    components/{navbar, sidebar, dashboard, SessionWrapper}.tsx
+    config/auth.ts (mock NextAuth)
+    lib/types.ts (TypeScript interfaces)
+```
+
 ## Agentes Especializados (`.claude/agents/`)
 
 - `sql-datamodel.md` → DDL, vistas, nomenclatura, RLS
@@ -141,7 +168,7 @@
 - `powerbi.md` → DAX, KPIs, segmentos
 - `qa.md` → Testing, criterios aceptación
 - `optica-negocio.md` → Glosario, reglas negocio
-- `azure-cloud.md` → Infrastructure, CI/CD
+- `azure-cloud.md` → Infrastructure, CI/CD, Vercel
 
 ---
 
@@ -191,6 +218,19 @@ Solicitados en mensaje WhatsApp del 17 abril — **Requerido HAYA para continuar
 
 ---
 
-**Última actualización:** 17 de abril de 2026 (WhatsApp Opticolor)  
-**Versión:** 1.2  
-**Estado:** Semana 1 Completa — Semana 2 Esperando Datos Opticolor
+**Última actualización:** 20 de abril de 2026 (Portal fixes + Vercel deploy)  
+**Versión:** 1.3  
+**Estado:** Semana 2 — Portal en Vercel (testing) — Esperando datos Opticolor para Semana 2.2
+
+---
+
+## Documentación Organizada
+
+Todos los .md iterativos están en `/docs/`:
+- INFORME_EJECUTIVO_SEMANA1.md
+- RESUMEN_CONTEXTO_ACTUALIZADO.md
+- CHECKLIST_SEMANA2.md
+- SOLICITUD_DATOS_OPTICOLOR.md
+- Y otros de sesiones anteriores
+
+Mantener raíz limpia: solo README.md + claude.md

@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs kill *)",
+      "Bash(PORT=3001 npm run dev)",
+      "Bash(netstat -ano)",
+      "Bash(pkill -9 node)",
+      "Bash(killall -9 node)",
+      "Bash(curl -s http://localhost:3000/auth/login)",
+      "Bash(curl -I http://localhost:3000)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Read(//c/opticolor-bi/portal/**)",
+      "Bash(curl -I http://localhost:3005)",
+      "Bash(npm start *)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs -r kill -9)",
+      "Bash(PORT=8000 npm start)",
+      "Bash(curl -s http://localhost:8000)"
+    ],
+    "additionalDirectories": [
+      "\\tmp",
+      "c:\\c\\opticolor-bi\\portal"
+    ]
+  }
+}

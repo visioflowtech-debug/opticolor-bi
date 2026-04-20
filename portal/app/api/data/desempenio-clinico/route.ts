@@ -1,56 +1,56 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '../../config/auth';
-import { DesempenioClinicoRow, ApiResponse } from '../../lib/types';
+import { auth } from '../../../config/auth';
+import { DesempenioClinicoRow, ApiResponse } from '../../../lib/types';
 
 const mockData: DesempenioClinicoRow[] = [
   {
     fecha: '2026-04-01',
-    examenes_realizados: 125,
-    venta_realizadas: 98,
+    total_examenes: 125,
+    pacientes_con_compra: 98,
     tasa_conversion: 78.4,
-    productividad_examinador: 8.9,
+    venta_promedio_paciente: 8.9,
   },
   {
     fecha: '2026-04-02',
-    examenes_realizados: 142,
-    venta_realizadas: 115,
+    total_examenes: 142,
+    pacientes_con_compra: 115,
     tasa_conversion: 81.0,
-    productividad_examinador: 9.5,
+    venta_promedio_paciente: 9.5,
   },
   {
     fecha: '2026-04-03',
-    examenes_realizados: 138,
-    venta_realizadas: 107,
+    total_examenes: 138,
+    pacientes_con_compra: 107,
     tasa_conversion: 77.5,
-    productividad_examinador: 9.1,
+    venta_promedio_paciente: 9.1,
   },
   {
     fecha: '2026-04-04',
-    examenes_realizados: 155,
-    venta_realizadas: 128,
+    total_examenes: 155,
+    pacientes_con_compra: 128,
     tasa_conversion: 82.6,
-    productividad_examinador: 9.8,
+    venta_promedio_paciente: 9.8,
   },
   {
     fecha: '2026-04-05',
-    examenes_realizados: 168,
-    venta_realizadas: 142,
+    total_examenes: 168,
+    pacientes_con_compra: 142,
     tasa_conversion: 84.5,
-    productividad_examinador: 10.2,
+    venta_promedio_paciente: 10.2,
   },
   {
     fecha: '2026-04-06',
-    examenes_realizados: 145,
-    venta_realizadas: 119,
+    total_examenes: 145,
+    pacientes_con_compra: 119,
     tasa_conversion: 82.1,
-    productividad_examinador: 9.6,
+    venta_promedio_paciente: 9.6,
   },
   {
     fecha: '2026-04-07',
-    examenes_realizados: 175,
-    venta_realizadas: 151,
+    total_examenes: 175,
+    pacientes_con_compra: 151,
     tasa_conversion: 86.3,
-    productividad_examinador: 10.5,
+    venta_promedio_paciente: 10.5,
   },
 ];
 
@@ -69,10 +69,10 @@ export async function GET(request: NextRequest): Promise<NextResponse<ApiRespons
     // const data = await query<DesempenioClinicoRow>(`
     //   SELECT
     //     CAST(DATEADD(HOUR, -5, fecha_utc) AS DATE) AS fecha,
-    //     COUNT(DISTINCT id_examen) AS examenes_realizados,
-    //     COUNT(DISTINCT CASE WHEN venta_realizada = 1 THEN id_examen END) AS venta_realizadas,
+    //     COUNT(DISTINCT id_examen) AS total_examenes,
+    //     COUNT(DISTINCT CASE WHEN venta_realizada = 1 THEN id_examen END) AS pacientes_con_compra,
     //     CAST(COUNT(DISTINCT CASE WHEN venta_realizada = 1 THEN id_examen END) * 100.0 / COUNT(DISTINCT id_examen) AS DECIMAL(5,2)) AS tasa_conversion,
-    //     CAST(COUNT(DISTINCT id_venta) * 1.0 / COUNT(DISTINCT id_examinador) AS DECIMAL(5,2)) AS productividad_examinador
+    //     CAST(COUNT(DISTINCT id_venta) * 1.0 / COUNT(DISTINCT id_examinador) AS DECIMAL(5,2)) AS venta_promedio_paciente
     //   FROM [dbo].[Fact_Clinica]
     //   WHERE id_sucursal IN (SELECT id_sucursal FROM [dbo].[Vw_RLS_Sucursales] WHERE email = @email)
     //   GROUP BY CAST(DATEADD(HOUR, -5, fecha_utc) AS DATE)
