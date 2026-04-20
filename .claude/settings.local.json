@@ -15,7 +15,11 @@
       "Bash(awk '{print $2}')",
       "Bash(xargs -r kill -9)",
       "Bash(PORT=8000 npm start)",
-      "Bash(curl -s http://localhost:8000)"
+      "Bash(curl -s http://localhost:8000)",
+      "WebFetch(domain:github.com)",
+      "Bash(xargs grep *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(gh api *)"
     ],
     "additionalDirectories": [
       "\\tmp",
