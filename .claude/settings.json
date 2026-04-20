@@ -15,7 +15,8 @@
       "Bash(npx -y degit@2.8.4 arhamkhnz/next-shadcn-admin-dashboard /tmp/portal-template)",
       "Bash(cp -r src package.json tsconfig.json components.json biome.json next.config.mjs postcss.config.mjs /tmp/)",
       "Bash(ls -lh /tmp/package.json /tmp/tsconfig.json)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(gh deployment *)"
     ]
   }
 }
