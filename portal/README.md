@@ -1,9 +1,10 @@
 # 🎨 Opticolor BI Portal — Next.js Dashboard
 
-**Estado:** Semana 2 — Portal funcional con mock data, listo para conectar datos reales  
+**Estado:** Semana 2 — ✅ Deployado en Vercel  
 **Cliente:** OPTI-COLOR #2, C.A. — Venezuela  
-**Stack:** Next.js 16 + TypeScript + NextAuth.js v5 + Azure SQL + Tailwind + shadcn/ui + Recharts
+**Stack:** Next.js 16 + TypeScript + NextAuth.js v5 + Tailwind + shadcn/ui + Recharts
 **Fuente de Verdad Base:** https://github.com/arhamkhnz/next-shadcn-admin-dashboard (admin template reference)
+**Deploy:** https://opticolor-bi.vercel.app (Vercel — testing visual)
 
 ---
 
@@ -60,12 +61,33 @@ JWT con roles + sucursales asignadas
 
 ---
 
+## 🌐 Deploy en Vercel
+
+**Configuración:**
+- Monorepo detectado via `vercel.json`
+- Build: `npm run build` 
+- Output: `.next`
+- Output dir: `portal`
+
+**Testing:**
+```bash
+# Vercel auto-deploya en cada push a main
+# URL: https://opticolor-bi.vercel.app
+# Redirige a /dashboard (mock session)
+```
+
+---
+
 ## 🚀 Próximos Pasos (Semana 2.2)
 
-1. Cargar usuarios reales en BD
-2. Conectar APIs a SQL real
+1. Cargar usuarios reales en BD (datos Opticolor)
+2. Conectar APIs a SQL real en Azure
 3. Crear vistas SQL (copiar Panamá)
 4. Testing por rol y RLS
-5. Deploy a Azure Container Apps
+5. Migrar a Azure Container Apps (producción)
 
-Ver README.md completo para más detalles.
+---
+
+## 📝 Contexto Completo
+
+Ver `/docs/` en raíz para documentación iterativa y `/claude.md` para arquitectura del ecosistema completo.
