@@ -1,0 +1,102 @@
+╔════════════════════════════════════════════════════════════════════════════════╗
+║                    🚀 TESTING RÁPIDO DEL PORTAL (5 MIN)                       ║
+║                          Opticolor BI — Semana 2                              ║
+╚════════════════════════════════════════════════════════════════════════════════╝
+
+PASO 1: Abrir Terminal PowerShell/CMD
+  └─ cd c:\opticolor-bi\portal
+
+PASO 2: Instalar & Ejecutar (30 segundos)
+  └─ npm install
+  └─ npm run dev
+
+  Esperar output:
+  ✓ Ready in 2.5s
+  - Local: http://localhost:3000
+
+PASO 3: Abrir Chrome (Ctrl+Click para new tab)
+  └─ http://localhost:3000
+
+════════════════════════════════════════════════════════════════════════════════
+
+QUÉ VERÁS:
+
+1. LOGIN PAGE (azul corporativo #1A3A6B)
+   ├─ Logo azul con icono
+   ├─ Campos: Email + Password
+   ├─ Botón "INICIAR SESIÓN"
+   └─ Text: "Credenciales testing"
+
+2. DASHBOARD (Resumen Comercial)
+   ├─ Navbar: Logo + Usuario + SALIR
+   ├─ Sidebar: 5 links (📊⚙️💰🏥📦)
+   ├─ Content:
+   │  ├─ Título + descripción
+   │  ├─ 5 KPI cards (números grandes: venta, cobrado, ticket, run rate, OTIF)
+   │  └─ Gráfico LineChart (3 líneas, 7 días, tooltip interactivo)
+   └─ Responsive (se adapta a mobile)
+
+════════════════════════════════════════════════════════════════════════════════
+
+TESTING RÁPIDO (3 MIN):
+
+✓ LOGIN:
+  • Email: cualquier@email.com
+  • Password: cualquier123
+  • Click "INICIAR SESIÓN"
+  • Resultado: Redirige a /dashboard ✅
+
+✓ NAVEGACIÓN:
+  • Click "⚙️ Eficiencia de Órdenes" → /dashboard/eficiencia-ordenes
+  • Click "💰 Control de Cartera" → /dashboard/control-cartera
+  • Click "📊 Resumen Comercial" → /dashboard
+  • Resultado: URLs cambian, Sidebar destaca activo ✅
+
+✓ GRÁFICO:
+  • Hover en líneas del gráfico
+  • Resultado: Tooltip muestra valores ✅
+  • Verifica: 3 líneas visibles (Venta, Cobrado, OTIF)
+
+✓ RESPONSIVO:
+  • Presiona F12 (DevTools)
+  • Toggle device (Ctrl+Shift+M o icono)
+  • Prueba: 1920x1080 → 768x1024 → 375x667
+  • Resultado: Se adapta, sigue siendo legible ✅
+
+✓ LOGOUT:
+  • Navbar top-right, click "SALIR"
+  • Resultado: Redirige a /auth/login ✅
+
+════════════════════════════════════════════════════════════════════════════════
+
+VERIFICACIÓN FINAL (30 SEG):
+
+□ Login page visible (azul)
+□ Puedo logearme (cualquier creds)
+□ Dashboard carga (veo gráfico + KPIs)
+□ Sidebar navigation funciona (5 links = 5 páginas)
+□ Responsive (mobile se adapta)
+□ Paleta Opticolor visible (#1A3A6B azul)
+□ No hay errores (F12 > Console limpia)
+
+════════════════════════════════════════════════════════════════════════════════
+
+DOCUMENTACIÓN:
+
+Guía completa: c:/opticolor-bi/TESTING_PORTAL_VISUAL.md
+Instrucciones: c:/opticolor-bi/portal/COMO_PROBAR_LOCALMENTE.md
+Resumen:       c:/opticolor-bi/RESUMEN_PORTAL_SEMANA_2_FINAL.md
+
+════════════════════════════════════════════════════════════════════════════════
+
+FUENTE DE VERDAD:
+
+Base Arquitectónica: github.com/arhamkhnz/next-shadcn-admin-dashboard
+(NO CLONAR, solo referencia — cambios en opticolor-bi/portal/)
+
+════════════════════════════════════════════════════════════════════════════════
+
+Si todo OK ✅ → Portal está listo para Semana 2.2
+Si hay errores ❌ → Ver troubleshooting en TESTING_PORTAL_VISUAL.md
+
+Happy Testing! 🚀
