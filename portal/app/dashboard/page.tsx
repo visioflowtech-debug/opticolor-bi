@@ -1,5 +1,5 @@
 import { Metadata } from 'next';
-import ResumenComercialDashboard from '@/components/dashboard/ResumenComercialDashboard';
+import ResumenComercialDashboard from '../components/dashboard/ResumenComercialDashboard';
 
 export const metadata: Metadata = {
   title: 'Resumen Comercial | Opticolor BI',

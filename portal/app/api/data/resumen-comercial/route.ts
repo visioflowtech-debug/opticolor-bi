@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/config/auth';
-import { ResumenComercialRow, ApiResponse } from '@/lib/types';
+import { auth } from '../../config/auth';
+import { ResumenComercialRow, ApiResponse } from '../../lib/types';
 
 // Mock data - será reemplazado por queries SQL reales en Semana 2.2
 const mockData: ResumenComercialRow[] = [

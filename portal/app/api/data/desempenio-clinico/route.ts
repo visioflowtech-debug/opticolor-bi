@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/config/auth';
-import { DesempenioClinicoRow, ApiResponse } from '@/lib/types';
+import { auth } from '../../config/auth';
+import { DesempenioClinicoRow, ApiResponse } from '../../lib/types';
 
 const mockData: DesempenioClinicoRow[] = [
   {
