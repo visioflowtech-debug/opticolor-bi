@@ -1,21 +1,13 @@
 import {
-  Banknote,
-  Calendar,
-  ChartBar,
+  BarChart3,
+  Clock,
   Fingerprint,
-  Forklift,
-  Gauge,
-  GraduationCap,
-  Kanban,
   LayoutDashboard,
   Lock,
   type LucideIcon,
-  Mail,
-  MessageSquare,
-  ReceiptText,
-  ShoppingBag,
-  SquareArrowUpRight,
-  Users,
+  Package,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -46,91 +38,43 @@ export interface NavGroup {
 export const sidebarItems: NavGroup[] = [
   {
     id: 1,
-    label: "Dashboards",
+    label: "Informes Opticolor",
     items: [
       {
-        title: "Default",
-        url: "/dashboard/default",
+        title: "Resumen Comercial",
+        url: "/dashboard/resumen-comercial",
         icon: LayoutDashboard,
       },
       {
-        title: "CRM",
-        url: "/dashboard/crm",
-        icon: ChartBar,
+        title: "Eficiencia de Órdenes",
+        url: "/dashboard/eficiencia-ordenes",
+        icon: Clock,
       },
       {
-        title: "Finance",
-        url: "/dashboard/finance",
-        icon: Banknote,
+        title: "Control de Cartera",
+        url: "/dashboard/control-cartera",
+        icon: Wallet,
       },
       {
-        title: "Analytics",
-        url: "/dashboard/analytics",
-        icon: Gauge,
-      },
-      // {
-      //   title: "Productivity",
-      //   url: "/dashboard/productivity",
-      //   icon: Kanban,
-      // },
-      {
-        title: "E-commerce",
-        url: "/dashboard/coming-soon",
-        icon: ShoppingBag,
-        comingSoon: true,
+        title: "Desempeño Clínico",
+        url: "/dashboard/desempenio-clinico",
+        icon: TrendingUp,
       },
       {
-        title: "Academy",
-        url: "/dashboard/coming-soon",
-        icon: GraduationCap,
-        comingSoon: true,
-      },
-      {
-        title: "Logistics",
-        url: "/dashboard/coming-soon",
-        icon: Forklift,
-        comingSoon: true,
+        title: "Inventario",
+        url: "/dashboard/inventario",
+        icon: Package,
       },
     ],
   },
   {
     id: 2,
-    label: "Pages",
+    label: "Administración",
     items: [
       {
-        title: "Email",
+        title: "Usuarios",
         url: "/dashboard/coming-soon",
-        icon: Mail,
-        comingSoon: true,
-      },
-      {
-        title: "Chat",
-        url: "/dashboard/coming-soon",
-        icon: MessageSquare,
-        comingSoon: true,
-      },
-      {
-        title: "Calendar",
-        url: "/dashboard/coming-soon",
-        icon: Calendar,
-        comingSoon: true,
-      },
-      {
-        title: "Kanban",
-        url: "/dashboard/coming-soon",
-        icon: Kanban,
-        comingSoon: true,
-      },
-      {
-        title: "Invoice",
-        url: "/dashboard/coming-soon",
-        icon: ReceiptText,
-        comingSoon: true,
-      },
-      {
-        title: "Users",
-        url: "/dashboard/coming-soon",
-        icon: Users,
+        icon: BarChart3,
         comingSoon: true,
       },
       {
@@ -140,38 +84,13 @@ export const sidebarItems: NavGroup[] = [
         comingSoon: true,
       },
       {
-        title: "Authentication",
+        title: "Autenticación",
         url: "/auth",
         icon: Fingerprint,
         subItems: [
-          { title: "Login v1", url: "/auth/v1/login", newTab: true },
-          { title: "Login v2", url: "/auth/v2/login", newTab: true },
-          { title: "Register v1", url: "/auth/v1/register", newTab: true },
-          { title: "Register v2", url: "/auth/v2/register", newTab: true },
+          { title: "Login", url: "/auth/v1/login", newTab: true },
+          { title: "Registro", url: "/auth/v1/register", newTab: true },
         ],
-      },
-    ],
-  },
-  {
-    id: 3,
-    label: "Legacy",
-    items: [
-      {
-        title: "Dashboards",
-        url: "/dashboard/default-v1",
-        subItems: [{ title: "Default V1", url: "/dashboard/default-v1" }],
-      },
-    ],
-  },
-  {
-    id: 4,
-    label: "Misc",
-    items: [
-      {
-        title: "Others",
-        url: "/dashboard/coming-soon",
-        icon: SquareArrowUpRight,
-        comingSoon: true,
       },
     ],
   },
