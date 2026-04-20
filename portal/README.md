@@ -1,133 +1,180 @@
-# Next.js Admin Template with TypeScript & Shadcn UI
+# 🎨 Opticolor BI Portal — Next.js 16 + shadcn/ui
 
-**Studio Admin** - Includes multiple dashboards, authentication layouts, customizable theme presets, and more.
+**Estado:** Semana 2 — ✅ Fresh clone template arhamkhnz + Lógica Opticolor integrada  
+**Cliente:** OPTI-COLOR #2, C.A. — Venezuela  
+**Stack:** Next.js 16 + React 19 + TypeScript + shadcn/ui (55 componentes) + Tailwind v4 + NextAuth v5  
+**Deploy:** https://opticolor-bi.vercel.app  
 
-<img src="https://github.com/arhamkhnz/next-shadcn-admin-dashboard/blob/main/media/dashboard.png?version=5" alt="Dashboard Screenshot">
+---
 
-Most admin templates I found, free or paid, felt cluttered, outdated, or too rigid. I built this as a cleaner alternative with features often missing in others, such as theme toggling and layout controls, while keeping the design modern, minimal, and flexible.
+## 🚀 Características Actuales
 
-I’ve taken design inspiration from various sources. If you’d like credit for something specific, feel free to open an issue or reach out.
+✅ **Sidebar colapsable** — Desktop y mobile responsive  
+✅ **Dark/Light mode** — 3 presets de tema (Tangerine, Neo Brutalism, Soft Pop)  
+✅ **55 componentes shadcn/ui** — Card, Table, Button, Badge, Chart, etc.  
+✅ **5 Informes Opticolor** — Rutas generadas, páginas placeholder  
+✅ **API Routes** — 5 endpoints con mock data (`/api/data/*`)  
+✅ **NextAuth v5 config** — Estructura lista para integración  
+✅ **TypeScript types** — Interfaces de dominio definidas  
+✅ **Build exitoso** — Sin errores TypeScript  
 
-> **View demo:** [studio admin](https://next-shadcn-admin-dashboard.vercel.app)
+---
 
-> [!TIP]
-> I’m also working on Nuxt.js, Svelte, and React (Vite + TanStack Router) versions of this dashboard. They’ll be live soon.
+## 📁 Estructura de Carpetas
 
-## Features
-
-- Built with Next.js 16, TypeScript, Tailwind CSS v4, and Shadcn UI  
-- Responsive and mobile-friendly  
-- Customizable theme presets (light/dark modes with color schemes like Tangerine, Brutalist, and more)  
-- Flexible layouts (collapsible sidebar, variable content widths)  
-- Authentication flows and screens  
-- Prebuilt dashboards (Default, CRM, Finance) with more coming soon  
-- Role-Based Access Control (RBAC) with config-driven UI and multi-tenant support *(planned)*  
-
-> [!NOTE]
-> The default dashboard uses the **shadcn neutral** theme.  
-> It also includes additional color presets inspired by [Tweakcn](https://tweakcn.com):  
->
-> - Tangerine  
-> - Neo Brutalism  
-> - Soft Pop  
->
-> You can create more presets by following the same structure as the existing ones.
-
-> Looking for the **Next.js 15** version?  
-> Check out the [`archive/next15`](https://github.com/arhamkhnz/next-shadcn-admin-dashboard/tree/archive/next15) branch.  
-> This branch contains the setup prior to upgrading to Next 16 and the React Compiler.
-
-> Looking for the **Next.js 14 + Tailwind CSS v3** version?  
-> Check out the [`archive/next14-tailwindv3`](https://github.com/arhamkhnz/next-shadcn-admin-dashboard/tree/archive/next14-tailwindv3) branch.  
-> It has a different color theme and is not actively maintained, but I try to keep it updated with major changes.  
-
-## Tech Stack
-
-- **Framework**: Next.js 16 (App Router), TypeScript, Tailwind CSS v4  
-- **UI Components**: Shadcn UI  
-- **Validation**: Zod  
-- **Forms & State Management**: React Hook Form, Zustand  
-- **Tables & Data Handling**: TanStack Table  
-- **Tooling & DX**: Biome, Husky  
-
-## Screens
-
-### Available
-- Default Dashboard  
-- CRM Dashboard  
-- Finance Dashboard  
-- Authentication (4 screens)
-
-### Coming Soon
-- Analytics Dashboard  
-- eCommerce Dashboard  
-- Academy Dashboard  
-- Logistics Dashboard  
-- Email Page  
-- Chat Page  
-- Calendar Page  
-- Kanban Board  
-- Invoice Page  
-- Users Management  
-- Roles Management  
-
-## Colocation File System Architecture
-
-This project follows a **colocation-based architecture** each feature keeps its own pages, components, and logic inside its route folder.  
-Shared UI, hooks, and configuration live at the top level, making the codebase modular, scalable, and easier to maintain as the app grows.
-
-For a full breakdown of the structure with examples, see the [Next Colocation Template](https://github.com/arhamkhnz/next-colocation-template).
-
-## Getting Started
-
-You can run this project locally, or deploy it instantly with Vercel.
-
-### Deploy with Vercel
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Farhamkhnz%2Fnext-shadcn-admin-dashboard)
-
-_Deploy your own copy with one click._
-
-### Run locally
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/arhamkhnz/next-shadcn-admin-dashboard.git
-   ```
-   
-2. **Navigate into the project**
-   ```bash
-    cd next-shadcn-admin-dashboard
-   ```
-   
-3. **Install dependencies**
-   ```bash
-    npm install
-   ```
-
-4. **Start the development server**
-   ```bash
-   npm run dev
-   ```
-
-Your app will be running at [http://localhost:3000](http://localhost:3000)
-
-### Formatting and Linting
-
-Format, lint, and organize imports
-```bash
-npx @biomejs/biome check --write
 ```
-> For more information on available rules, fixes, and CLI options, refer to the [Biome documentation](https://biomejs.dev/).
+portal/
+├── src/
+│   ├── app/
+│   │   ├── (main)/           # Layout principal con sidebar
+│   │   │   ├── dashboard/
+│   │   │   │   ├── resumen-comercial/
+│   │   │   │   ├── eficiencia-ordenes/
+│   │   │   │   ├── control-cartera/
+│   │   │   │   ├── desempenio-clinico/
+│   │   │   │   └── inventario/
+│   │   │   ├── auth/         # Autenticación (v1, v2)
+│   │   │   └── api/          # Rutas API
+│   │   ├── (external)/       # Layout sin sidebar
+│   │   └── globals.css
+│   ├── components/
+│   │   ├── admin-panel/      # Sidebar, navbar, layout
+│   │   └── ui/               # 55 componentes shadcn
+│   ├── config/
+│   │   └── auth.ts           # NextAuth config (skeleton)
+│   ├── lib/
+│   │   ├── types.ts          # Interfaces Opticolor
+│   │   └── utils.ts
+│   ├── navigation/
+│   │   └── sidebar-items.ts  # Menu de navegación (Informes + Admin)
+│   ├── stores/
+│   │   └── preferences/      # Zustand (tema, sidebar, etc)
+│   └── styles/
+│       └── presets/          # Temas personalizados
+├── .env.local                # Desarrollo
+├── .env.production           # Producción (Vercel)
+├── components.json           # shadcn config
+├── package.json
+├── tsconfig.json
+└── README.md (este archivo)
+```
 
 ---
 
-> [!IMPORTANT]  
-> This project is updated frequently. If you’re working from a fork or an older clone, pull the latest changes before syncing. Some updates may include breaking changes.
+## 📊 Los 5 Informes
+
+| Informe | URL | Estado |
+|---------|-----|--------|
+| **Resumen Comercial** | `/dashboard/resumen-comercial` | 🔧 Placeholder |
+| **Eficiencia de Órdenes** | `/dashboard/eficiencia-ordenes` | 🔧 Placeholder |
+| **Control de Cartera** | `/dashboard/control-cartera` | 🔧 Placeholder |
+| **Desempeño Clínico** | `/dashboard/desempenio-clinico` | 🔧 Placeholder |
+| **Inventario** | `/dashboard/inventario` | 🔧 Placeholder |
+
+**Próximos pasos (Semana 2.2):**
+- Conectar a SQL real (Fact_Ventas, Fact_Ordenes, etc.)
+- Implementar componentes de visualización (Recharts, TanStack Table)
+- Aplicar Row-Level Security (RLS) por usuario/sucursal
 
 ---
 
-Contributions are welcome. Feel free to open issues, feature requests, or start a discussion.
+## 🔐 Autenticación
 
+**Implementación actual:** NextAuth v5 skeleton con mock credentials  
+**Usuário test:** `test@opticolor.com` (sin password requerido)  
 
-**Happy Vibe Coding!**
+**Semana 2.2:**
+- Integración con tabla `Seguridad_Usuarios` en Azure SQL
+- JWT con roles + sucursales asignadas
+- RLS automático en queries
+
+---
+
+## 🌐 Desarrollo Local
+
+```bash
+# Instalar dependencias
+npm install
+
+# Iniciar servidor (dev)
+npm run dev
+
+# Acceder a
+open http://localhost:3000
+
+# Build para producción
+npm run build
+
+# Test build localmente
+npm run start
+```
+
+---
+
+## 🔌 Variables de Entorno
+
+**Desarrollo (.env.local):**
+```env
+NEXTAUTH_SECRET=tu-secret-aqui
+NEXTAUTH_URL=http://localhost:3000
+AZURE_SQL_SERVER=srv-opticolor.database.windows.net
+AZURE_SQL_DATABASE=db-opticolor-dw
+AZURE_SQL_USER=admin_opticolor
+AZURE_SQL_PASSWORD=tu-password
+```
+
+**Producción (.env.production):**
+```env
+NEXTAUTH_URL=https://opticolor-bi.vercel.app
+NEXTAUTH_SECRET=opticolor-bi-secret-prod-2026-semana2
+# Resto se configura en Vercel Dashboard
+```
+
+---
+
+## 🚀 Deploy en Vercel
+
+**URL:** https://opticolor-bi.vercel.app  
+**Auto-deploy:** Cada push a `main`  
+
+**Configuración Vercel:**
+- Framework: Next.js
+- Build: `npm run build`
+- Output: `.next`
+- Environment Variables: `NEXTAUTH_SECRET`, `NEXTAUTH_URL`
+
+---
+
+## 📝 Fuentes de Verdad
+
+- **claude.md** — Contexto arquitectónico completo
+- **PROYECTO OPTICOLOR.pdf** — Tracker de tareas por semana
+- **Optilux panama DB v2.0** — Referencia vistas SQL (Dim_*, Fact_*)
+- **GitHub** — Código fuente (rama `main`)
+
+---
+
+## ✅ Checklist Semana 2
+
+- ✅ Fresh clone template arhamkhnz
+- ✅ Integración lógica Opticolor (types, auth, API routes)
+- ✅ Adaptación navegación (5 informes)
+- ✅ Páginas placeholder dashboard
+- ✅ Build sin errores
+- ⏳ **Deploy Vercel** (siguiente: push + configurar env vars)
+- ⏳ Feedback visual de usuario
+- ⏳ Semana 2.2: SQL real + RLS
+
+---
+
+## 🔗 Enlaces Útiles
+
+- [Next.js 16 Docs](https://nextjs.org)
+- [shadcn/ui Components](https://ui.shadcn.com)
+- [Vercel Deployments](https://vercel.com/dashboard)
+- [GitHub Repo](https://github.com/visioflowtech-debug/opticolor-bi)
+
+---
+
+**Última actualización:** 19 de abril de 2026 — Fresh Clone + Rutas Opticolor  
+**Siguiente sesión:** Deploy Vercel + feedback UI/UX
