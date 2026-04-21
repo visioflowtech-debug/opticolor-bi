@@ -92,7 +92,7 @@ class GesvisionEtl:
         LOAD_MODE_INVOICES  = 'HISTORICAL'  # Primera carga: backfill desde 01/01/2025.
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
-        LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Catálogo (mantenimiento diario post-backfill).
+        LOAD_MODE_PRODUCTS  = 'HISTORICAL'  # Backfill completo desde 01/01/2025 para cubrir todas las ventas.
         LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
         LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
         LOAD_MODE_COBROS    = 'INCREMENTAL'  # Dual Load (Historical/Incremental).
