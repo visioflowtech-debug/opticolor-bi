@@ -149,6 +149,19 @@ CREATE TABLE [dbo].[Ventas_Cabecera](
 ) ON [PRIMARY]
 GO
 
+-- Detalle de Ventas / Líneas de Facturas
+CREATE TABLE [dbo].[Ventas_Detalle](
+	[id_factura] [int] NOT NULL,
+	[id_linea] [int] NOT NULL,
+	[id_producto] [int] NULL,
+	[cantidad] [decimal](18, 4) NULL,
+	[precio_unitario] [decimal](18, 4) NULL,
+	[total_linea] [decimal](18, 4) NULL,
+	[fecha_carga_etl] [datetime2](7) NULL,
+	PRIMARY KEY CLUSTERED ([id_factura] ASC, [id_linea] ASC)
+) ON [PRIMARY]
+GO
+
 -- Pedidos de Venta
 CREATE TABLE [dbo].[Ventas_Pedidos](
 	[id_pedido] [int] NOT NULL,
