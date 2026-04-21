@@ -87,7 +87,7 @@ class GesvisionEtl:
         # 'INCREMENTAL': Mantenimiento diario (Últimos 3 días, Skip 0).
         # 'FULL': Barrido completo (Para dimensiones pequeñas).
 
-        LOAD_MODE_CUSTOMERS = 'HISTORICAL'  # Carga completa histórica desde 01/01/2025.
+        LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
         LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVOICES  = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
