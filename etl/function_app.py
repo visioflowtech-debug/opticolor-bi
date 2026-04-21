@@ -48,8 +48,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('METODOS_PAGO', etl.sync_payment_methods),
             ('PROVEEDORES', etl.sync_suppliers),
             ('MARCAS_FULL', etl.sync_brands_full),
-            ('PRODUCTOS', etl.sync_products),
-            # ('CLIENTES', etl.sync_customers),
+            # ('PRODUCTOS', etl.sync_products),
+            ('CLIENTES', etl.sync_customers),
             # ('CITAS', etl.sync_appointments),
             # ('EXAMENES', etl.sync_exams),
             # ('PEDIDOS', etl.sync_orders),
@@ -87,7 +87,7 @@ class GesvisionEtl:
         # 'INCREMENTAL': Mantenimiento diario (Últimos 3 días, Skip 0).
         # 'FULL': Barrido completo (Para dimensiones pequeñas).
 
-        LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Ya tenemos la base masiva.
+        LOAD_MODE_CUSTOMERS = 'HISTORICAL'  # Carga completa histórica desde 01/01/2025.
         LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVOICES  = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
@@ -636,6 +636,26 @@ class GesvisionEtl:
             item['tipo_montura'] = clean_text(item.get('tipo_montura'))
             return item
 
+        def _sanitize_cliente(self, item):
+            """Limpia datos de clientes: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['name'] = clean_text(item.get('name'))
+            item['lastName'] = clean_text(item.get('lastName'))
+            item['ciudad'] = clean_text(item.get('ciudad'))
+            return item
+
         def sync_dimensions(self):
             """Sincroniza almacenes/sucursales."""
             if not self.token: self.get_token()
@@ -848,6 +868,7 @@ class GesvisionEtl:
 
                     if items:
                         empty_pages = 0
+                        items = [self._sanitize_cliente(item) for item in items]
                         self._process_and_save(conn, items, "Maestro_Clientes", "id_cliente", self.MAP_CLIENTE)
                         total_processed += len(items)
                     
