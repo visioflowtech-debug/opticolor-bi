@@ -51,7 +51,7 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             # ('PRODUCTOS', etl.sync_products),
             ('CLIENTES', etl.sync_customers),
             ('CITAS', etl.sync_appointments),
-            # ('EXAMENES', etl.sync_exams),
+            ('EXAMENES', etl.sync_exams),
             # ('PEDIDOS', etl.sync_orders),
             # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
             # ('VENTAS', etl.sync_invoices_incremental),
@@ -676,6 +676,25 @@ class GesvisionEtl:
             item['nombre_cliente'] = clean_text(item.get('nombre_cliente'))
             return item
 
+        def _sanitize_examen(self, item):
+            """Limpia datos de exámenes: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['tipo_examen'] = clean_text(item.get('tipo_examen'))
+            item['observations'] = clean_text(item.get('observations'))
+            return item
+
         def sync_dimensions(self):
             """Sincroniza almacenes/sucursales."""
             if not self.token: self.get_token()
@@ -1286,6 +1305,7 @@ class GesvisionEtl:
 
                         if not items: break
 
+                        items = [self._sanitize_examen(item) for item in items]
                         self._process_and_save(conn, items, "Clinica_Examenes", "id_examen", self.MAP_EXAMEN)
                         count = len(items)
                         day_processed_count += count
