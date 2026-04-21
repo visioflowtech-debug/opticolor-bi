@@ -4,8 +4,8 @@ import { cookies } from "next/headers";
 import Link from "next/link";
 
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
-import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
+import { SquareActivity } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { users } from "@/data/users";
@@ -53,7 +53,11 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
         >
           <div className="flex w-full items-center justify-between px-4 lg:px-6">
             <div className="flex items-center gap-1 lg:gap-2">
-              <Logo size="md" href="/" priority={true} />
+              <Button asChild variant="ghost" size="icon">
+                <Link href="/">
+                  <SquareActivity className="size-5" />
+                </Link>
+              </Button>
               <Separator
                 orientation="vertical"
                 className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"

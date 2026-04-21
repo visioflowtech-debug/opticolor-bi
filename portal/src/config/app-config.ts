@@ -9,6 +9,6 @@ export const APP_CONFIG = {
   meta: {
     title: "Opticolor - BI",
     description:
-      "Portal de Inteligencia de Datos para OPTI-COLOR — Sistema integrado de análisis y reportería.",
+      "Sistema integrado de análisis y reportería para OPTI-COLOR.",
   },
 };

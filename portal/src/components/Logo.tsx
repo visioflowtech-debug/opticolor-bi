@@ -23,7 +23,7 @@ export function Logo({ size = "md", href = "/", priority = false, className }: L
   const image = (
     <Image
       src="/media/logo-opticolor.png"
-      alt="OPTI-COLOR - Portal de Inteligencia de Datos"
+      alt="Opticolor - BI"
       width={width}
       height={height}
       priority={priority}
