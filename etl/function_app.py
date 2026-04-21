@@ -50,7 +50,7 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('MARCAS_FULL', etl.sync_brands_full),
             # ('PRODUCTOS', etl.sync_products),
             ('CLIENTES', etl.sync_customers),
-            # ('CITAS', etl.sync_appointments),
+            ('CITAS', etl.sync_appointments),
             # ('EXAMENES', etl.sync_exams),
             # ('PEDIDOS', etl.sync_orders),
             # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
@@ -654,6 +654,26 @@ class GesvisionEtl:
             item['name'] = clean_text(item.get('name'))
             item['lastName'] = clean_text(item.get('lastName'))
             item['ciudad'] = clean_text(item.get('ciudad'))
+            return item
+
+        def _sanitize_cita(self, item):
+            """Limpia datos de citas: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['meetingType_name'] = clean_text(item.get('meetingType_name'))
+            item['details'] = clean_text(item.get('details'))
+            item['nombre_cliente'] = clean_text(item.get('nombre_cliente'))
             return item
 
         def sync_dimensions(self):
@@ -1595,7 +1615,10 @@ class GesvisionEtl:
                                         self._process_and_save(conn, rescued_clients, "Maestro_Clientes", "id_cliente", self.MAP_CLIENTE)
                                         conn.commit()
 
-                            # 2. Insertar citas (Ahora seguro)
+                            # 2. Sanitizar citas
+                            items = [self._sanitize_cita(item) for item in items]
+
+                            # 3. Insertar citas (Ahora seguro)
                             self._process_and_save(conn, items, "Marketing_Citas", ["id_cliente", "fecha_cita_inicio"], self.MAP_CITAS)
                             total_processed += len(items)
                             
