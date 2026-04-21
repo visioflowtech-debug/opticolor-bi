@@ -1,7 +1,7 @@
 "use client";
 import * as React from "react";
 
-import { ChartBar, Forklift, Gauge, GraduationCap, LayoutDashboard, Search, ShoppingBag } from "lucide-react";
+import { ChartBar, Forklift, Gauge, GraduationCap, Search, ShoppingBag } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,17 +15,19 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 
-const searchItems = [
-  { group: "Dashboards", icon: LayoutDashboard, label: "Default" },
-  { group: "Dashboards", icon: ChartBar, label: "CRM" },
-  { group: "Dashboards", icon: Gauge, label: "Analytics" },
-  { group: "Dashboards", icon: ShoppingBag, label: "E-Commerce", disabled: true },
-  { group: "Dashboards", icon: GraduationCap, label: "Academy", disabled: true },
-  { group: "Dashboards", icon: Forklift, label: "Logistics", disabled: true },
-  { group: "Authentication", label: "Login v1" },
-  { group: "Authentication", label: "Login v2" },
-  { group: "Authentication", label: "Register v1" },
-  { group: "Authentication", label: "Register v2" },
+interface SearchItem {
+  group: string;
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  href: string;
+}
+
+const searchItems: SearchItem[] = [
+  { group: "Informes", icon: ChartBar, label: "Resumen Comercial", href: "/dashboard/resumen-comercial" },
+  { group: "Informes", icon: Gauge, label: "Eficiencia de Órdenes", href: "/dashboard/eficiencia-ordenes" },
+  { group: "Informes", icon: ShoppingBag, label: "Control de Cartera", href: "/dashboard/control-cartera" },
+  { group: "Informes", icon: GraduationCap, label: "Desempeño Clínico", href: "/dashboard/desempenio-clinico" },
+  { group: "Informes", icon: Forklift, label: "Inventario", href: "/dashboard/inventario" },
 ];
 
 export function SearchDialog() {
@@ -51,16 +53,16 @@ export function SearchDialog() {
         className="px-0! font-normal text-muted-foreground hover:no-underline"
       >
         <Search data-icon="inline-start" />
-        Search
+        Buscar
         <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
           <span className="text-xs">⌘</span>J
         </kbd>
       </Button>
       <CommandDialog open={open} onOpenChange={setOpen}>
         <Command>
-          <CommandInput placeholder="Search dashboards, users, and more…" />
+          <CommandInput placeholder="Buscar informes…" />
           <CommandList>
-            <CommandEmpty>No results found.</CommandEmpty>
+            <CommandEmpty>No se encontraron resultados.</CommandEmpty>
             {groups.map((group, index) => (
               <React.Fragment key={group}>
                 {index > 0 && <CommandSeparator />}
@@ -69,12 +71,10 @@ export function SearchDialog() {
                     .filter((item) => item.group === group)
                     .map((item) => (
                       <CommandItem
-                        disabled={item.disabled}
                         key={item.label}
                         onSelect={() => {
-                          if (!item.disabled) {
-                            setOpen(false);
-                          }
+                          window.location.href = item.href;
+                          setOpen(false);
                         }}
                       >
                         {item.icon && <item.icon />}

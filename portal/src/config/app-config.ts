@@ -3,12 +3,12 @@ import packageJson from "../../package.json";
 const currentYear = new Date().getFullYear();
 
 export const APP_CONFIG = {
-  name: "Studio Admin",
+  name: "Opticolor - BI",
   version: packageJson.version,
-  copyright: `© ${currentYear}, Studio Admin.`,
+  copyright: `© ${currentYear}, Opticolor - BI.`,
   meta: {
-    title: "Studio Admin - Modern Next.js Dashboard Starter Template",
+    title: "Opticolor - BI",
     description:
-      "Studio Admin is a modern, open-source dashboard starter template built with Next.js 16, Tailwind CSS v4, and shadcn/ui. Perfect for SaaS apps, admin panels, and internal tools—fully customizable and production-ready.",
+      "Portal de Inteligencia de Datos para OPTI-COLOR — Sistema integrado de análisis y reportería.",
   },
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleUser, EllipsisVertical, LogOut, MessageSquareDot } from "lucide-react";
+import { CircleUser, EllipsisVertical, LogOut } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -68,17 +68,13 @@ export function NavUser({
             <DropdownMenuGroup>
               <DropdownMenuItem>
                 <CircleUser />
-                Account
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <MessageSquareDot />
-                Notifications
+                Cuenta
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuItem>
               <LogOut />
-              Log out
+              Cerrar sesión
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

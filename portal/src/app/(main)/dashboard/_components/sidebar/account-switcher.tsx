@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import { BadgeCheck, Bell, LogOut } from "lucide-react";
+import { BadgeCheck, LogOut } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -51,11 +51,7 @@ export function AccountSwitcher({
         <DropdownMenuGroup>
           <DropdownMenuItem>
             <BadgeCheck />
-            Account
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Bell />
-            Notifications
+            Cuenta
           </DropdownMenuItem>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
