@@ -158,8 +158,25 @@ CREATE TABLE [dbo].[Ventas_Detalle](
 	[precio_unitario] [decimal](18, 4) NULL,
 	[total_linea] [decimal](18, 4) NULL,
 	[fecha_carga_etl] [datetime2](7) NULL,
-	PRIMARY KEY CLUSTERED ([id_factura] ASC, [id_linea] ASC)
+	CONSTRAINT [PK_Ventas_Detalle] PRIMARY KEY CLUSTERED ([id_factura] ASC, [id_linea] ASC)
 ) ON [PRIMARY]
+GO
+
+ALTER TABLE [dbo].[Ventas_Detalle] ADD DEFAULT (getdate()) FOR [fecha_carga_etl]
+GO
+
+ALTER TABLE [dbo].[Ventas_Detalle] WITH CHECK ADD CONSTRAINT [FK_Detalle_Factura] FOREIGN KEY([id_factura])
+REFERENCES [dbo].[Ventas_Cabecera] ([id_factura])
+GO
+
+ALTER TABLE [dbo].[Ventas_Detalle] CHECK CONSTRAINT [FK_Detalle_Factura]
+GO
+
+ALTER TABLE [dbo].[Ventas_Detalle] WITH CHECK ADD CONSTRAINT [FK_Detalle_Producto] FOREIGN KEY([id_producto])
+REFERENCES [dbo].[Maestro_Productos] ([id_producto])
+GO
+
+ALTER TABLE [dbo].[Ventas_Detalle] CHECK CONSTRAINT [FK_Detalle_Producto]
 GO
 
 -- Pedidos de Venta
