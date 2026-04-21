@@ -91,7 +91,7 @@ class GesvisionEtl:
         LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVOICES  = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
-        LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (Scanner Adaptativo).
+        LOAD_MODE_EXAMS     = 'HISTORICAL'  # Carga completa histórica desde 01/01/2025 (primera carga Venezuela).
         LOAD_MODE_PRODUCTS  = 'HISTORICAL'  # Catálogo (histórico desde 01/01/2025).
         LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
         LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
@@ -1223,9 +1223,6 @@ class GesvisionEtl:
 
             with pyodbc.connect(self.conn_str) as conn:
                 # 1. Determinar Fecha de Inicio y Límite del barrido
-                limit_date = datetime.datetime(2025, 1, 1)
-                limit_date = datetime.datetime(2025, 12, 1, 0, 0, 0)
-                limit_date = datetime.datetime(2025, 12, 1) # Límite para la carga histórica.
                 current_day = datetime.datetime.now()
 
                 if self.LOAD_MODE_EXAMS == 'INCREMENTAL':
@@ -1233,6 +1230,7 @@ class GesvisionEtl:
                     limit_date = datetime.datetime.now() - datetime.timedelta(days=10)
                     logging.info(f"   [Incremental] Barriendo los últimos 10 días (hasta {limit_date.strftime('%Y-%m-%d')}).")
                 else: # HISTORICAL
+                    limit_date = datetime.datetime(2025, 1, 1)  # Carga histórica desde 01/01/2025
                     chk_val = self._get_checkpoint(conn, CHECKPOINT_KEY)
                     if chk_val and chk_val != 0:
                         try:
