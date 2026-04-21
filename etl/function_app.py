@@ -52,7 +52,7 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('CLIENTES', etl.sync_customers),
             ('CITAS', etl.sync_appointments),
             ('EXAMENES', etl.sync_exams),
-            # ('PEDIDOS', etl.sync_orders),
+            ('PEDIDOS', etl.sync_orders),
             # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
             # ('VENTAS', etl.sync_invoices_incremental),
             # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
@@ -88,7 +88,7 @@ class GesvisionEtl:
         # 'FULL': Barrido completo (Para dimensiones pequeñas).
 
         LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
-        LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario.
+        LOAD_MODE_ORDERS    = 'HISTORICAL'  # Primera carga: backfill desde 01/01/2025.
         LOAD_MODE_INVOICES  = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
