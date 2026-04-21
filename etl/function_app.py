@@ -48,7 +48,7 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('METODOS_PAGO', etl.sync_payment_methods),
             ('PROVEEDORES', etl.sync_suppliers),
             ('MARCAS_FULL', etl.sync_brands_full),
-            # ('PRODUCTOS', etl.sync_products),
+            ('PRODUCTOS', etl.sync_products),
             ('CLIENTES', etl.sync_customers),
             ('CITAS', etl.sync_appointments),
             ('EXAMENES', etl.sync_exams),
