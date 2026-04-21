@@ -5,7 +5,6 @@ import Link from "next/link";
 import { CircleHelp, ClipboardList, Command, Database, File, Search, Settings } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
-import { Logo } from "@/components/Logo";
 import {
   Sidebar,
   SidebarContent,
@@ -76,7 +75,16 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props} variant={variant} collapsible={collapsible}>
       <SidebarHeader>
-        <Logo size="sm" href="/" />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild>
+              <Link prefetch={false} href="/dashboard/default">
+                <Command />
+                <span className="font-semibold text-base">OPTICOLOR - BI</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={sidebarItems} />
