@@ -16,9 +16,9 @@ app = func.FunctionApp()
 # --- NUEVO MODELO: CASCADA SECUENCIAL (Trigger-to-Trigger) ---
 # Solo la primera función tiene TimerTrigger. Las demás se ejecutan en cadena.
 
-# Horarios Panama (UTC-5): 07:50, 09:50, 11:50, 13:50, 15:50, 17:50, 19:50, 21:50
-# Equivalente UTC (+5h):   12:50, 14:50, 16:50, 18:50, 20:50, 22:50, 00:50, 02:50
-@app.timer_trigger(schedule="0 50 0,2,12,14,16,18,20,22 * * *", arg_name="myTimer", run_on_startup=False)
+# Horarios Venezuela (UTC-4): 07:50, 09:50, 11:50, 13:50, 15:50, 17:50, 19:50, 21:50
+# Equivalente UTC (+4h):   11:50, 13:50, 15:50, 17:50, 19:50, 21:50, 23:50, 01:50
+@app.timer_trigger(schedule="0 50 1,11,13,15,17,19,21,23 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
@@ -49,17 +49,17 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('PROVEEDORES', etl.sync_suppliers),
             ('MARCAS_FULL', etl.sync_brands_full),
             ('PRODUCTOS', etl.sync_products),
-            ('CLIENTES', etl.sync_customers),
-            ('CITAS', etl.sync_appointments),
-            ('EXAMENES', etl.sync_exams),
-            ('PEDIDOS', etl.sync_orders),
-            ('ORDENES_CRISTALES', etl.sync_glasses_orders),
-            ('VENTAS', etl.sync_invoices_incremental),
-            ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
-            ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
-            ('PEDIDOS_LAB', etl.sync_laboratory_orders),
-            ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            ('INVENTARIO', etl.sync_inventory)
+            # ('CLIENTES', etl.sync_customers),
+            # ('CITAS', etl.sync_appointments),
+            # ('EXAMENES', etl.sync_exams),
+            # ('PEDIDOS', etl.sync_orders),
+            # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
+            # ('VENTAS', etl.sync_invoices_incremental),
+            # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
+            # ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
+            # ('PEDIDOS_LAB', etl.sync_laboratory_orders),
+            # ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
+            # ('INVENTARIO', etl.sync_inventory)
         ]
 
         for mod_name, mod_func in remaining_modules:
@@ -92,7 +92,7 @@ class GesvisionEtl:
         LOAD_MODE_INVOICES  = 'INCREMENTAL'  # Mantenimiento diario.
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (Scanner Adaptativo).
-        LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Catálogo.
+        LOAD_MODE_PRODUCTS  = 'HISTORICAL'  # Catálogo (histórico desde 01/01/2025).
         LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
         LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
         LOAD_MODE_COBROS    = 'INCREMENTAL'  # Dual Load (Historical/Incremental).
@@ -493,6 +493,149 @@ class GesvisionEtl:
                 logging.warning(f"No se pudo determinar último ID en {table_name}: {e}")
                 return 0
 
+        def _sanitize_sucursal(self, item):
+            """Limpia datos de sucursales: mayúsculas, sin caracteres especiales, espacios extras."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['name'] = clean_text(item.get('name'))
+            item['alias'] = clean_text(item.get('alias'))
+            item['municipality'] = clean_text(item.get('municipality')) if item.get('municipality') not in ['0', '1'] else item.get('municipality')
+            item['locality'] = clean_text(item.get('locality')) if item.get('locality') not in ['0', '1'] else item.get('locality')
+            item['street'] = clean_text(item.get('street'))
+            return item
+
+        def _sanitize_empleado(self, item):
+            """Limpia datos de empleados: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['name'] = clean_text(item.get('name'))
+            item['lastName'] = clean_text(item.get('lastName'))
+            item['type'] = clean_text(item.get('type'))
+            return item
+
+        def _sanitize_categoria(self, item):
+            """Limpia datos de categorías: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['name'] = clean_text(item.get('name'))
+            return item
+
+        def _sanitize_metodo_pago(self, item):
+            """Limpia datos de métodos de pago: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['name'] = clean_text(item.get('name'))
+            item['description'] = clean_text(item.get('description'))
+            item['code'] = clean_text(item.get('code'))
+            return item
+
+        def _sanitize_proveedor(self, item):
+            """Limpia datos de proveedores: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['name'] = clean_text(item.get('name'))
+            item['code'] = clean_text(item.get('code'))
+            return item
+
+        def _sanitize_marca(self, item):
+            """Limpia datos de marcas: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['name'] = clean_text(item.get('name'))
+            item['code'] = clean_text(item.get('code'))
+            return item
+
+        def _sanitize_producto(self, item):
+            """Limpia datos de productos: mayúsculas, sin caracteres especiales."""
+            import unicodedata
+            import re
+
+            def clean_text(text):
+                if not text or not isinstance(text, str):
+                    return text
+                text = text.strip()
+                text = unicodedata.normalize('NFD', text)
+                text = ''.join(c for c in text if unicodedata.category(c) != 'Mn')
+                text = text.upper()
+                text = re.sub(r'\s+', ' ', text)
+                return text
+
+            item['description'] = clean_text(item.get('description'))
+            item['reference'] = clean_text(item.get('reference'))
+            item['barCode'] = clean_text(item.get('barCode'))
+            item['nombre_modelo_padre'] = clean_text(item.get('nombre_modelo_padre'))
+            item['genero_objetivo'] = clean_text(item.get('genero_objetivo'))
+            item['material_marco'] = clean_text(item.get('material_marco'))
+            item['color_comercial'] = clean_text(item.get('color_comercial'))
+            item['tipo_montura'] = clean_text(item.get('tipo_montura'))
+            return item
+
         def sync_dimensions(self):
             """Sincroniza almacenes/sucursales."""
             if not self.token: self.get_token()
@@ -501,6 +644,7 @@ class GesvisionEtl:
             if resp.status_code == 200:
                 items = self._safe_parse_json(resp, "warehouses")
                 if items:
+                    items = [self._sanitize_sucursal(item) for item in items]
                     with pyodbc.connect(self.conn_str) as conn:
                         self._process_and_save(conn, items, "Maestro_Sucursales", "id_sucursal", self.MAP_SUCURSAL)
                     logging.info("   -> Catálogo de sucursales actualizado con éxito.")
@@ -520,6 +664,7 @@ class GesvisionEtl:
                     if resp.status_code == 200:
                         items = self._safe_parse_json(resp, "categories")
                         if items:
+                            items = [self._sanitize_categoria(item) for item in items]
                             with pyodbc.connect(self.conn_str) as conn:
                                 self._process_and_save(conn, items, "Maestro_Categorias", "id_categoria", self.MAP_CATEGORIA)
                         
@@ -550,6 +695,7 @@ class GesvisionEtl:
                     if resp.status_code == 200:
                         items = self._safe_parse_json(resp, "paymentMethod")
                         if items:
+                            items = [self._sanitize_metodo_pago(item) for item in items]
                             with pyodbc.connect(self.conn_str) as conn:
                                 self._process_and_save(conn, items, "Maestro_Metodos_Pago", "id_metodo_pago", self.MAP_METODO_PAGO)
                         
@@ -610,6 +756,7 @@ class GesvisionEtl:
                         break
 
                     if items:
+                        items = [self._sanitize_proveedor(item) for item in items]
                         self._process_and_save(conn, items, "Maestro_Proveedores", "id_proveedor", self.MAP_PROVEEDOR)
                         total_processed += len(items)
 
@@ -740,8 +887,9 @@ class GesvisionEtl:
 
                             items = self._safe_parse_json(resp, "employees")
                             logging.info(f"   -> [RES] Status: {resp.status_code} | Count: {len(items)}")
-                            
+
                             if items:
+                                items = [self._sanitize_empleado(item) for item in items]
                                 self._process_and_save(conn, items, "Maestro_Empleados", "id_empleado", self.MAP_EMPLEADO)
                                 total_processed += len(items)
 
@@ -794,9 +942,10 @@ class GesvisionEtl:
                             break
                         
                         items = self._safe_parse_json(resp, "brands")
-                        if not items: 
+                        if not items:
                             break
-                        
+
+                        items = [self._sanitize_marca(item) for item in items]
                         # Guardado Inmediato en BD
                         self._process_and_save(conn, items, "Maestro_Marcas", "id_marca", self.MAP_MARCA)
                         conn.commit() # Commit explícito por bloque
@@ -885,7 +1034,7 @@ class GesvisionEtl:
                 # --- 2. GESTIÓN DE CHECKPOINT (AUTO-RESUME) ---
                 # Si es HISTORICAL, intentamos retomar donde nos quedamos
                 if self.LOAD_MODE_PRODUCTS == 'HISTORICAL':
-                    last_date = datetime.datetime(2020, 1, 1)
+                    last_date = datetime.datetime(2025, 1, 1)
                     skip = self._get_checkpoint(conn, CHECKPOINT_KEY)
                     logging.info(f"   [Historical] Retomando carga masiva desde SKIP: {skip}")
                 else:
@@ -967,7 +1116,10 @@ class GesvisionEtl:
                                     desc = item.get('description')
                                     item['nombre_modelo_padre'] = str(desc).strip().upper() if desc else None
 
-                                # C. Buffer
+                                # C. Sanitización
+                                items = [self._sanitize_producto(item) for item in items]
+
+                                # D. Buffer
                                 current_buffer = buffer + items
                                 if len(current_buffer) >= BUFFER_LIMIT:
                                     logging.info(f"   [SQL Write] Guardando bloque (Skip actual: {skip})...")
