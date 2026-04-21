@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { Command } from "lucide-react";
 
+import { Logo } from "@/components/Logo";
 import { LoginForm } from "../../_components/login-form";
 import { GoogleButton } from "../../_components/social-auth/google-button";
 
@@ -22,6 +23,9 @@ export default function LoginV1() {
 
       <div className="flex w-full items-center justify-center bg-background p-8 lg:w-2/3">
         <div className="w-full max-w-md space-y-10 py-24 lg:py-32">
+          <div className="flex justify-center">
+            <Logo size="lg" className="mb-6" />
+          </div>
           <div className="space-y-4 text-center">
             <div className="font-medium tracking-tight">Login</div>
             <div className="mx-auto max-w-xl text-muted-foreground">

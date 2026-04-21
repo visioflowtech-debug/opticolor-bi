@@ -33,6 +33,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
       suppressHydrationWarning
     >
       <head>
+        <link rel="icon" href="/favicon.ico" />
         {/* Applies theme and layout preferences on load to avoid flicker and unnecessary server rerenders. */}
         <ThemeBootScript />
       </head>
