@@ -80,8 +80,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link prefetch={false} href="/dashboard/default">
-                <Logo size="sm" className="w-6 h-6" />
-                <span className="font-semibold text-base">OPTICOLOR</span>
+                <Logo size="md" />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
