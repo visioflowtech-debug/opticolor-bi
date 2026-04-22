@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 
 import { CircleHelp, ClipboardList, Command, Database, File, Search, Settings } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
@@ -80,7 +81,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link prefetch={false} href="/dashboard/default">
-                <Logo size="sm" />
+                {/* Mostrar Logo cuando sidebar está expandido */}
+                <div className="group-data-[state=collapsed]/sidebar-wrapper:hidden">
+                  <Logo size="sm" />
+                </div>
+                {/* Mostrar favicon cuando sidebar está colapsado */}
+                <div className="hidden group-data-[state=collapsed]/sidebar-wrapper:flex">
+                  <Image src="/favicon.ico" alt="Opticolor" width={24} height={24} />
+                </div>
                 {/* Mostrar texto solo cuando sidebar está expandido */}
                 <span className="font-semibold text-sm group-data-[state=collapsed]/sidebar-wrapper:hidden">
                   OPTICOLOR
