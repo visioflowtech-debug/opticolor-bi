@@ -149,17 +149,37 @@ app = func.FunctionApp()
 
 # --- FUNCIÓN TEMPORAL: INVENTARIO CADA MINUTO (estrategia PRODUCTOS) ---
 # [22 ABRIL 2026] ACTIVO — INVENTARIO se ejecuta cada minuto hasta completar carga histórica
+# Con lock en BD para evitar ejecuciones paralelas (solo 1 a la vez, secuencial)
 @app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
 def EtlInventarioRepetitivo(myTimer: func.TimerRequest) -> None:
     """
     Ejecutor temporal SOLO INVENTARIO que se reinicia cada minuto.
-    Estrategia idéntica a PRODUCTOS: MAX 24 minutos, checkpoint automático, re-ejecución el siguiente minuto.
+    Estrategia SECUENCIAL: MAX 24 minutos por ejecución, con lock en BD para evitar paralelismo.
+    Una ejecución termina → espera al siguiente minuto → comienza la siguiente.
     """
     logging.info("--- [INVENTARIO-LOOP] Inicio repetitivo (cada minuto) ---")
     etl = GesvisionEtl()
     start_time = time.time()
+    lock_acquired = False
 
     try:
+        # Adquirir lock exclusivo en BD (evitar ejecuciones paralelas)
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+            try:
+                # Intenta adquirir lock (espera máximo 5 segundos)
+                cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_inventory_execution' WAITFOR DELAY '00:00:05'")
+                lock_acquired = True
+                logging.info("   [LOCK] Lock exclusivo adquirido — ejecutando INVENTARIO secuencialmente")
+            except Exception as lock_err:
+                logging.warning(f"   [LOCK] No se pudo adquirir lock (otra ejecución en progreso): {lock_err}")
+                cursor.close()
+                return
+
+        if not lock_acquired:
+            logging.warning("   [LOCK] Otra ejecución de INVENTARIO está en progreso. Saltando esta ronda.")
+            return
+
         if not etl.token: etl.get_token()
         total_processed = etl.sync_inventory()
 
@@ -173,7 +193,10 @@ def EtlInventarioRepetitivo(myTimer: func.TimerRequest) -> None:
                 cursor.execute("SELECT COUNT(*) FROM Operaciones_Inventario")
                 count_inventario = cursor.fetchone()[0]
                 cursor.close()
-            etl.notificar_telegram(f"[INVENTARIO-LOOP] Progreso: {count_inventario:,} items cargados ({total_processed} en esta ejecución)")
+            etl.notificar_telegram(f"[INVENTARIO-LOOP] Progreso: {count_inventario:,} items cargados ({total_processed} en {elapsed:.1f} min)")
+        else:
+            logging.info("   [INVENTARIO-LOOP] ✅ COMPLETADO - No hay más items para procesar (status 204)")
+            etl.notificar_telegram("✅ INVENTARIO completado - Tabla poblada en su totalidad")
 
     except Exception as e:
         logging.error(f"Error en INVENTARIO-LOOP: {e}")
