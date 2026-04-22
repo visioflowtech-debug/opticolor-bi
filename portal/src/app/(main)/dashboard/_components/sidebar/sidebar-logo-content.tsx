@@ -15,14 +15,16 @@ export function SidebarLogoContent() {
       <SidebarMenuItem>
         <SidebarMenuButton asChild>
           <Link prefetch={false} href="/dashboard/default" className="flex items-center gap-2">
-            {/* Logo: visible when expanded */}
-            {!isCollapsed && <Logo size="sm" />}
+            {/* Logo + Text: visible when expanded */}
+            {!isCollapsed && (
+              <>
+                <Logo size="sm" />
+                <span className="font-semibold text-sm">OPTICOLOR</span>
+              </>
+            )}
 
-            {/* Favicon: visible when collapsed */}
-            {isCollapsed && <Image src="/favicon.ico" alt="Opticolor" width={24} height={24} />}
-
-            {/* Text: visible only when expanded */}
-            {!isCollapsed && <span className="font-semibold text-sm">OPTICOLOR</span>}
+            {/* Collapsed state: empty space (clean minimalist design) */}
+            {isCollapsed && <div className="h-6 w-full" />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
