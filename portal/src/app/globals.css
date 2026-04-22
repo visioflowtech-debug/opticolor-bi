@@ -143,6 +143,19 @@ These serve as the fallback; there is no separate default.css file. */
 }
 
 @layer utilities {
+  /* Opticolor brand interactions */
+  .interactive-hover {
+    @apply transition-colors duration-200 hover:bg-gray-100 dark:hover:bg-gray-800;
+  }
+
+  .interactive-focus {
+    @apply focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
+  }
+
+  .opticolor-link {
+    @apply text-primary dark:text-blue-400 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
+  }
+
   [data-theme-preset]:not([data-theme-preset="default"]) .shadow-2xs {
     box-shadow: var(--shadow-2xs);
   }
