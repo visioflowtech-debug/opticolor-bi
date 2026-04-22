@@ -61,8 +61,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             ('PEDIDOS_LAB', etl.sync_laboratory_orders),
             ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            ('INVENTARIO', etl.sync_inventory),
-            # ✅ 18/18 MÓDULOS ACTIVADOS - CASCADA COMPLETA
+            # INVENTARIO ejecuta en función separada (EtlInventarioRepetitivo) cada 30 min
+            # ✅ 17/18 MÓDULOS EN CASCADA + 1 ESPECIALIZADO
         ]
 
         for mod_name, mod_func in remaining_modules:
@@ -142,6 +142,37 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 #
 #     finally:
 #         if etl.session: etl.session.close()
+
+
+# --- FUNCIÓN TEMPORAL: INVENTARIO CADA 30 MIN (especializada) ---
+# [22 ABRIL 2026] INVENTARIO se ejecuta de forma separada para evitar timeout de cascada
+@app.timer_trigger(schedule="0 */30 * * * *", arg_name="myTimer", run_on_startup=False)
+def EtlInventarioRepetitivo(myTimer: func.TimerRequest) -> None:
+    """
+    Ejecutor especializado para INVENTARIO que se reinicia cada 30 minutos.
+    Permite a INVENTARIO completar su carga sin afectar el timeout de la cascada principal.
+    MAX_EXECUTION_TIME = 20 minutos (margen de seguridad Azure 30min).
+    """
+    logging.info("--- [INVENTARIO-LOOP] Inicio (cada 30 min) ---")
+    etl = GesvisionEtl()
+    start_time = time.time()
+
+    try:
+        if not etl.token: etl.get_token()
+        total_processed = etl.sync_inventory()
+
+        elapsed = (time.time() - start_time) / 60
+        logging.info(f"--- [INVENTARIO-LOOP] Procesados: {total_processed} items en {elapsed:.1f} min ---")
+        etl.notificar_telegram(f"✅ INVENTARIO: {total_processed} items en {elapsed:.1f} min")
+
+    except Exception as e:
+        logging.error(f"Error en INVENTARIO-LOOP: {e}")
+        try:
+            etl.notificar_telegram(f"❌ ERROR INVENTARIO: {str(e)[:200]}")
+        except: pass
+
+    finally:
+        if etl.session: etl.session.close()
 
 
 # --- SECCIÓN 2: CLASE DE LÓGICA GesvisionEtl ---
@@ -1834,12 +1865,12 @@ class GesvisionEtl:
                 return total_processed
 
         def sync_inventory(self):
-            """Sincroniza niveles de inventario con estrategia Híbrida."""
+            """Sincroniza niveles de inventario con estrategia Híbrida. Ejecutada en función separada EtlInventarioRepetitivo."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
 
             start_time = time.time()
-            MAX_EXECUTION_TIME = 24 * 60
+            MAX_EXECUTION_TIME = 20 * 60  # 20 min (margen Azure 30min - 10min buffer)
             total_processed = 0
 
             with pyodbc.connect(self.conn_str) as conn:
