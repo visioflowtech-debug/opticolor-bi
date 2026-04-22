@@ -61,8 +61,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             ('PEDIDOS_LAB', etl.sync_laboratory_orders),
             ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            # Próximos módulos a activar:
-            # ('INVENTARIO', etl.sync_inventory)
+            ('INVENTARIO', etl.sync_inventory),
+            # ✅ 18/18 MÓDULOS ACTIVADOS - CASCADA COMPLETA
         ]
 
         for mod_name, mod_func in remaining_modules:
