@@ -62,8 +62,9 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             ('PEDIDOS_LAB', etl.sync_laboratory_orders),
             ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            ('INVENTARIO', etl.sync_inventory),
-            # ✅ 18/18 MÓDULOS EN CASCADA - COMPLETO
+            # INVENTARIO ejecuta en función separada (EtlInventarioRepetitivo) cada minuto
+            # ('INVENTARIO', etl.sync_inventory),
+            # ✅ 17/18 MÓDULOS EN CASCADA + 1 ESPECIALIZADO (INVENTARIO cada minuto)
         ]
 
         for mod_name, mod_func in remaining_modules:
@@ -146,41 +147,41 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
 
 # --- FUNCIÓN TEMPORAL: INVENTARIO CADA MINUTO (estrategia PRODUCTOS) ---
-# [22 ABRIL 2026] COMENTADO — INVENTARIO ahora ejecuta en cascada principal con LOAD_MODE HISTORICAL
-# @app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
-# def EtlInventarioRepetitivo(myTimer: func.TimerRequest) -> None:
-#     """
-#     Ejecutor temporal SOLO INVENTARIO que se reinicia cada minuto.
-#     Estrategia idéntica a PRODUCTOS: MAX 24 minutos, checkpoint automático, re-ejecución el siguiente minuto.
-#     """
-#     logging.info("--- [INVENTARIO-LOOP] Inicio repetitivo (cada minuto) ---")
-#     etl = GesvisionEtl()
-#     start_time = time.time()
-#
-#     try:
-#         if not etl.token: etl.get_token()
-#         total_processed = etl.sync_inventory()
-#
-#         elapsed = (time.time() - start_time) / 60
-#         logging.info(f"--- [INVENTARIO-LOOP] Procesados: {total_processed} items en {elapsed:.1f} min ---")
-#
-#         # Notificar progreso solo si se procesaron items
-#         if total_processed > 0:
-#             with pyodbc.connect(etl.conn_str) as conn:
-#                 cursor = conn.cursor()
-#                 cursor.execute("SELECT COUNT(*) FROM Operaciones_Inventario")
-#                 count_inventario = cursor.fetchone()[0]
-#                 cursor.close()
-#             etl.notificar_telegram(f"[INVENTARIO-LOOP] Progreso: {count_inventario:,} items cargados ({total_processed} en esta ejecución)")
-#
-#     except Exception as e:
-#         logging.error(f"Error en INVENTARIO-LOOP: {e}")
-#         try:
-#             etl.notificar_telegram(f"❌ ERROR INVENTARIO-LOOP: {str(e)[:200]}")
-#         except: pass
-#
-#     finally:
-#         if etl.session: etl.session.close()
+# [22 ABRIL 2026] ACTIVO — INVENTARIO se ejecuta cada minuto hasta completar carga histórica
+@app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
+def EtlInventarioRepetitivo(myTimer: func.TimerRequest) -> None:
+    """
+    Ejecutor temporal SOLO INVENTARIO que se reinicia cada minuto.
+    Estrategia idéntica a PRODUCTOS: MAX 24 minutos, checkpoint automático, re-ejecución el siguiente minuto.
+    """
+    logging.info("--- [INVENTARIO-LOOP] Inicio repetitivo (cada minuto) ---")
+    etl = GesvisionEtl()
+    start_time = time.time()
+
+    try:
+        if not etl.token: etl.get_token()
+        total_processed = etl.sync_inventory()
+
+        elapsed = (time.time() - start_time) / 60
+        logging.info(f"--- [INVENTARIO-LOOP] Procesados: {total_processed} items en {elapsed:.1f} min ---")
+
+        # Notificar progreso solo si se procesaron items
+        if total_processed > 0:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM Operaciones_Inventario")
+                count_inventario = cursor.fetchone()[0]
+                cursor.close()
+            etl.notificar_telegram(f"[INVENTARIO-LOOP] Progreso: {count_inventario:,} items cargados ({total_processed} en esta ejecución)")
+
+    except Exception as e:
+        logging.error(f"Error en INVENTARIO-LOOP: {e}")
+        try:
+            etl.notificar_telegram(f"❌ ERROR INVENTARIO-LOOP: {str(e)[:200]}")
+        except: pass
+
+    finally:
+        if etl.session: etl.session.close()
 
 
 # --- SECCIÓN 2: CLASE DE LÓGICA GesvisionEtl ---
@@ -194,7 +195,7 @@ class GesvisionEtl:
         LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
         LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
         LOAD_MODE_INVOICES  = 'HISTORICAL'  # Primera carga: backfill desde 01/01/2025 (post-PRODUCTOS completo).
-        LOAD_MODE_INVENTORY = 'HISTORICAL'  # Control de stock — barrido completo con auto-resume en checkpoint.
+        LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock — Smart Sync con auto-resume en checkpoint.
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
         LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
         LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
