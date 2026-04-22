@@ -14,6 +14,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
 import { Logo } from "@/components/Logo";
@@ -24,6 +25,7 @@ import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 import { NavMain } from "./nav-main";
 import { NavUser } from "./nav-user";
 import { SidebarSupportCard } from "./sidebar-support-card";
+import { SidebarLogoContent } from "./sidebar-logo-content";
 
 const _data = {
   navSecondary: [
@@ -77,26 +79,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
     <Sidebar {...props} variant={variant} collapsible={collapsible}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton asChild>
-              <Link prefetch={false} href="/dashboard/default">
-                {/* Mostrar Logo cuando sidebar está expandido */}
-                <div className="group-data-[state=collapsed]/sidebar-wrapper:hidden">
-                  <Logo size="sm" />
-                </div>
-                {/* Mostrar favicon cuando sidebar está colapsado */}
-                <div className="hidden group-data-[state=collapsed]/sidebar-wrapper:flex">
-                  <Image src="/favicon.ico" alt="Opticolor" width={24} height={24} />
-                </div>
-                {/* Mostrar texto solo cuando sidebar está expandido */}
-                <span className="font-semibold text-sm group-data-[state=collapsed]/sidebar-wrapper:hidden">
-                  OPTICOLOR
-                </span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <SidebarLogoContent />
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={sidebarItems} />
