@@ -2,10 +2,10 @@ import type { ReactNode } from "react";
 
 import { cookies } from "next/headers";
 import Link from "next/link";
+import Image from "next/image";
 
 import { AppSidebar } from "@/app/(main)/dashboard/_components/sidebar/app-sidebar";
 import { Button } from "@/components/ui/button";
-import { SquareActivity } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { users } from "@/data/users";
@@ -55,7 +55,7 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
             <div className="flex items-center gap-1 lg:gap-2">
               <Button asChild variant="ghost" size="icon">
                 <Link href="/">
-                  <SquareActivity className="size-5" />
+                  <Image src="/favicon.ico" alt="Opticolor" width={20} height={20} />
                 </Link>
               </Button>
               <Separator
