@@ -41,8 +41,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
     try:
         # --- GESVISION (Remaining Modules) ---
-        # Módulos activados progresivamente. Hasta COBROS completados.
-        # Siguiente: TESORERIA (Finanzas_Tesoreria)
+        # Módulos activados progresivamente. Hasta TESORERIA completados.
+        # Siguiente: PEDIDOS_LAB (Operaciones_Pedidos_Laboratorio)
         remaining_modules = [
             ('SUCURSALES', etl.sync_dimensions),
             ('EMPLEADOS', etl.sync_employees),
@@ -58,8 +58,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('ORDENES_CRISTALES', etl.sync_glasses_orders),
             ('VENTAS', etl.sync_invoices_incremental),
             ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
+            ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             # Próximos módulos a activar:
-            # ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             # ('PEDIDOS_LAB', etl.sync_laboratory_orders),
             # ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
             # ('INVENTARIO', etl.sync_inventory)
