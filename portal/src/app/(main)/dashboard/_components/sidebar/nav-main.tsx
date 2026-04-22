@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { ChevronRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
@@ -42,6 +43,7 @@ const NavItemExpanded = ({
   isActive: (url: string, subItems?: NavMainItem["subItems"]) => boolean;
   isSubmenuOpen: (subItems?: NavMainItem["subItems"]) => boolean;
 }) => {
+  const itemIsActive = isActive(item.url, item.subItems);
   return (
     <Collapsible key={item.title} asChild defaultOpen={isSubmenuOpen(item.subItems)} className="group/collapsible">
       <SidebarMenuItem>
@@ -49,25 +51,29 @@ const NavItemExpanded = ({
           {item.subItems ? (
             <SidebarMenuButton
               disabled={item.comingSoon}
-              isActive={isActive(item.url, item.subItems)}
+              isActive={itemIsActive}
               tooltip={item.title}
+              className={itemIsActive ? "border-l-4 border-l-sidebar-primary bg-sidebar-primary/10" : ""}
             >
-              {item.icon && <item.icon />}
-              <span>{item.title}</span>
+              {item.icon && <item.icon className={itemIsActive ? "text-sidebar-primary" : ""} />}
+              <span className={itemIsActive ? "font-semibold text-sidebar-primary" : ""}>{item.title}</span>
               {item.comingSoon && <IsComingSoon />}
+              {itemIsActive && <Badge className="ml-auto text-xs" variant="default">Active</Badge>}
               <ChevronRight className="ml-auto transition-transform duration-200 group-data-[state=open]/collapsible:rotate-90" />
             </SidebarMenuButton>
           ) : (
             <SidebarMenuButton
               asChild
               aria-disabled={item.comingSoon}
-              isActive={isActive(item.url)}
+              isActive={itemIsActive}
               tooltip={item.title}
+              className={itemIsActive ? "border-l-4 border-l-sidebar-primary bg-sidebar-primary/10" : ""}
             >
               <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
-                {item.icon && <item.icon />}
-                <span>{item.title}</span>
+                {item.icon && <item.icon className={itemIsActive ? "text-sidebar-primary" : ""} />}
+                <span className={itemIsActive ? "font-semibold text-sidebar-primary" : ""}>{item.title}</span>
                 {item.comingSoon && <IsComingSoon />}
+                {itemIsActive && <Badge className="ml-auto text-xs" variant="default">Active</Badge>}
               </Link>
             </SidebarMenuButton>
           )}
