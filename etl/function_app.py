@@ -41,8 +41,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
     try:
         # --- GESVISION (Remaining Modules) ---
-        # Módulos activados progresivamente. Hasta ORDENES_CRISTALES completados.
-        # Siguiente: VENTAS (Ventas_Cabecera)
+        # Módulos activados progresivamente. Hasta VENTAS completados.
+        # Siguiente: COBROS (Finanzas_Cobros)
         remaining_modules = [
             ('SUCURSALES', etl.sync_dimensions),
             ('EMPLEADOS', etl.sync_employees),
@@ -56,8 +56,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('EXAMENES', etl.sync_exams),
             ('PEDIDOS', etl.sync_orders),
             ('ORDENES_CRISTALES', etl.sync_glasses_orders),
+            ('VENTAS', etl.sync_invoices_incremental),
             # Próximos módulos a activar:
-            # ('VENTAS', etl.sync_invoices_incremental),
             # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
             # ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             # ('PEDIDOS_LAB', etl.sync_laboratory_orders),
@@ -154,7 +154,7 @@ class GesvisionEtl:
 
         LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
         LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
-        LOAD_MODE_INVOICES  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (productos completados).
+        LOAD_MODE_INVOICES  = 'HISTORICAL'  # Primera carga: backfill desde 01/01/2025 (post-PRODUCTOS completo).
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
         LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
