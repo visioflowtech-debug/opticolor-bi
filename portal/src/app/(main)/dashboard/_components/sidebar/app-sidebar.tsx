@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
+import { Logo } from "@/components/Logo";
 import { rootUser } from "@/data/users";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
@@ -79,8 +80,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarMenuItem>
             <SidebarMenuButton asChild>
               <Link prefetch={false} href="/dashboard/default">
-                <Command />
-                <span className="font-semibold text-base">OPTICOLOR - BI</span>
+                <Logo size="sm" className="w-6 h-6" />
+                <span className="font-semibold text-base">OPTICOLOR</span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

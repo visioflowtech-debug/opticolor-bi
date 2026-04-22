@@ -18,67 +18,68 @@ app = func.FunctionApp()
 
 # Horarios Venezuela (UTC-4): 07:50, 09:50, 11:50, 13:50, 15:50, 17:50, 19:50, 21:50
 # Equivalente UTC (+4h):   11:50, 13:50, 15:50, 17:50, 19:50, 21:50, 23:50, 01:50
-@app.timer_trigger(schedule="0 50 1,11,13,15,17,19,21,23 * * *", arg_name="myTimer", run_on_startup=False)
-def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
-    """Función Maestra que inicia la cascada de ejecución."""
-    logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
-    etl = GesvisionEtl()
-    reporte = []
-    start_global = time.time()
-    inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    MAX_DURATION_MINS = 24  # Límite de seguridad Azure
-
-    # Notificación de inicio
-    etl.notificar_telegram(f"✅ ETL Opticolor iniciado — {inicio_ts}")
-    
-    def check_time_limit():
-        """Verifica si se excedió el tiempo límite global."""
-        elapsed = (time.time() - start_global) / 60
-        if elapsed > MAX_DURATION_MINS:
-            logging.warning(f"⚠️ [TIMEOUT PREVENTIVO] Tiempo excedido ({elapsed:.1f} min). Deteniendo cascada.")
-            return True
-        return False
-
-    try:
-        # --- GESVISION (Remaining Modules) ---
-        # ⚠️ [21 ABRIL 2026] SOLO PRODUCTOS ACTIVADO PARA EJECUCIÓN LOCAL SIN TIMEOUT
-        # Los demás módulos comentados temporalmente hasta completar carga masiva de PRODUCTOS
-        remaining_modules = [
-            # ('SUCURSALES', etl.sync_dimensions),
-            # ('EMPLEADOS', etl.sync_employees),
-            # ('CATEGORIAS', etl.sync_categories),
-            # ('METODOS_PAGO', etl.sync_payment_methods),
-            # ('PROVEEDORES', etl.sync_suppliers),
-            # ('MARCAS_FULL', etl.sync_brands_full),
-            ('PRODUCTOS', etl.sync_products),  # ✅ ÚNICO MÓDULO ACTIVO
-            # ('CLIENTES', etl.sync_customers),
-            # ('CITAS', etl.sync_appointments),
-            # ('EXAMENES', etl.sync_exams),
-            # ('PEDIDOS', etl.sync_orders),
-            # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
-            # ('VENTAS', etl.sync_invoices_incremental),
-            # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
-            # ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
-            # ('PEDIDOS_LAB', etl.sync_laboratory_orders),
-            # ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            # ('INVENTARIO', etl.sync_inventory)
-        ]
-
-        for mod_name, mod_func in remaining_modules:
-            if check_time_limit(): break
-            reporte.append(etl.ejecutar_modulo(mod_name, mod_func))
-
-        # --- REPORTE FINAL ---
-        duration = (time.time() - start_global) / 60
-        etl.enviar_resumen_ciclo_telegram(reporte, duration)
-        logging.info(f"--- [FIN] CICLO ETL COMPLETADO EN {duration:.2f} MIN ---")
-
-    except Exception as e:
-        duration = (time.time() - start_global) / 60
-        logging.error(f"Error crítico en cascada: {e}")
-        etl.enviar_resumen_ciclo_telegram(reporte, duration, error_critico=str(e))
-    finally:
-        if etl.session: etl.session.close()
+# ⚠️ [21 ABRIL 2026] COMENTADO TEMPORALMENTE — Solo PRODUCTOS activo hasta completar 143,860 items
+# @app.timer_trigger(schedule="0 50 1,11,13,15,17,19,21,23 * * *", arg_name="myTimer", run_on_startup=False)
+# def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
+#     """Función Maestra que inicia la cascada de ejecución."""
+#     logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
+#     etl = GesvisionEtl()
+#     reporte = []
+#     start_global = time.time()
+#     inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#     MAX_DURATION_MINS = 24  # Límite de seguridad Azure
+#
+#     # Notificación de inicio
+#     etl.notificar_telegram(f"✅ ETL Opticolor iniciado — {inicio_ts}")
+#
+#     def check_time_limit():
+#         """Verifica si se excedió el tiempo límite global."""
+#         elapsed = (time.time() - start_global) / 60
+#         if elapsed > MAX_DURATION_MINS:
+#             logging.warning(f"⚠️ [TIMEOUT PREVENTIVO] Tiempo excedido ({elapsed:.1f} min). Deteniendo cascada.")
+#             return True
+#         return False
+#
+#     try:
+#         # --- GESVISION (Remaining Modules) ---
+#         # ⚠️ [21 ABRIL 2026] SOLO PRODUCTOS ACTIVADO PARA EJECUCIÓN LOCAL SIN TIMEOUT
+#         # Los demás módulos comentados temporalmente hasta completar carga masiva de PRODUCTOS
+#         remaining_modules = [
+#             # ('SUCURSALES', etl.sync_dimensions),
+#             # ('EMPLEADOS', etl.sync_employees),
+#             # ('CATEGORIAS', etl.sync_categories),
+#             # ('METODOS_PAGO', etl.sync_payment_methods),
+#             # ('PROVEEDORES', etl.sync_suppliers),
+#             # ('MARCAS_FULL', etl.sync_brands_full),
+#             ('PRODUCTOS', etl.sync_products),  # ✅ ÚNICO MÓDULO ACTIVO
+#             # ('CLIENTES', etl.sync_customers),
+#             # ('CITAS', etl.sync_appointments),
+#             # ('EXAMENES', etl.sync_exams),
+#             # ('PEDIDOS', etl.sync_orders),
+#             # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
+#             # ('VENTAS', etl.sync_invoices_incremental),
+#             # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
+#             # ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
+#             # ('PEDIDOS_LAB', etl.sync_laboratory_orders),
+#             # ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
+#             # ('INVENTARIO', etl.sync_inventory)
+#         ]
+#
+#         for mod_name, mod_func in remaining_modules:
+#             if check_time_limit(): break
+#             reporte.append(etl.ejecutar_modulo(mod_name, mod_func))
+#
+#         # --- REPORTE FINAL ---
+#         duration = (time.time() - start_global) / 60
+#         etl.enviar_resumen_ciclo_telegram(reporte, duration)
+#         logging.info(f"--- [FIN] CICLO ETL COMPLETADO EN {duration:.2f} MIN ---")
+#
+#     except Exception as e:
+#         duration = (time.time() - start_global) / 60
+#         logging.error(f"Error crítico en cascada: {e}")
+#         etl.enviar_resumen_ciclo_telegram(reporte, duration, error_critico=str(e))
+#     finally:
+#         if etl.session: etl.session.close()
 
 
 # --- FUNCIÓN TEMPORAL: PRODUCTOS CADA MINUTO (hasta completar carga histórica) ---

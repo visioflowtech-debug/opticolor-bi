@@ -18,11 +18,11 @@ const sizeMap = {
 
 export function Logo({ size = "md", href = "/", priority = false, className }: LogoProps) {
   const width = sizeMap[size];
-  const height = Math.round(width * (200 / 500)); // 500x200 original ratio
+  const height = Math.round(width * (200 / 500)); // Proporción original
 
   const image = (
     <Image
-      src="/media/logo-opticolor.png"
+      src="/media/logo_opticolor.webp"
       alt="Opticolor - BI"
       width={width}
       height={height}
