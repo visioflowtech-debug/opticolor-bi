@@ -153,7 +153,24 @@ These serve as the fallback; there is no separate default.css file. */
   }
 
   .opticolor-link {
-    @apply text-primary dark:text-blue-400 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary;
+    @apply text-primary dark:text-blue-300 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:focus-visible:outline-blue-300;
+  }
+
+  /* WCAG AA dark mode compliance */
+  .dark a {
+    @apply text-blue-300;
+  }
+
+  .dark a:hover {
+    @apply text-blue-200;
+  }
+
+  .dark .text-muted-foreground {
+    @apply text-gray-300 dark:text-gray-300;
+  }
+
+  .dark .text-secondary-foreground {
+    @apply text-gray-100;
   }
 
   [data-theme-preset]:not([data-theme-preset="default"]) .shadow-2xs {
