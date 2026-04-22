@@ -376,7 +376,7 @@ class GesvisionEtl:
                     "text": mensaje,
                     "disable_notification": silencioso
                 }
-                requests.post(url, json=payload, timeout=5)
+                requests.post(url, json=payload, timeout=(10, 30))
             except Exception as e:
                 logging.warning(f"Fallo envío Telegram: {e}")
 
@@ -527,7 +527,7 @@ class GesvisionEtl:
                     row = cursor.fetchone()
                     db_last_date = row[0] if row and row[0] else None
 
-                    current_time = datetime.datetime.now()
+                    current_time = datetime.datetime.utcnow()
 
                     if db_last_date:
                         # FIX: Asegurar que sea datetime para comparación
@@ -1276,6 +1276,7 @@ class GesvisionEtl:
                     skip += limit
                     time.sleep(0.01)
 
+                logging.info(f"   [Fin] PRODUCTOS procesados: {total_processed} registros")
                 return total_processed
 
         def sync_exams(self):
