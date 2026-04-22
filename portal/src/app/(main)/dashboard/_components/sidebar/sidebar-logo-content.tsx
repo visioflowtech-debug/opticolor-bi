@@ -23,8 +23,8 @@ export function SidebarLogoContent() {
               </>
             )}
 
-            {/* Collapsed state: empty space (clean minimalist design) */}
-            {isCollapsed && <div className="h-6 w-full" />}
+            {/* Favicon: visible when collapsed */}
+            {isCollapsed && <Image src="/favicon.ico" alt="Opticolor" width={24} height={24} />}
           </Link>
         </SidebarMenuButton>
       </SidebarMenuItem>
