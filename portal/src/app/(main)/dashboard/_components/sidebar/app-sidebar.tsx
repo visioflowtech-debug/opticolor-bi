@@ -81,7 +81,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton asChild>
               <Link prefetch={false} href="/dashboard/default">
                 <Logo size="sm" />
-                <span className="font-semibold text-sm">OPTICOLOR</span>
+                {/* Mostrar texto solo cuando sidebar está expandido */}
+                <span className="font-semibold text-sm group-data-[state=collapsed]/sidebar-wrapper:hidden">
+                  OPTICOLOR
+                </span>
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
