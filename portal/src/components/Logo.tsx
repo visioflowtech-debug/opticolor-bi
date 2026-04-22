@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 interface LogoProps {
   size?: "sm" | "md" | "lg";
+  width?: number;
   href?: string;
   priority?: boolean;
   className?: string;
@@ -16,16 +17,16 @@ const sizeMap = {
   lg: 180,
 };
 
-export function Logo({ size = "md", href = "/", priority = false, className }: LogoProps) {
-  const width = sizeMap[size];
-  const height = Math.round(width * (200 / 500)); // Proporción original
+export function Logo({ size, width, href = "/", priority = false, className }: LogoProps) {
+  const logoWidth = width || sizeMap[size || "md"];
+  const logoHeight = Math.round(logoWidth * (200 / 500)); // Proporción original
 
   const image = (
     <Image
       src="/media/logo_opticolor.webp"
       alt="Opticolor - BI"
-      width={width}
-      height={height}
+      width={logoWidth}
+      height={logoHeight}
       priority={priority}
       quality={90}
       className={cn("object-contain", className)}
