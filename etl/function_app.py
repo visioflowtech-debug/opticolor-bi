@@ -41,20 +41,22 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
     try:
         # --- GESVISION (Remaining Modules) ---
+        # ⚠️ [21 ABRIL 2026] SOLO PRODUCTOS ACTIVADO PARA EJECUCIÓN LOCAL SIN TIMEOUT
+        # Los demás módulos comentados temporalmente hasta completar carga masiva de PRODUCTOS
         remaining_modules = [
-            ('SUCURSALES', etl.sync_dimensions),
-            ('EMPLEADOS', etl.sync_employees),
-            ('CATEGORIAS', etl.sync_categories),
-            ('METODOS_PAGO', etl.sync_payment_methods),
-            ('PROVEEDORES', etl.sync_suppliers),
-            ('MARCAS_FULL', etl.sync_brands_full),
-            ('PRODUCTOS', etl.sync_products),
-            ('CLIENTES', etl.sync_customers),
-            ('CITAS', etl.sync_appointments),
-            ('EXAMENES', etl.sync_exams),
-            ('PEDIDOS', etl.sync_orders),
+            # ('SUCURSALES', etl.sync_dimensions),
+            # ('EMPLEADOS', etl.sync_employees),
+            # ('CATEGORIAS', etl.sync_categories),
+            # ('METODOS_PAGO', etl.sync_payment_methods),
+            # ('PROVEEDORES', etl.sync_suppliers),
+            # ('MARCAS_FULL', etl.sync_brands_full),
+            ('PRODUCTOS', etl.sync_products),  # ✅ ÚNICO MÓDULO ACTIVO
+            # ('CLIENTES', etl.sync_customers),
+            # ('CITAS', etl.sync_appointments),
+            # ('EXAMENES', etl.sync_exams),
+            # ('PEDIDOS', etl.sync_orders),
             # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
-            ('VENTAS', etl.sync_invoices_incremental),
+            # ('VENTAS', etl.sync_invoices_incremental),
             # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
             # ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             # ('PEDIDOS_LAB', etl.sync_laboratory_orders),
@@ -75,6 +77,69 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         duration = (time.time() - start_global) / 60
         logging.error(f"Error crítico en cascada: {e}")
         etl.enviar_resumen_ciclo_telegram(reporte, duration, error_critico=str(e))
+    finally:
+        if etl.session: etl.session.close()
+
+
+# --- FUNCIÓN TEMPORAL: PRODUCTOS CADA MINUTO (hasta completar carga histórica) ---
+# [21 ABRIL 2026] Ejecuta SOLO PRODUCTOS cada minuto para completar 143,860 productos
+# Duración total estimada: ~144 minutos (2.4 horas), se ejecutará toda la noche
+# Timer: cada minuto (*/1 * * * *) → máx 20 minutos por ejecución → reinicio automático
+@app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
+def EtlProductosRepetitivo(myTimer: func.TimerRequest) -> None:
+    """
+    Ejecutor temporal SOLO PRODUCTOS que se reinicia cada minuto.
+    Una vez completada la carga histórica, comentar esta función.
+    """
+    logging.info("--- [PRODUCTOS-LOOP] Inicio repetitivo (cada minuto) ---")
+    etl = GesvisionEtl()
+    start_time = time.time()
+
+    try:
+        # Verificar si ya completó
+        import pyodbc
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT LastValue FROM Etl_Checkpoints WHERE KeyName = 'checkpoint_products_skip'")
+            row = cursor.fetchone()
+            skip_actual = int(row[0]) if row and row[0] else 0
+            cursor.close()
+
+        if skip_actual == 0:
+            # Verificar si hay datos (significa que completó alguna vez)
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM Maestro_Productos")
+                count_productos = cursor.fetchone()[0]
+                cursor.close()
+
+            if count_productos > 0:
+                logging.info(f"✅ [PRODUCTOS-LOOP] Carga histórica COMPLETADA ({count_productos:,} productos)")
+                etl.notificar_telegram(f"✅ PRODUCTOS completado: {count_productos:,} productos en BD")
+                return
+
+        # Ejecutar sync_products() con timeout de 20 minutos
+        if not etl.token: etl.get_token()
+        total_processed = etl.sync_products()
+
+        elapsed = (time.time() - start_time) / 60
+        logging.info(f"--- [PRODUCTOS-LOOP] Procesados: {total_processed} productos en {elapsed:.1f} min ---")
+
+        # Notificar progreso cada 5 ciclos (~5 minutos)
+        if int(elapsed) % 5 == 0:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM Maestro_Productos")
+                count_productos = cursor.fetchone()[0]
+                cursor.close()
+            etl.notificar_telegram(f"[PRODUCTOS-LOOP] Progreso: {count_productos:,} productos cargados")
+
+    except Exception as e:
+        logging.error(f"Error en PRODUCTOS-LOOP: {e}")
+        try:
+            etl.notificar_telegram(f"❌ ERROR PRODUCTOS-LOOP: {str(e)[:200]}")
+        except: pass
+
     finally:
         if etl.session: etl.session.close()
 
@@ -1105,10 +1170,10 @@ class GesvisionEtl:
                 limit = 50
                 buffer = []
                 total_processed = 0
-                
-                BUFFER_LIMIT = 200 
+
+                BUFFER_LIMIT = 200
                 start_time = time.time()
-                MAX_EXECUTION_TIME = 9 * 60 
+                MAX_EXECUTION_TIME = 20 * 60  # 20 minutos para aprovechar ciclo Azure (24 min límite) 
 
                 while True:
                     # --- 3. MANEJO DE TIMEOUT CON GUARDADO DE ESTADO ---
