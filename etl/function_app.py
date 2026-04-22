@@ -41,7 +41,8 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
     try:
         # --- GESVISION (Remaining Modules) ---
-        # Todos los módulos activos en cascada secuencial
+        # Módulos activados progresivamente. Hasta EXAMENES completados.
+        # Siguiente: PEDIDOS (Operaciones_Pedidos) - pendiente activación
         remaining_modules = [
             ('SUCURSALES', etl.sync_dimensions),
             ('EMPLEADOS', etl.sync_employees),
@@ -53,14 +54,15 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('CLIENTES', etl.sync_customers),
             ('CITAS', etl.sync_appointments),
             ('EXAMENES', etl.sync_exams),
-            ('PEDIDOS', etl.sync_orders),
-            ('ORDENES_CRISTALES', etl.sync_glasses_orders),
-            ('VENTAS', etl.sync_invoices_incremental),
-            ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
-            ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
-            ('PEDIDOS_LAB', etl.sync_laboratory_orders),
-            ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            ('INVENTARIO', etl.sync_inventory)
+            # Próximos módulos a activar:
+            # ('PEDIDOS', etl.sync_orders),
+            # ('ORDENES_CRISTALES', etl.sync_glasses_orders),
+            # ('VENTAS', etl.sync_invoices_incremental),
+            # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
+            # ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
+            # ('PEDIDOS_LAB', etl.sync_laboratory_orders),
+            # ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
+            # ('INVENTARIO', etl.sync_inventory)
         ]
 
         for mod_name, mod_func in remaining_modules:
