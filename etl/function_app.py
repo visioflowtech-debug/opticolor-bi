@@ -144,16 +144,15 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 #         if etl.session: etl.session.close()
 
 
-# --- FUNCIÓN TEMPORAL: INVENTARIO CADA 30 MIN (especializada) ---
-# [22 ABRIL 2026] INVENTARIO se ejecuta de forma separada para evitar timeout de cascada
-@app.timer_trigger(schedule="0 */30 * * * *", arg_name="myTimer", run_on_startup=False)
+# --- FUNCIÓN TEMPORAL: INVENTARIO CADA MINUTO (estrategia PRODUCTOS) ---
+# [22 ABRIL 2026] INVENTARIO se ejecuta cada minuto con detención controlada y re-ejecución automática
+@app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
 def EtlInventarioRepetitivo(myTimer: func.TimerRequest) -> None:
     """
-    Ejecutor especializado para INVENTARIO que se reinicia cada 30 minutos.
-    Permite a INVENTARIO completar su carga sin afectar el timeout de la cascada principal.
-    MAX_EXECUTION_TIME = 20 minutos (margen de seguridad Azure 30min).
+    Ejecutor temporal SOLO INVENTARIO que se reinicia cada minuto.
+    Estrategia idéntica a PRODUCTOS: MAX 24 minutos, checkpoint automático, re-ejecución el siguiente minuto.
     """
-    logging.info("--- [INVENTARIO-LOOP] Inicio (cada 30 min) ---")
+    logging.info("--- [INVENTARIO-LOOP] Inicio repetitivo (cada minuto) ---")
     etl = GesvisionEtl()
     start_time = time.time()
 
@@ -163,12 +162,20 @@ def EtlInventarioRepetitivo(myTimer: func.TimerRequest) -> None:
 
         elapsed = (time.time() - start_time) / 60
         logging.info(f"--- [INVENTARIO-LOOP] Procesados: {total_processed} items en {elapsed:.1f} min ---")
-        etl.notificar_telegram(f"✅ INVENTARIO: {total_processed} items en {elapsed:.1f} min")
+
+        # Notificar progreso solo si se procesaron items
+        if total_processed > 0:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM Operaciones_Inventario")
+                count_inventario = cursor.fetchone()[0]
+                cursor.close()
+            etl.notificar_telegram(f"[INVENTARIO-LOOP] Progreso: {count_inventario:,} items cargados ({total_processed} en esta ejecución)")
 
     except Exception as e:
         logging.error(f"Error en INVENTARIO-LOOP: {e}")
         try:
-            etl.notificar_telegram(f"❌ ERROR INVENTARIO: {str(e)[:200]}")
+            etl.notificar_telegram(f"❌ ERROR INVENTARIO-LOOP: {str(e)[:200]}")
         except: pass
 
     finally:
@@ -1870,7 +1877,7 @@ class GesvisionEtl:
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
 
             start_time = time.time()
-            MAX_EXECUTION_TIME = 20 * 60  # 20 min (margen Azure 30min - 10min buffer)
+            MAX_EXECUTION_TIME = 24 * 60  # 24 min (margen Azure 30min - 6min buffer)
             total_processed = 0
 
             with pyodbc.connect(self.conn_str) as conn:
