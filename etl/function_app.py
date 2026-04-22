@@ -41,8 +41,7 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
     try:
         # --- GESVISION (Remaining Modules) ---
-        # Módulos activados progresivamente. Hasta PEDIDOS completados.
-        # ⚠️ [22 ABRIL 2026] ORDENES_CRISTALES pausado — bucle infinito en INCREMENTAL mode
+        # Módulos activados progresivamente. Hasta ORDENES_CRISTALES completados.
         # Siguiente: VENTAS (Ventas_Cabecera)
         remaining_modules = [
             ('SUCURSALES', etl.sync_dimensions),
@@ -56,7 +55,7 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('CITAS', etl.sync_appointments),
             ('EXAMENES', etl.sync_exams),
             ('PEDIDOS', etl.sync_orders),
-            # ('ORDENES_CRISTALES', etl.sync_glasses_orders),  # ⚠️ PAUSADO: Bucle infinito en INCREMENTAL
+            ('ORDENES_CRISTALES', etl.sync_glasses_orders),
             # Próximos módulos a activar:
             # ('VENTAS', etl.sync_invoices_incremental),
             # ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
