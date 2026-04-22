@@ -53,7 +53,7 @@ const NavItemExpanded = ({
               disabled={item.comingSoon}
               isActive={itemIsActive}
               tooltip={item.title}
-              className={itemIsActive ? "border-l-4 border-l-sidebar-primary bg-sidebar-primary/10" : ""}
+              className={`transition-colors duration-200 ${itemIsActive ? "border-l-4 border-l-sidebar-primary bg-sidebar-primary/10" : "hover:bg-sidebar-accent/5"} focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2`}
             >
               {item.icon && <item.icon className={itemIsActive ? "text-sidebar-primary" : ""} />}
               <span className={itemIsActive ? "font-semibold text-sidebar-primary" : ""}>{item.title}</span>
@@ -67,7 +67,7 @@ const NavItemExpanded = ({
               aria-disabled={item.comingSoon}
               isActive={itemIsActive}
               tooltip={item.title}
-              className={itemIsActive ? "border-l-4 border-l-sidebar-primary bg-sidebar-primary/10" : ""}
+              className={`transition-colors duration-200 ${itemIsActive ? "border-l-4 border-l-sidebar-primary bg-sidebar-primary/10" : "hover:bg-sidebar-accent/5"} focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2`}
             >
               <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
                 {item.icon && <item.icon className={itemIsActive ? "text-sidebar-primary" : ""} />}
@@ -83,7 +83,12 @@ const NavItemExpanded = ({
             <SidebarMenuSub>
               {item.subItems.map((subItem) => (
                 <SidebarMenuSubItem key={subItem.title}>
-                  <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={isActive(subItem.url)} asChild>
+                  <SidebarMenuSubButton
+                    aria-disabled={subItem.comingSoon}
+                    isActive={isActive(subItem.url)}
+                    asChild
+                    className="transition-colors duration-200 hover:bg-sidebar-accent/5 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2"
+                  >
                     <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
                       {subItem.icon && <subItem.icon />}
                       <span>{subItem.title}</span>
@@ -115,6 +120,7 @@ const NavItemCollapsed = ({
             disabled={item.comingSoon}
             tooltip={item.title}
             isActive={isActive(item.url, item.subItems)}
+            className="transition-colors duration-200 hover:bg-sidebar-accent/5 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2"
           >
             {item.icon && <item.icon />}
             <span>{item.title}</span>
@@ -178,6 +184,7 @@ export function NavMain({ items }: NavMainProps) {
                           aria-disabled={item.comingSoon}
                           tooltip={item.title}
                           isActive={isItemActive(item.url)}
+                          className="transition-colors duration-200 hover:bg-sidebar-accent/5 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:ring-offset-2"
                         >
                           <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
                             {item.icon && <item.icon />}
