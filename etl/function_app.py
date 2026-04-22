@@ -157,7 +157,7 @@ class GesvisionEtl:
         LOAD_MODE_INVOICES  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (productos completados).
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock.
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
-        LOAD_MODE_PRODUCTS  = 'HISTORICAL'  # Backfill completo desde 01/01/2025 para cubrir todas las ventas.
+        LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
         LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
         LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
         LOAD_MODE_COBROS    = 'INCREMENTAL'  # Dual Load (Historical/Incremental).
@@ -1165,6 +1165,8 @@ class GesvisionEtl:
                 else:
                     last_date = self.get_last_date(conn, "Maestro_Productos", "fecha_ultima_actualizacion")
                     skip = 0
+                    # Limpiar checkpoint cuando se cambia a INCREMENTAL
+                    self._update_checkpoint(conn, CHECKPOINT_KEY, 0)
                     logging.info(f"   [Incremental] Buscando cambios desde: {last_date}")
 
                 limit = 50
