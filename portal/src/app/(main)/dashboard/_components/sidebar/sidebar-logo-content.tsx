@@ -15,40 +15,63 @@ export function SidebarLogoContent() {
 
   return (
     <SidebarMenu>
-      <SidebarMenuItem className="flex items-center justify-between gap-2">
-        {/* Logo/Favicon + Home Link */}
-        <SidebarMenuButton asChild className="flex-1">
-          <Link prefetch={false} href="/dashboard/default" className="flex items-center gap-2">
-            {/* Logo + Text: visible when expanded */}
-            {!isCollapsed && (
-              <>
+      <SidebarMenuItem>
+        {/* Expanded state: Logo + Text + Toggle */}
+        {!isCollapsed && (
+          <div className="flex items-center justify-between gap-2">
+            <SidebarMenuButton asChild className="flex-1">
+              <Link prefetch={false} href="/dashboard/default" className="flex items-center gap-2">
                 <Logo size="sm" />
                 <span className="font-semibold text-sm">OPTICOLOR</span>
-              </>
-            )}
+              </Link>
+            </SidebarMenuButton>
 
-            {/* Favicon: visible when collapsed */}
-            {isCollapsed && <Image src="/favicon.ico" alt="Opticolor" width={24} height={24} />}
-          </Link>
-        </SidebarMenuButton>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 shrink-0"
+                  onClick={() => toggleSidebar()}
+                  aria-label="Minimizar sidebar"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="ml-2">
+                Minimizar
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
 
-        {/* Toggle Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0"
-              onClick={() => toggleSidebar()}
-              aria-label={isCollapsed ? "Expandir sidebar" : "Minimizar sidebar"}
-            >
-              {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="ml-2">
-            {isCollapsed ? "Expandir" : "Minimizar"}
-          </TooltipContent>
-        </Tooltip>
+        {/* Collapsed state: Favicon + Toggle */}
+        {isCollapsed && (
+          <div className="flex flex-col items-center justify-center gap-2">
+            <SidebarMenuButton asChild className="w-full justify-center">
+              <Link prefetch={false} href="/dashboard/default">
+                <Image src="/favicon.ico" alt="Opticolor" width={24} height={24} />
+              </Link>
+            </SidebarMenuButton>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => toggleSidebar()}
+                  aria-label="Expandir sidebar"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right" className="ml-2">
+                Expandir
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        )}
       </SidebarMenuItem>
     </SidebarMenu>
   );
