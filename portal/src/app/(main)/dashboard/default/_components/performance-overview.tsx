@@ -2,9 +2,11 @@
 
 import { addHours, endOfToday, format, parseISO, subHours } from "date-fns";
 import { Area, CartesianGrid, ComposedChart, Line, XAxis } from "recharts";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChartWithSkeleton } from "@/components/ui/chart-skeleton";
 import {
   type ChartConfig,
   ChartContainer,
@@ -230,6 +232,8 @@ const chartConfig = {
 } satisfies ChartConfig;
 
 export function PerformanceOverview() {
+  const [isLoading] = useState(false);
+
   return (
     <Card className="@container/card">
       <CardHeader>
@@ -272,7 +276,8 @@ export function PerformanceOverview() {
       </CardHeader>
 
       <CardContent>
-        <ChartContainer config={chartConfig} className="aspect-auto h-80 w-full">
+        <ChartWithSkeleton isLoading={isLoading} height="h-80">
+          <ChartContainer config={chartConfig} className="aspect-auto h-80 w-full">
           <ComposedChart data={chartData} margin={{ top: 0 }}>
             <defs>
               <linearGradient id="fillNewCustomers" x1="0" y1="0" x2="0" y2="1">
@@ -332,7 +337,8 @@ export function PerformanceOverview() {
               dot={false}
             />
           </ComposedChart>
-        </ChartContainer>
+          </ChartContainer>
+        </ChartWithSkeleton>
       </CardContent>
     </Card>
   );
