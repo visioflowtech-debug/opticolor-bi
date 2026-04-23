@@ -1,6 +1,6 @@
 import { query } from '@/lib/db';
 import bcrypt from 'bcryptjs';
-import { SignJWT } from 'jose';
+import { jwtVerify, SignJWT } from 'jose';
 import { cookies } from 'next/headers';
 
 const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || '');
@@ -42,20 +42,23 @@ export async function POST(req: Request) {
 
     console.log('[Login API] Autenticación exitosa para:', email);
 
-    // Crear JWT
+    // Crear JWT en formato NextAuth
+    const now = Math.floor(Date.now() / 1000);
+    const expires = now + 24 * 60 * 60; // 24 horas
+
     const token = await new SignJWT({
-      id: String(user.id_usuario),
+      sub: String(user.id_usuario),
       email: user.email,
       name: user.nombre_completo,
-      nombre_rol: user.nombre_rol,
-      nivel_jerarquico: user.nivel_jerarquico,
-      iat: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 horas
-    })
-      .setProtectedHeader({ alg: 'HS256' })
+      iat: now,
+      exp: expires,
+      jti: Math.random().toString(36).substring(2, 15),
+      // Agregar claims personalizadas para NextAuth
+    } as any)
+      .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
       .sign(secret);
 
-    console.log('[Login API] JWT creado');
+    console.log('[Login API] JWT creado, expires:', new Date(expires * 1000).toISOString());
 
     // Guardar en cookie
     const cookieStore = await cookies();
@@ -73,6 +76,10 @@ export async function POST(req: Request) {
     });
 
     console.log('[Login API] Cookie guardada:', cookieName);
+
+    // Verificar que la cookie se creó correctamente
+    const verifyToken = cookieStore.get(cookieName);
+    console.log('[Login API] Cookie verificada:', verifyToken ? 'OK' : 'FALLO');
 
     return Response.json({
       ok: true,
