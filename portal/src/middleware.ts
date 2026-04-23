@@ -1,20 +1,22 @@
-import { auth } from '@/app/api/auth/[...nextauth]/route';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export async function middleware(req: NextRequest) {
+export function middleware(req: NextRequest) {
   const pathname = req.nextUrl.pathname;
   const isLoginPage = pathname.startsWith('/auth');
   const isDashboard = pathname.startsWith('/dashboard');
 
-  // Obtener sesión usando auth() de NextAuth
-  const session = await auth();
-  const hasSession = !!session;
+  // Obtener sessionToken de las cookies
+  const sessionToken = req.cookies.get('next-auth.session-token')?.value ||
+                      req.cookies.get('__Secure-next-auth.session-token')?.value;
+
+  const hasSession = !!sessionToken;
 
   console.log('[Middleware]', {
     path: pathname,
     hasSession,
-    user: hasSession ? (session?.user as any)?.email : 'no autenticado',
+    cookieName: req.cookies.get('next-auth.session-token') ? 'next-auth.session-token' :
+                req.cookies.get('__Secure-next-auth.session-token') ? '__Secure-next-auth.session-token' : 'ninguna',
   });
 
   // Proteger rutas de dashboard
