@@ -74,18 +74,7 @@ export const { handlers, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
-      if (user) {
-        token.nombre_rol = (user as any).nombre_rol;
-        token.nivel_jerarquico = (user as any).nivel_jerarquico;
-      }
-      return token;
-    },
-    session({ session, token }) {
-      if (session.user) {
-        (session.user as any).nombre_rol = token.nombre_rol;
-        (session.user as any).nivel_jerarquico = token.nivel_jerarquico;
-      }
+    async session({ session }) {
       return session;
     },
   },

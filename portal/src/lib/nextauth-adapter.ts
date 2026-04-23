@@ -1,4 +1,4 @@
-import { type Adapter } from 'next-auth/adapters';
+import { type Adapter, type AdapterSession, type AdapterUser } from 'next-auth/adapters';
 import { query } from './db';
 
 /**
@@ -7,52 +7,46 @@ import { query } from './db';
  */
 export function MSSQLAdapter(): Adapter {
   return {
-    async createSession(data) {
+    async createSession(data): Promise<AdapterSession> {
       const { sessionToken, userId, expires } = data;
 
       try {
-        console.log('[NextAuth Adapter] Creando sesión:', {
-          userId,
-          sessionToken: sessionToken?.substring(0, 20) + '...',
-          expires: new Date(expires),
-        });
+        console.log('[NextAuth Adapter] createSession start', { userId });
+
+        const expiresDate = new Date(expires);
 
         await query(
           `INSERT INTO [sessions] ([id], [sessionToken], [userId], [expires])
            VALUES (NEWID(), @sessionToken, @userId, @expires)`,
           {
             sessionToken,
-            userId: parseInt(userId),
-            expires: new Date(expires),
+            userId,
+            expires: expiresDate,
           }
         );
 
-        console.log('[NextAuth Adapter] Sesión creada exitosamente');
+        console.log('[NextAuth Adapter] createSession success');
 
         return {
           sessionToken,
-          userId: parseInt(userId),
-          expires: new Date(expires),
-        } as any;
-      } catch (error) {
-        console.error('[NextAuth Adapter] Error creando sesión:', {
-          error: error instanceof Error ? error.message : String(error),
           userId,
-          sessionToken: sessionToken?.substring(0, 20),
-        });
+          expires: expiresDate,
+        };
+      } catch (error) {
+        console.error('[NextAuth Adapter] createSession error:', error);
         throw error;
       }
     },
 
-    async getSessionAndUser(sessionToken) {
+    async getSessionAndUser(sessionToken): Promise<{ session: AdapterSession; user: AdapterUser } | null> {
       try {
-        console.log('[NextAuth Adapter] Buscando sesión:', sessionToken);
+        console.log('[NextAuth Adapter] getSessionAndUser start');
 
         const rows = await query<{
           sessionToken: string;
-          userId: number;
-          expires: Date;
-          id_usuario: number;
+          userId: string;
+          expires: string;
+          id_usuario: string;
           email: string;
           nombre_completo: string;
           nombre_rol: string;
@@ -74,38 +68,40 @@ export function MSSQLAdapter(): Adapter {
         );
 
         if (!rows.length) {
-          console.log('[NextAuth Adapter] Sesión no encontrada o expirada');
+          console.log('[NextAuth Adapter] getSessionAndUser: not found');
           return null;
         }
 
         const row = rows[0];
-        console.log('[NextAuth Adapter] Sesión encontrada para:', row.email);
+        console.log('[NextAuth Adapter] getSessionAndUser success');
 
         return {
           session: {
             sessionToken: row.sessionToken,
-            userId: row.userId,
+            userId: String(row.userId),
             expires: new Date(row.expires),
-          } as any,
+          },
           user: {
             id: String(row.id_usuario),
             email: row.email,
             name: row.nombre_completo,
-            nombre_rol: row.nombre_rol,
-            nivel_jerarquico: row.nivel_jerarquico,
-          } as any,
+            image: null,
+            emailVerified: null,
+          },
         };
       } catch (error) {
-        console.error('[NextAuth Adapter] Error obteniendo sesión:', error);
+        console.error('[NextAuth Adapter] getSessionAndUser error:', error);
         throw error;
       }
     },
 
-    async updateSession(data) {
+    async updateSession(data): Promise<AdapterSession | null> {
       const { sessionToken, expires } = data;
 
       try {
-        console.log('[NextAuth Adapter] Actualizando sesión:', sessionToken);
+        console.log('[NextAuth Adapter] updateSession start');
+
+        const expiresDate = new Date(expires);
 
         await query(
           `UPDATE [sessions]
@@ -113,14 +109,14 @@ export function MSSQLAdapter(): Adapter {
            WHERE [sessionToken] = @sessionToken`,
           {
             sessionToken,
-            expires,
+            expires: expiresDate,
           }
         );
 
         const rows = await query<{
           sessionToken: string;
-          userId: number;
-          expires: Date;
+          userId: string;
+          expires: string;
         }>(
           `SELECT [sessionToken], [userId], [expires]
            FROM [sessions]
@@ -133,31 +129,36 @@ export function MSSQLAdapter(): Adapter {
         }
 
         const row = rows[0];
+        console.log('[NextAuth Adapter] updateSession success');
+
         return {
           sessionToken: row.sessionToken,
-          userId: row.userId,
+          userId: String(row.userId),
           expires: new Date(row.expires),
-        } as any;
+        };
       } catch (error) {
-        console.error('[NextAuth Adapter] Error actualizando sesión:', error);
+        console.error('[NextAuth Adapter] updateSession error:', error);
         throw error;
       }
     },
 
-    async deleteSession(sessionToken) {
+    async deleteSession(sessionToken): Promise<void> {
       try {
-        console.log('[NextAuth Adapter] Eliminando sesión:', sessionToken);
+        console.log('[NextAuth Adapter] deleteSession start');
 
         await query(
           `DELETE FROM [sessions] WHERE [sessionToken] = @sessionToken`,
           { sessionToken }
         );
+
+        console.log('[NextAuth Adapter] deleteSession success');
       } catch (error) {
-        console.error('[NextAuth Adapter] Error eliminando sesión:', error);
+        console.error('[NextAuth Adapter] deleteSession error:', error);
         throw error;
       }
     },
 
+    // Métodos no implementados
     async createUser() {
       throw new Error('createUser no está implementado');
     },
