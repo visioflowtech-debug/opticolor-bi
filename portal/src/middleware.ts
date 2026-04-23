@@ -1,33 +1,37 @@
-import { auth } from '@/config/auth';
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export default auth((req) => {
-  const isAuth = !!req.auth;
-  const isLoginPage = req.nextUrl.pathname.startsWith('/auth');
-  const isDashboard = req.nextUrl.pathname.startsWith('/dashboard');
+export function middleware(req: NextRequest) {
+  const pathname = req.nextUrl.pathname;
+  const isLoginPage = pathname.startsWith('/auth');
+  const isDashboard = pathname.startsWith('/dashboard');
+
+  // Obtener token JWT de las cookies
+  const token = req.cookies.get('next-auth.session-token')?.value ||
+               req.cookies.get('__Secure-next-auth.session-token')?.value;
+
+  const hasSession = !!token;
 
   console.log('[Middleware]', {
-    path: req.nextUrl.pathname,
-    isAuth,
-    isLoginPage,
-    isDashboard,
+    path: pathname,
+    hasSession,
+    token: token ? 'presente' : 'ausente',
   });
 
   // Proteger rutas de dashboard
-  if (isDashboard && !isAuth) {
-    console.log('[Middleware] Redirigiendo a login - no autenticado');
+  if (isDashboard && !hasSession) {
+    console.log('[Middleware] Redirigiendo a login - sin sesión');
     return NextResponse.redirect(new URL('/auth/v2/login', req.url));
   }
 
   // Si está autenticado en login, ir a dashboard
-  if (isLoginPage && isAuth) {
-    console.log('[Middleware] Redirigiendo a dashboard - ya autenticado');
+  if (isLoginPage && hasSession) {
+    console.log('[Middleware] Redirigiendo a dashboard - sesión presente');
     return NextResponse.redirect(new URL('/dashboard/default', req.url));
   }
 
-  // Permitir acceso
-  return undefined;
-});
+  return NextResponse.next();
+}
 
 export const config = {
   matcher: ['/dashboard/:path*', '/auth/:path*'],
