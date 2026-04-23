@@ -11,11 +11,14 @@ coverage/
 out/
 build/
 
+# Environment Variables
+.env.local
+.env.production.local
+.env*.local
+
 # Misc
 .DS_Store
 *.pem
-.env.local
-.env.*.local
 
 # Debug
 npm-debug.log*
@@ -33,5 +36,3 @@ yarn-error.log*
 
 # Vercel
 .vercel/
-
-.vercel
