@@ -101,6 +101,11 @@ export function MSSQLAdapter(): Adapter {
       try {
         console.log('[NextAuth Adapter] updateSession start');
 
+        if (!expires) {
+          console.warn('[NextAuth Adapter] updateSession: expires no definido');
+          return null;
+        }
+
         const expiresDate = new Date(expires);
 
         await query(
