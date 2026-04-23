@@ -18,9 +18,9 @@ app = func.FunctionApp()
 
 # Horarios Venezuela (UTC-4): 07:50, 09:50, 11:50, 13:50, 15:50, 17:50, 19:50, 21:50
 # Equivalente UTC (+4h):   11:50, 13:50, 15:50, 17:50, 19:50, 21:50, 23:50, 01:50
-# Horarios Venezuela (UTC-4): 03:50, 05:50, 07:50, 09:50, 11:50, 13:50, 15:50, 17:50 (8x/día)
-# [23 ABRIL 2026] REACTIVADA — INVENTARIO completo, pasando a modo producción
-@app.timer_trigger(schedule="0 50 3,5,7,9,11,13,15,17 * * *", arg_name="myTimer", run_on_startup=False)
+# Horarios Venezuela (UTC-4): 8:30, 10:30, 12:30, 14:30, 16:30, 18:30, 20:30, 22:30 (8x/día)
+# [23 ABRIL 2026] CRON ajustado — Inicia 8:30 AM Venezuela, cubre jornada laboral completa
+@app.timer_trigger(schedule="0 30 6,8,10,12,14,16,18,20 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
