@@ -1,5 +1,6 @@
 .git*
 .vscode
+__azurite_data__
 __azurite_db*__.json
 __blobstorage__
 __queuestorage__
@@ -9,3 +10,5 @@ test
 __pycache__
 *.pyc
 *.old
+*.log
+*.md
