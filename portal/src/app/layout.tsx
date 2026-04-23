@@ -14,6 +14,7 @@ import { ThemeBootScript } from "@/scripts/theme-boot";
 import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
 import { getPreference } from "@/server/server-actions";
 import { fontRegistry } from "@/lib/fonts/registry";
+import { Providers } from "@/app/providers";
 
 const FONT_KEYS = Object.keys(fontRegistry) as Array<keyof typeof fontRegistry>;
 
@@ -55,18 +56,20 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
         <ThemeBootScript />
       </head>
       <body className={`${fontVars} min-h-screen antialiased`}>
-        <TooltipProvider>
-          <PreferencesStoreProvider
-            themeMode={theme_mode}
-            themePreset={theme_preset}
-            contentLayout={content_layout}
-            navbarStyle={navbar_style}
-            font={font}
-          >
-            {children}
-            <Toaster />
-          </PreferencesStoreProvider>
-        </TooltipProvider>
+        <Providers>
+          <TooltipProvider>
+            <PreferencesStoreProvider
+              themeMode={theme_mode}
+              themePreset={theme_preset}
+              contentLayout={content_layout}
+              navbarStyle={navbar_style}
+              font={font}
+            >
+              {children}
+              <Toaster />
+            </PreferencesStoreProvider>
+          </TooltipProvider>
+        </Providers>
       </body>
     </html>
   );
