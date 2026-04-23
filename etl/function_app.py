@@ -27,25 +27,34 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     etl = None
 
     try:
-        # === MECANISMO DE LOCK GLOBAL ===
-        # Evita ejecuciones paralelas de la cascada
         etl = GesvisionEtl()
-        with pyodbc.connect(etl.conn_str) as conn:
-            cursor = conn.cursor()
-            try:
-                # Intenta adquirir lock exclusivo (espera máximo 10 segundos)
-                cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_cascada_execution' WAITFOR DELAY '00:00:10'")
-                lock_acquired = True
-                logging.info("   ✅ [LOCK GLOBAL] Adquirido — ejecutando cascada secuencialmente")
-            except Exception as lock_err:
-                logging.warning(f"   ❌ [LOCK GLOBAL] No se pudo adquirir (otra cascada en progreso): {lock_err}")
-                return
-            finally:
-                cursor.close()
 
-        if not lock_acquired:
-            logging.warning("   ⚠️ [CASCADA] Otra ejecución en progreso. Saltando este ciclo.")
-            return
+        # === MECANISMO DE LOCK GLOBAL (Solo en Azure, no en local) ===
+        # Evita ejecuciones paralelas de la cascada
+        import os
+        is_local = os.environ.get('AZURE_FUNCTIONS_ENVIRONMENT') == 'Development'
+
+        if not is_local:
+            # En Azure: intenta adquirir lock exclusivo
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                try:
+                    # Intenta adquirir lock exclusivo (espera máximo 10 segundos)
+                    cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_cascada_execution' WAITFOR DELAY '00:00:10'")
+                    lock_acquired = True
+                    logging.info("   ✅ [LOCK GLOBAL] Adquirido — ejecutando cascada secuencialmente")
+                except Exception as lock_err:
+                    logging.warning(f"   ❌ [LOCK GLOBAL] No se pudo adquirir (otra cascada en progreso): {lock_err}")
+                    return
+                finally:
+                    cursor.close()
+
+            if not lock_acquired:
+                logging.warning("   ⚠️ [CASCADA] Otra ejecución en progreso. Saltando este ciclo.")
+                return
+        else:
+            # En local: skip lock para evitar problemas con Azurite
+            logging.info("   ℹ️ [LOCAL] Ejecutando sin lock global (modo desarrollo)")
 
         logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
         reporte = []
