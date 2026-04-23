@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { query } from '@/lib/db';
 
 export const { handlers, auth } = NextAuth({
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
       credentials: {
@@ -92,6 +93,18 @@ export const { handlers, auth } = NextAuth({
   session: {
     strategy: 'jwt',
     maxAge: 24 * 60 * 60,
+  },
+  cookies: {
+    sessionToken: {
+      name: '__Secure-next-auth.session-token',
+      options: {
+        httpOnly: true,
+        secure: true,
+        sameSite: 'lax',
+        path: '/',
+        maxAge: 24 * 60 * 60,
+      },
+    },
   },
 });
 
