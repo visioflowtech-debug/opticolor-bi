@@ -20,31 +20,55 @@ app = func.FunctionApp()
 # Equivalente UTC (+4h):   11:50, 13:50, 15:50, 17:50, 19:50, 21:50, 23:50, 01:50
 # Horarios Venezuela (UTC-4): 8:30, 10:30, 12:30, 14:30, 16:30, 18:30, 20:30, 22:30 (8x/día)
 # [23 ABRIL 2026] COMENTADA TEMPORALMENTE — Solo ejecutar EtlVentasRepetitivo hasta completar backfill HISTÓRICO
-# @app.timer_trigger(schedule="0 30 6,8,10,12,14,16,18,20 * * *", arg_name="myTimer", run_on_startup=False)
+@app.timer_trigger(schedule="0 30 6,8,10,12,14,16,18,20 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
-    """Función Maestra que inicia la cascada de ejecución."""
-    logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
-    etl = GesvisionEtl()
-    reporte = []
-    start_global = time.time()
-    inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    MAX_DURATION_MINS = 24  # Límite de seguridad Azure
-
-    # Notificación de inicio
-    etl.notificar_telegram(f"✅ ETL Opticolor iniciado — {inicio_ts}")
-
-    def check_time_limit():
-        """Verifica si se excedió el tiempo límite global."""
-        elapsed = (time.time() - start_global) / 60
-        if elapsed > MAX_DURATION_MINS:
-            logging.warning(f"⚠️ [TIMEOUT PREVENTIVO] Tiempo excedido ({elapsed:.1f} min). Deteniendo cascada.")
-            return True
-        return False
+    """Función Maestra que inicia la cascada de ejecución con lock global."""
+    lock_acquired = False
+    etl = None
 
     try:
-        # --- GESVISION (Remaining Modules) ---
-        # Módulos activados progresivamente. Hasta RECEPCIONES_LAB completados.
-        # INVENTARIO ejecuta en función separada (EtlInventarioRepetitivo) cada minuto
+        # === MECANISMO DE LOCK GLOBAL ===
+        # Evita ejecuciones paralelas de la cascada
+        etl = GesvisionEtl()
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+            try:
+                # Intenta adquirir lock exclusivo (espera máximo 10 segundos)
+                cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_cascada_execution' WAITFOR DELAY '00:00:10'")
+                lock_acquired = True
+                logging.info("   ✅ [LOCK GLOBAL] Adquirido — ejecutando cascada secuencialmente")
+            except Exception as lock_err:
+                logging.warning(f"   ❌ [LOCK GLOBAL] No se pudo adquirir (otra cascada en progreso): {lock_err}")
+                return
+            finally:
+                cursor.close()
+
+        if not lock_acquired:
+            logging.warning("   ⚠️ [CASCADA] Otra ejecución en progreso. Saltando este ciclo.")
+            return
+
+        logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
+        reporte = []
+        start_global = time.time()
+        inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        MAX_DURATION_MINS = 24  # Límite de seguridad Azure
+
+        # Notificación de inicio
+        etl.notificar_telegram(f"✅ ETL Opticolor iniciado — {inicio_ts}")
+
+        def check_time_limit():
+            """Verifica si se excedió el tiempo límite global."""
+            elapsed = (time.time() - start_global) / 60
+            if elapsed > MAX_DURATION_MINS:
+                logging.warning(f"⚠️ [TIMEOUT PREVENTIVO] Tiempo excedido ({elapsed:.1f} min). Deteniendo cascada.")
+                return True
+            return False
+
+        # --- CASCADA COMPLETA: 18/18 MÓDULOS GESVISION ---
+        # [23 ABRIL 2026] ACTIVACIÓN CASCADA NORMALIZADA
+        # - VENTAS: 2,573 facturas backfill completado → INCREMENTAL (últimos 10 días)
+        # - COBROS: 4,608 cobros backfill completado → INCREMENTAL (últimas 2 horas)
+        # - INVENTARIO: 146,707 items backfill completado → INCREMENTAL (sincronización diaria)
         remaining_modules = [
             ('SUCURSALES', etl.sync_dimensions),
             ('EMPLEADOS', etl.sync_employees),
@@ -58,15 +82,13 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('EXAMENES', etl.sync_exams),
             ('PEDIDOS', etl.sync_orders),
             ('ORDENES_CRISTALES', etl.sync_glasses_orders),
-            # VENTAS ejecuta en función separada (EtlVentasRepetitivo) cada minuto hasta completar backfill HISTORICAL
-            # ('VENTAS', etl.sync_invoices_incremental),
-            ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
-            ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
+            ('VENTAS', etl.sync_invoices_incremental),
+            ('COBROS', etl.sync_collections),
+            ('TESORERIA', etl.sync_treasury),
             ('PEDIDOS_LAB', etl.sync_laboratory_orders),
             ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            # INVENTARIO ejecuta en función separada (EtlInventarioRepetitivo) cada minuto
-            # ('INVENTARIO', etl.sync_inventory),
-            # ✅ 16/18 MÓDULOS EN CASCADA + 2 ESPECIALIZADOS (VENTAS + INVENTARIO en funciones temporales)
+            ('INVENTARIO', etl.sync_inventory),
+            # ✅ 18/18 MÓDULOS EN CASCADA (Todas las temporales desactivadas)
         ]
 
         for mod_name, mod_func in remaining_modules:
@@ -79,11 +101,21 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         logging.info(f"--- [FIN] CICLO ETL COMPLETADO EN {duration:.2f} MIN ---")
 
     except Exception as e:
-        duration = (time.time() - start_global) / 60
-        logging.error(f"Error crítico en cascada: {e}")
-        etl.enviar_resumen_ciclo_telegram(reporte, duration, error_critico=str(e))
+        if etl:
+            try:
+                duration = (time.time() - start_global) / 60
+                logging.error(f"Error crítico en cascada: {e}")
+                etl.enviar_resumen_ciclo_telegram(reporte, duration, error_critico=str(e))
+            except:
+                logging.error(f"Error al enviar reporte: {e}")
+        else:
+            logging.error(f"Error fatal en cascada (etl no inicializado): {e}")
     finally:
-        if etl.session: etl.session.close()
+        if etl and etl.session:
+            try:
+                etl.session.close()
+            except:
+                pass
 
 
 # --- FUNCIÓN TEMPORAL: PRODUCTOS CADA MINUTO (hasta completar carga histórica) ---
@@ -211,65 +243,56 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
 
 # --- FUNCIÓN TEMPORAL: COBROS CADA MINUTO (Backfill HISTORICAL) ---
-# [23 ABRIL 2026] ACTIVA — COBROS en carga histórica completa hasta terminar (Status 204)
+# [23 ABRIL 2026] DESACTIVADA — COBROS completada, pasando a cascada normal
 # Con lock en BD para evitar ejecuciones paralelas (solo 1 a la vez, secuencial)
-@app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
-def EtlCobrosRepetitivo(myTimer: func.TimerRequest) -> None:
-    """
-    Ejecutor temporal SOLO COBROS que se reinicia cada minuto.
-    Estrategia SECUENCIAL: MAX 24 minutos por ejecución, con lock en BD para evitar paralelismo.
-    Una ejecución termina → espera al siguiente minuto → comienza la siguiente.
-    Termina automáticamente cuando API retorna Status 204 (sin más datos).
-    """
-    logging.info("--- [COBROS-LOOP] Inicio repetitivo (cada minuto) ---")
-    etl = GesvisionEtl()
-    start_time = time.time()
-    lock_acquired = False
-
-    try:
-        # Adquirir lock exclusivo en BD (evitar ejecuciones paralelas)
-        with pyodbc.connect(etl.conn_str) as conn:
-            cursor = conn.cursor()
-            try:
-                # Intenta adquirir lock (espera máximo 5 segundos)
-                cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_cobros_execution' WAITFOR DELAY '00:00:05'")
-                lock_acquired = True
-                logging.info("   [LOCK] Lock exclusivo adquirido — ejecutando COBROS secuencialmente")
-            except Exception as lock_err:
-                logging.warning(f"   [LOCK] No se pudo adquirir lock (otra ejecución en progreso): {lock_err}")
-                cursor.close()
-                return
-
-        if not lock_acquired:
-            logging.warning("   [LOCK] Otra ejecución de COBROS está en progreso. Saltando esta ronda.")
-            return
-
-        if not etl.token: etl.get_token()
-        total_processed, total_amount = etl.sync_collections()
-
-        elapsed = (time.time() - start_time) / 60
-        logging.info(f"--- [COBROS-LOOP] Procesados: {total_processed} cobros en {elapsed:.1f} min (Monto total: ${total_amount:,.2f}) ---")
-
-        # Notificar progreso solo si se procesaron items
-        if total_processed > 0:
-            with pyodbc.connect(etl.conn_str) as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT COUNT(*) FROM Finanzas_Cobros")
-                count_cobros = cursor.fetchone()[0]
-                cursor.close()
-            etl.notificar_telegram(f"[COBROS-LOOP] Progreso: {count_cobros:,} cobros cargados (${total_amount:,.2f}) ({total_processed} en {elapsed:.1f} min)")
-        else:
-            logging.info("   [COBROS-LOOP] ✅ COMPLETADO - No hay más cobros para procesar (status 204)")
-            etl.notificar_telegram("✅ COBROS completado - Tabla poblada en su totalidad. Cambiar a cascada normal.")
-
-    except Exception as e:
-        logging.error(f"Error en COBROS-LOOP: {e}")
-        try:
-            etl.notificar_telegram(f"❌ ERROR COBROS-LOOP: {str(e)[:200]}")
-        except: pass
-
-    finally:
-        if etl.session: etl.session.close()
+# # @app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
+# # def EtlCobrosRepetitivo(myTimer: func.TimerRequest) -> None:
+# #     """
+# #     Ejecutor temporal SOLO COBROS que se reinicia cada minuto.
+# #     Estrategia SECUENCIAL: MAX 24 minutos por ejecución, con lock en BD para evitar paralelismo.
+# #     Una ejecución termina → espera al siguiente minuto → comienza la siguiente.
+# #     Termina automáticamente cuando API retorna Status 204 (sin más datos).
+# #     """
+# #     logging.info("--- [COBROS-LOOP] Inicio repetitivo (cada minuto) ---")
+# #     etl = GesvisionEtl()
+# #     start_time = time.time()
+# #     lock_acquired = False
+# #
+# #     try:
+# #         # Adquirir lock exclusivo en BD (evitar ejecuciones paralelas)
+# #         with pyodbc.connect(etl.conn_str) as conn:
+# #             cursor = conn.cursor()
+# #             try:
+# #                 # Intenta adquirir lock (espera máximo 5 segundos)
+# #                 cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_cobros_execution' WAITFOR DELAY '00:00:05'")
+# #                 lock_acquired = True
+# #                 logging.info("   [LOCK] Lock exclusivo adquirido — ejecutando COBROS secuencialmente")
+# #             except Exception as lock_err:
+# #                 logging.warning(f"   [LOCK] No se pudo adquirir lock (otra ejecución en progreso): {lock_err}")
+# #                 cursor.close()
+# #                 return
+# #
+# #         if not lock_acquired:
+# #             logging.warning("   [LOCK] Otra ejecución de COBROS está en progreso. Saltando esta ronda.")
+# #             return
+# #
+# #         if not etl.token: etl.get_token()
+# #         total_processed, total_amount = etl.sync_collections()
+# #
+# #         elapsed = (time.time() - start_time) / 60
+# #         logging.info(f"--- [COBROS-LOOP] Procesados: {total_processed} cobros en {elapsed:.1f} min (Monto total: ${total_amount:,.2f}) ---")
+# #
+# #         # Notificar progreso solo si se procesaron items
+# #         if total_processed > 0:
+# #             with pyodbc.connect(etl.conn_str) as conn:
+# #                 cursor = conn.cursor()
+# #                 cursor.execute("SELECT COUNT(*) FROM Finanzas_Cobros")
+# #                 count_cobros = cursor.fetchone()[0]
+# #                 cursor.close()
+# #             etl.notificar_telegram(f"[COBROS-LOOP] Progreso: {count_cobros:,} cobros cargados (${total_amount:,.2f}) ({total_processed} en {elapsed:.1f} min)")
+# #         else:
+# #             logging.info("   [COBROS-LOOP] ✅ COMPLETADO - No hay más cobros para procesar (status 204)")
+# #             etl.notificar_telegram("✅ COBROS completado - Tabla poblada en su totalidad. Cambiar a cascada normal.")
 
 
 # --- FUNCIÓN TEMPORAL: INVENTARIO CADA MINUTO (estrategia PRODUCTOS) ---
@@ -343,13 +366,13 @@ class GesvisionEtl:
 
         LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
         LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
-        LOAD_MODE_INVOICES  = 'HISTORICAL'  # Primera carga: backfill desde 01/01/2025 (post-PRODUCTOS completo).
+        LOAD_MODE_INVOICES  = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (2,573 facturas). Ahora INCREMENTAL (últimos 10 días).
         LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock — Mantenimiento diario post-backfill (146,707 items completados).
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
         LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
         LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
         LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
-        LOAD_MODE_COBROS    = 'HISTORICAL'  # Backfill completo desde 2025 (EtlCobrosRepetitivo).
+        LOAD_MODE_COBROS    = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (4,608 cobros). Ahora INCREMENTAL (últimas 2 horas).
         LOAD_MODE_TREASURY  = 'INCREMENTAL'  # Movimientos de caja/banco.
         LOAD_MODE_LAB       = 'INCREMENTAL'  # Pedidos de laboratorio.
         LOAD_MODE_RECEPCIONES = 'INCREMENTAL' # Carga inicial de recepciones.
@@ -2181,100 +2204,122 @@ class GesvisionEtl:
             total_processed = 0
             total_amount = 0.0
 
-            skip = 0
-            limit = 50
-            params_base = {}
-
-            # --- FASE 1: DETERMINAR ESTADO INICIAL (Conexión efímera) ---
-            try:
-                with pyodbc.connect(self.conn_str) as conn:
-                    if self.LOAD_MODE_COBROS == 'INCREMENTAL':
-                        try:
-                            last_date = self.get_last_date(conn, "Finanzas_Cobros", "fecha_cobro")
-                            # Margen de seguridad de 2 horas
-                            start_date = last_date - datetime.timedelta(hours=2)
-                            params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
-                            logging.info(f"   [Incremental] Cobros: Buscando desde {params_base['fechaInicial']}")
-                            skip = 0
-                        except:
-                            logging.info("   [Incremental] Cobros: Tabla vacía o error, iniciando carga completa.")
-                    else:
-                        # --- AUTO-RESUME ---
-                        try:
-                            with conn.cursor() as cursor:
-                                cursor.execute("SELECT COUNT(*) FROM Finanzas_Cobros")
-                                row = cursor.fetchone()
-                                total_rows = row[0] if row else 0
-                                skip = (total_rows // limit) * limit
-                                logging.info(f"   [Historical] Cobros: Retomando desde skip {skip} (Total en BD: {total_rows}).")
-                        except Exception as e:
-                            logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
-                            logging.info("   [Historical] Cobros: Descarga completa por paginación (Skip 0).")
-            except Exception as e:
-                logging.error(f"Error de conexión inicial en Cobros: {e}")
-
-            # --- FASE 2: BUCLE DE EXTRACCIÓN (Conexión por lote) ---
-            while True:
-                if (time.time() - start_time) > MAX_EXECUTION_TIME:
-                    logging.warning("   [TIMEOUT] Límite de tiempo en Cobros.")
-                    break
-
-                params = params_base.copy()
-                params["skip"] = skip
-                
-                items = []
-                success_batch = False
-                
-                for retry in range(3):
+            with pyodbc.connect(self.conn_str) as conn:
+                # === CHECK PREVIO: ¿COBROS YA COMPLETADA? ===
+                if self.LOAD_MODE_COBROS == 'HISTORICAL':
                     try:
-                        resp = self.session.get(f"{self.base_url}/collections", headers=headers, params=params, timeout=(15, 90))
-                        logging.info(f"   -> [REQ] skip: {skip} | URL: {resp.url}")
-                        
-                        if resp.status_code == 204:
-                            return total_processed, total_amount
-                            
-                        items = self._safe_parse_json(resp, "collections")
-                        logging.info(f"   -> [RES] Status: {resp.status_code} | Count: {len(items)}")
-                        
-                        success_batch = True
-                        break
+                        with conn.cursor() as cursor:
+                            cursor.execute("SELECT LastValue FROM Etl_Checkpoints WHERE KeyName = 'checkpoint_cobros_final_detected'")
+                            row = cursor.fetchone()
+                            if row and row[0] == '1':
+                                logging.info("   ✅ [EARLY EXIT] COBROS ya está COMPLETADA (checkpoint detectado). Abortando.")
+                                return 0, 0.0
                     except Exception as e:
-                        wait = (retry + 1) * 5
-                        logging.warning(f"   [!] Reintento {retry+1} en Cobros (Skip {skip}): {e}")
-                        time.sleep(wait)
+                        logging.warning(f"   [Checkpoint Check] No se pudo verificar completitud: {e}")
 
-                if not success_batch:
-                    logging.error(f"Fallo definitivo en Cobros lote {skip}.")
-                    break
+                skip = 0
+                limit = 50
+                params_base = {}
 
-                if items:
-                    # Calcular monto del lote
-                    batch_amount = sum(float(x.get('amount', 0) or 0) for x in items)
-                    total_amount += batch_amount
+                # --- FASE 1: DETERMINAR ESTADO INICIAL (Conexión efímera) ---
+                if self.LOAD_MODE_COBROS == 'INCREMENTAL':
+                    try:
+                        last_date = self.get_last_date(conn, "Finanzas_Cobros", "fecha_cobro")
+                        # Margen de seguridad de 2 horas
+                        start_date = last_date - datetime.timedelta(hours=2)
+                        params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
+                        logging.info(f"   [Incremental] Cobros: Buscando desde {params_base['fechaInicial']}")
+                        skip = 0
+                    except:
+                        logging.info("   [Incremental] Cobros: Tabla vacía o error, iniciando carga completa.")
+                else:
+                    # --- AUTO-RESUME ---
+                    try:
+                        with conn.cursor() as cursor:
+                            cursor.execute("SELECT COUNT(*) FROM Finanzas_Cobros")
+                            row = cursor.fetchone()
+                            total_rows = row[0] if row else 0
+                            skip = (total_rows // limit) * limit
+                            logging.info(f"   [Historical] Cobros: Retomando desde skip {skip} (Total en BD: {total_rows}).")
+                    except Exception as e:
+                        logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
+                        logging.info("   [Historical] Cobros: Descarga completa por paginación (Skip 0).")
 
-                    # Guardado con conexión fresca y reintentos
-                    saved = False
-                    for db_retry in range(3):
+                # --- FASE 2: BUCLE DE EXTRACCIÓN (Conexión por lote) ---
+                while True:
+                    if (time.time() - start_time) > MAX_EXECUTION_TIME:
+                        logging.warning("   [TIMEOUT] Límite de tiempo en Cobros.")
+                        break
+
+                    params = params_base.copy()
+                    params["skip"] = skip
+
+                    items = []
+                    success_batch = False
+
+                    for retry in range(3):
                         try:
-                            with pyodbc.connect(self.conn_str) as conn:
-                                logging.info(f"   [DB] Guardando lote cobros {skip} ({len(items)} items)...")
-                                self._process_and_save(conn, items, "Finanzas_Cobros", "id_cobro", self.MAP_COBROS)
-                            saved = True
+                            resp = self.session.get(f"{self.base_url}/collections", headers=headers, params=params, timeout=(15, 90))
+                            logging.info(f"   -> [REQ] skip: {skip} | URL: {resp.url}")
+
+                            if resp.status_code == 204:
+                                return total_processed, total_amount
+
+                            items = self._safe_parse_json(resp, "collections")
+                            logging.info(f"   -> [RES] Status: {resp.status_code} | Count: {len(items)}")
+
+                            success_batch = True
                             break
                         except Exception as e:
-                            logging.warning(f"   [DB Retry {db_retry+1}] Error guardando cobros: {e}")
-                            time.sleep(5)
-                    
-                    if not saved:
-                        raise Exception("Fallo definitivo guardando cobros en BD.")
+                            wait = (retry + 1) * 5
+                            logging.warning(f"   [!] Reintento {retry+1} en Cobros (Skip {skip}): {e}")
+                            time.sleep(wait)
 
-                    total_processed += len(items)
-                
-                if not items or len(items) < limit:
-                    break
-                
-                skip += limit
-                time.sleep(2) # Throttling aumentado
+                    if not success_batch:
+                        logging.error(f"Fallo definitivo en Cobros lote {skip}.")
+                        break
+
+                    if items:
+                        # Calcular monto del lote
+                        batch_amount = sum(float(x.get('amount', 0) or 0) for x in items)
+                        total_amount += batch_amount
+
+                        # Guardado con conexión fresca y reintentos
+                        saved = False
+                        for db_retry in range(3):
+                            try:
+                                with pyodbc.connect(self.conn_str) as db_conn:
+                                    logging.info(f"   [DB] Guardando lote cobros {skip} ({len(items)} items)...")
+                                    self._process_and_save(db_conn, items, "Finanzas_Cobros", "id_cobro", self.MAP_COBROS)
+                                saved = True
+                                break
+                            except Exception as e:
+                                logging.warning(f"   [DB Retry {db_retry+1}] Error guardando cobros: {e}")
+                                time.sleep(5)
+
+                        if not saved:
+                            raise Exception("Fallo definitivo guardando cobros en BD.")
+
+                        total_processed += len(items)
+
+                    if not items or len(items) < limit:
+                        # FIN DE DATOS DETECTADO: Guardar checkpoint y terminar
+                        if self.LOAD_MODE_COBROS == 'HISTORICAL':
+                            try:
+                                with conn.cursor() as cursor:
+                                    cursor.execute("DELETE FROM Etl_Checkpoints WHERE KeyName = 'checkpoint_cobros_final_detected'")
+                                    cursor.execute("INSERT INTO Etl_Checkpoints (KeyName, LastValue) VALUES (?, ?)",
+                                                 'checkpoint_cobros_final_detected', '1')
+                                    conn.commit()
+                                logging.info("   [Checkpoint] COBROS marcado como COMPLETADO para evitar re-intentos.")
+                            except Exception as e:
+                                logging.warning(f"   [Checkpoint] No se pudo marcar completitud: {e}")
+
+                        logging.info(f"   ✅ [COBROS] CARGA COMPLETADA - Total procesado: {total_processed:,} cobros por ${total_amount:,.2f}")
+                        break
+
+                    skip += limit
+                    time.sleep(2) # Throttling aumentado
 
             return total_processed, total_amount
 
