@@ -13,13 +13,15 @@ export const { handlers, auth } = NextAuth({
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
+        console.log('[NextAuth Credentials] authorize called with:', { email: credentials?.email });
+
         if (!credentials?.email || !credentials?.password) {
-          console.warn('[NextAuth] Credenciales vacías');
+          console.warn('[NextAuth Credentials] Credenciales vacías');
           return null;
         }
 
         try {
-          console.log('[NextAuth] Intentando autenticar:', credentials.email);
+          console.log('[NextAuth Credentials] Intentando autenticar:', credentials.email);
 
           const rows = await query<{
             id_usuario: number;
@@ -35,38 +37,40 @@ export const { handlers, auth } = NextAuth({
             { email: credentials.email }
           );
 
-          console.log('[NextAuth] Query resultado:', rows.length, 'registros');
+          console.log('[NextAuth Credentials] Query resultado:', rows.length, 'registros');
 
           if (!rows.length) {
-            console.warn('[NextAuth] Usuario no encontrado:', credentials.email);
+            console.warn('[NextAuth Credentials] Usuario no encontrado:', credentials.email);
             return null;
           }
 
           const user = rows[0];
-          console.log('[NextAuth] Usuario encontrado:', user.nombre_completo, 'ID:', user.id_usuario);
+          console.log('[NextAuth Credentials] Usuario encontrado:', user.nombre_completo, 'ID:', user.id_usuario);
 
           const isValidPassword = await bcrypt.compare(
             credentials.password as string,
             user.password_hash
           );
 
-          console.log('[NextAuth] Password válido:', isValidPassword);
+          console.log('[NextAuth Credentials] Password válido:', isValidPassword);
 
           if (!isValidPassword) {
-            console.warn('[NextAuth] Password incorrecto');
+            console.warn('[NextAuth Credentials] Password incorrecto');
             return null;
           }
 
-          console.log('[NextAuth] Autenticación exitosa para:', credentials.email, '- ID:', user.id_usuario);
-          return {
+          console.log('[NextAuth Credentials] Autenticación exitosa para:', credentials.email, '- ID:', user.id_usuario);
+          const result = {
             id: String(user.id_usuario),
             email: user.email,
             name: user.nombre_completo,
             nombre_rol: user.nombre_rol,
             nivel_jerarquico: user.nivel_jerarquico,
           };
+          console.log('[NextAuth Credentials] Retornando usuario:', result);
+          return result;
         } catch (error) {
-          console.error('[NextAuth] Error en authorize:', error instanceof Error ? error.message : String(error));
+          console.error('[NextAuth Credentials] Error en authorize:', error instanceof Error ? error.message : String(error), error);
           throw error;
         }
       },
