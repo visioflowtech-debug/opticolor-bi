@@ -2,9 +2,11 @@ import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { query } from '@/lib/db';
+import { MSSQLAdapter } from '@/lib/nextauth-adapter';
 
 export const { handlers, auth } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
+  adapter: MSSQLAdapter(),
   providers: [
     Credentials({
       credentials: {
@@ -91,15 +93,17 @@ export const { handlers, auth } = NextAuth({
     signIn: '/auth/v2/login',
   },
   session: {
-    strategy: 'jwt',
+    strategy: 'database',
     maxAge: 24 * 60 * 60,
   },
   cookies: {
     sessionToken: {
-      name: '__Secure-next-auth.session-token',
+      name: process.env.NODE_ENV === 'production'
+        ? '__Secure-next-auth.session-token'
+        : 'next-auth.session-token',
       options: {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
         maxAge: 24 * 60 * 60,
