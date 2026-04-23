@@ -1,16 +1,15 @@
 {
-    "version": "0.2.0",
-    "configurations": [
-        
-        {
-            "name": "Attach to Python Functions",
-            "type": "debugpy",
-            "request": "attach",
-            "connect": {
-                "host": "localhost",
-                "port": 9091
-            },
-            "preLaunchTask": "func: host start"
-        }
-    ]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Attach to Python Functions",
+      "type": "python",
+      "request": "attach",
+      "preLaunchTask": "func: host start",
+      "pythonPath": "${workspaceFolder}/.venv/Scripts/python.exe",
+      "projectRoot": "${workspaceFolder}",
+      "port": 9091,
+      "host": "localhost"
+    }
+  ]
 }
