@@ -44,7 +44,7 @@ export const { handlers, auth } = NextAuth({
           }
 
           const user = rows[0];
-          console.log('[NextAuth] Usuario encontrado:', user.nombre_completo);
+          console.log('[NextAuth] Usuario encontrado:', user.nombre_completo, 'ID:', user.id_usuario);
 
           const isValidPassword = await bcrypt.compare(
             credentials.password as string,
@@ -58,7 +58,7 @@ export const { handlers, auth } = NextAuth({
             return null;
           }
 
-          console.log('[NextAuth] Autenticación exitosa para:', credentials.email);
+          console.log('[NextAuth] Autenticación exitosa para:', credentials.email, '- ID:', user.id_usuario);
           return {
             id: String(user.id_usuario),
             email: user.email,
@@ -67,7 +67,7 @@ export const { handlers, auth } = NextAuth({
             nivel_jerarquico: user.nivel_jerarquico,
           };
         } catch (error) {
-          console.error('[NextAuth] Error en authorize:', error);
+          console.error('[NextAuth] Error en authorize:', error instanceof Error ? error.message : String(error));
           throw error;
         }
       },

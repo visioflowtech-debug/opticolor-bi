@@ -11,25 +11,35 @@ export function MSSQLAdapter(): Adapter {
       const { sessionToken, userId, expires } = data;
 
       try {
-        console.log('[NextAuth Adapter] Creando sesión para usuario:', userId);
+        console.log('[NextAuth Adapter] Creando sesión:', {
+          userId,
+          sessionToken: sessionToken?.substring(0, 20) + '...',
+          expires: new Date(expires),
+        });
 
         await query(
           `INSERT INTO [sessions] ([id], [sessionToken], [userId], [expires])
            VALUES (NEWID(), @sessionToken, @userId, @expires)`,
           {
             sessionToken,
-            userId,
-            expires,
+            userId: parseInt(userId),
+            expires: new Date(expires),
           }
         );
 
+        console.log('[NextAuth Adapter] Sesión creada exitosamente');
+
         return {
           sessionToken,
-          userId,
-          expires,
+          userId: parseInt(userId),
+          expires: new Date(expires),
         } as any;
       } catch (error) {
-        console.error('[NextAuth Adapter] Error creando sesión:', error);
+        console.error('[NextAuth Adapter] Error creando sesión:', {
+          error: error instanceof Error ? error.message : String(error),
+          userId,
+          sessionToken: sessionToken?.substring(0, 20),
+        });
         throw error;
       }
     },
