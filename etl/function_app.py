@@ -1118,7 +1118,7 @@ class GesvisionEtl:
             # Si LOAD_MODE_CUSTOMERS == 'INCREMENTAL': Usa skip = 0 y fechaInicial = Hace 3 días.
             params_base = {}
             if self.LOAD_MODE_CUSTOMERS == 'INCREMENTAL':
-                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=10)
+                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
                 params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                 logging.info(f"   [Smart Sync] Clientes: Buscando cambios desde {params_base['fechaInicial']}")
             elif self.LOAD_MODE_CUSTOMERS == 'HISTORICAL':
@@ -1506,9 +1506,9 @@ class GesvisionEtl:
                 current_day = datetime.datetime.now()
 
                 if self.LOAD_MODE_EXAMS == 'INCREMENTAL':
-                    # En modo incremental, siempre barremos los últimos 10 días para asegurar consistencia.
-                    limit_date = datetime.datetime.now() - datetime.timedelta(days=10)
-                    logging.info(f"   [Incremental] Barriendo los últimos 10 días (hasta {limit_date.strftime('%Y-%m-%d')}).")
+                    # En modo incremental, barremos los últimos 3 días para asegurar consistencia sin exceso de datos.
+                    limit_date = datetime.datetime.now() - datetime.timedelta(days=3)
+                    logging.info(f"   [Incremental] Barriendo los últimos 3 días (hasta {limit_date.strftime('%Y-%m-%d')}).")
                 else: # HISTORICAL
                     limit_date = datetime.datetime(2025, 1, 1)  # Carga histórica desde 01/01/2025
                     chk_val = self._get_checkpoint(conn, CHECKPOINT_KEY)
@@ -1688,7 +1688,7 @@ class GesvisionEtl:
 
             params_base = {}
             if self.LOAD_MODE_ORDERS == 'INCREMENTAL':
-                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=10)
+                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
                 params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                 logging.info(f"   [Smart Sync] Pedidos: Buscando cambios desde {params_base['fechaInicial']}")
             elif self.LOAD_MODE_ORDERS == 'HISTORICAL':
@@ -1826,7 +1826,7 @@ class GesvisionEtl:
                 
                 # --- FIX: Validación de fecha futura ---
                 if last_date > datetime.datetime.now():
-                    last_date = datetime.datetime.now() - datetime.timedelta(days=10)
+                    last_date = datetime.datetime.now() - datetime.timedelta(days=3)
                 
                 params_base = {"fechaInicial": last_date.strftime("%Y-%m-%d %H:%M:%S")}
                 skip = 0
@@ -1972,7 +1972,7 @@ class GesvisionEtl:
                 # skip = 0.
                 params_base = {}
                 if self.LOAD_MODE_INVOICES == 'INCREMENTAL':
-                    fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=10)
+                    fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
                     params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                     logging.info(f"   [Smart Sync] Ventas: Buscando cambios desde {params_base['fechaInicial']}")
                 elif self.LOAD_MODE_INVOICES == 'HISTORICAL':
@@ -2572,10 +2572,10 @@ class GesvisionEtl:
                     except Exception as e:
                         logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
                 else:
-                    # Modo Incremental: Ventana de seguridad de 2 días
+                    # Modo Incremental: Ventana de seguridad de 3 días
                     try:
                         last_date = self.get_last_date(conn, "Operaciones_Ordenes_Cristales", "fecha_creacion")
-                        start_date = last_date - datetime.timedelta(days=2)
+                        start_date = last_date - datetime.timedelta(days=3)
                         params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
                         logging.info(f"   [Incremental] Órdenes Cristales: Buscando desde {params_base['fechaInicial']}")
                     except:
@@ -2723,10 +2723,10 @@ class GesvisionEtl:
                     except Exception as e:
                         logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
                 else:
-                    # Patrón Incremental por defecto
+                    # Patrón Incremental por defecto (ventana de seguridad 3 días)
                     try:
                         last_date = self.get_last_date(conn, "Operaciones_Recepciones_Lab", "fecha_recepcion")
-                        start_date = last_date - datetime.timedelta(days=2)
+                        start_date = last_date - datetime.timedelta(days=3)
                     except:
                         start_date = datetime.datetime(2025, 1, 1)
                     
