@@ -219,7 +219,7 @@ class GesvisionEtl:
         LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
         LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
         LOAD_MODE_INVOICES  = 'HISTORICAL'  # Primera carga: backfill desde 01/01/2025 (post-PRODUCTOS completo).
-        LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock — Smart Sync con auto-resume en checkpoint.
+        LOAD_MODE_INVENTORY = 'HISTORICAL'  # Control de stock — Barrido completo desde skip=0 con auto-resume en checkpoint. FIX: evitar loop infinito de Smart Sync.
         LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
         LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
         LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
