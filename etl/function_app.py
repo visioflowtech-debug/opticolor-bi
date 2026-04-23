@@ -1978,12 +1978,29 @@ class GesvisionEtl:
                         empty_pages = 0
                         self._process_and_save(conn, items, "Operaciones_Inventario", ["id_producto", "id_sucursal"], self.MAP_INVENTARIO)
                         total_processed += len(items)
-                        
+
                     if not items or len(items) < limit:
                         break
-                    
+
                     skip += limit
                     time.sleep(0.05)
+
+                # Guardar checkpoint después de procesar
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute("""
+                            IF EXISTS (SELECT 1 FROM Etl_Checkpoints WHERE KeyName = 'checkpoint_inventory_skip')
+                                UPDATE Etl_Checkpoints SET LastValue = ?, FechaActualizacion = GETDATE()
+                                WHERE KeyName = 'checkpoint_inventory_skip'
+                            ELSE
+                                INSERT INTO Etl_Checkpoints (KeyName, LastValue, FechaActualizacion)
+                                VALUES ('checkpoint_inventory_skip', ?, GETDATE())
+                        """, str(skip), str(skip))
+                        conn.commit()
+                        logging.info(f"   [CHECKPOINT] Guardado: checkpoint_inventory_skip = {skip}")
+                except Exception as e:
+                    logging.warning(f"   [CHECKPOINT ERROR] No se pudo guardar checkpoint: {e}")
+
                 return total_processed
 
         def sync_collections(self):
