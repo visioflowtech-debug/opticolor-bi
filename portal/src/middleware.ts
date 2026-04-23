@@ -6,11 +6,11 @@ export function middleware(req: NextRequest) {
   const isLoginPage = pathname.startsWith('/auth');
   const isDashboard = pathname.startsWith('/dashboard');
 
-  // Obtener sessionToken de las cookies
-  const sessionToken = req.cookies.get('next-auth.session-token')?.value ||
-                      req.cookies.get('__Secure-next-auth.session-token')?.value;
+  // Obtener token JWT de las cookies
+  const token = req.cookies.get('next-auth.session-token')?.value ||
+                req.cookies.get('__Secure-next-auth.session-token')?.value;
 
-  const hasSession = !!sessionToken;
+  const hasSession = !!token;
 
   console.log('[Middleware]', {
     path: pathname,

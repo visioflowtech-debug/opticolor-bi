@@ -6,7 +6,6 @@ import { MSSQLAdapter } from '@/lib/nextauth-adapter';
 
 export const { handlers, auth } = NextAuth({
   secret: process.env.NEXTAUTH_SECRET,
-  adapter: MSSQLAdapter(),
   providers: [
     Credentials({
       credentials: {
@@ -74,7 +73,24 @@ export const { handlers, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async session({ session }) {
+    jwt({ token, user }) {
+      if (user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.nombre_rol = (user as any).nombre_rol;
+        token.nivel_jerarquico = (user as any).nivel_jerarquico;
+      }
+      return token;
+    },
+    session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        session.user.email = token.email as string;
+        session.user.name = token.name as string;
+        (session.user as any).nombre_rol = token.nombre_rol;
+        (session.user as any).nivel_jerarquico = token.nivel_jerarquico;
+      }
       return session;
     },
   },
@@ -82,7 +98,7 @@ export const { handlers, auth } = NextAuth({
     signIn: '/auth/v2/login',
   },
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
     maxAge: 24 * 60 * 60,
   },
   cookies: {
