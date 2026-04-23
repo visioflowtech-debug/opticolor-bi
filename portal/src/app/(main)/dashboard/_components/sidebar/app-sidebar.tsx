@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useSession } from "next-auth/react";
 
 import { CircleHelp, ClipboardList, Command, Database, File, Search, Settings } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
@@ -18,7 +19,6 @@ import {
 } from "@/components/ui/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
 import { Logo } from "@/components/Logo";
-import { rootUser } from "@/data/users";
 import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 import { usePreferencesStore } from "@/stores/preferences/preferences-provider";
 
@@ -72,9 +72,22 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       isSynced: s.isSynced,
     })),
   );
+  const { data: session } = useSession();
 
   const variant = isSynced ? sidebarVariant : props.variant;
   const collapsible = isSynced ? sidebarCollapsible : props.collapsible;
+
+  const currentUser = session?.user
+    ? {
+        name: session.user.name || "Usuario",
+        email: session.user.email || "usuario@opticolor.com",
+        avatar: "",
+      }
+    : {
+        name: "Usuario",
+        email: "usuario@opticolor.com",
+        avatar: "",
+      };
 
   return (
     <Sidebar {...props} variant={variant} collapsible={collapsible}>
@@ -88,7 +101,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarContent>
       <SidebarFooter>
         <SidebarSupportCard />
-        <NavUser user={rootUser} />
+        <NavUser user={currentUser} />
       </SidebarFooter>
     </Sidebar>
   );
