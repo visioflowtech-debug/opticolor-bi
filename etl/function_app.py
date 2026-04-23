@@ -22,41 +22,12 @@ app = func.FunctionApp()
 # [23 ABRIL 2026] COMENTADA TEMPORALMENTE — Solo ejecutar EtlVentasRepetitivo hasta completar backfill HISTÓRICO
 @app.timer_trigger(schedule="0 30 6,8,10,12,14,16,18,20 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
-    """Función Maestra que inicia la cascada de ejecución con lock global."""
-    lock_acquired = False
+    """Función Maestra que inicia la cascada de ejecución."""
     etl = None
 
     try:
-        etl = GesvisionEtl()
-
-        # === MECANISMO DE LOCK GLOBAL (Solo en Azure, no en local) ===
-        # Evita ejecuciones paralelas de la cascada
-        import os
-        is_local = os.environ.get('AZURE_FUNCTIONS_ENVIRONMENT') == 'Development'
-
-        if not is_local:
-            # En Azure: intenta adquirir lock exclusivo
-            with pyodbc.connect(etl.conn_str) as conn:
-                cursor = conn.cursor()
-                try:
-                    # Intenta adquirir lock exclusivo (espera máximo 10 segundos)
-                    cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_cascada_execution' WAITFOR DELAY '00:00:10'")
-                    lock_acquired = True
-                    logging.info("   ✅ [LOCK GLOBAL] Adquirido — ejecutando cascada secuencialmente")
-                except Exception as lock_err:
-                    logging.warning(f"   ❌ [LOCK GLOBAL] No se pudo adquirir (otra cascada en progreso): {lock_err}")
-                    return
-                finally:
-                    cursor.close()
-
-            if not lock_acquired:
-                logging.warning("   ⚠️ [CASCADA] Otra ejecución en progreso. Saltando este ciclo.")
-                return
-        else:
-            # En local: skip lock para evitar problemas con Azurite
-            logging.info("   ℹ️ [LOCAL] Ejecutando sin lock global (modo desarrollo)")
-
         logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
+        etl = GesvisionEtl()
         reporte = []
         start_global = time.time()
         inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
