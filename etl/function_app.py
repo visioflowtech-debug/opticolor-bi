@@ -1990,7 +1990,7 @@ class GesvisionEtl:
                     cursor = conn.cursor()
                     # Intenta UPDATE primero
                     cursor.execute(
-                        "UPDATE Etl_Checkpoints SET LastValue = ?, FechaActualizacion = GETDATE() WHERE KeyName = ?",
+                        "UPDATE Etl_Checkpoints SET LastValue = ? WHERE KeyName = ?",
                         str(skip), 'checkpoint_inventory_skip'
                     )
                     rows_updated = cursor.rowcount
@@ -2000,7 +2000,7 @@ class GesvisionEtl:
                     if rows_updated == 0:
                         logging.info(f"   [CHECKPOINT] Insertando nuevo checkpoint...")
                         cursor.execute(
-                            "INSERT INTO Etl_Checkpoints (KeyName, LastValue, FechaActualizacion) VALUES (?, ?, GETDATE())",
+                            "INSERT INTO Etl_Checkpoints (KeyName, LastValue) VALUES (?, ?)",
                             'checkpoint_inventory_skip', str(skip)
                         )
 
