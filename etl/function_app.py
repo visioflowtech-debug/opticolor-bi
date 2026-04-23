@@ -10,6 +10,86 @@ import numpy as np
 import json
 
 app = func.FunctionApp()
+
+# --- FUNCIÓN DE PRUEBA: HTTP TRIGGER PARA EJECUTAR INMEDIATAMENTE ---
+@app.route(route="run-etl-now", methods=["POST"])
+def EtlExecuteNow(req: func.HttpRequest) -> func.HttpResponse:
+    """Ejecutor manual de la cascada ETL. Útil para testing sin esperar CRON."""
+    logging.info("=== [MANUAL TRIGGER] ETL Ejecutándose por petición HTTP ===")
+    etl = None
+
+    try:
+        logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA - MANUAL) ---")
+        etl = GesvisionEtl()
+        reporte = []
+        start_global = time.time()
+        inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        MAX_DURATION_MINS = 24
+
+        etl.notificar_telegram(f"✅ ETL Manual iniciado — {inicio_ts}")
+
+        def check_time_limit():
+            elapsed = (time.time() - start_global) / 60
+            if elapsed > MAX_DURATION_MINS:
+                logging.warning(f"⚠️ [TIMEOUT PREVENTIVO] Tiempo excedido ({elapsed:.1f} min). Deteniendo cascada.")
+                return True
+            return False
+
+        # Módulos de cascada
+        remaining_modules = [
+            ('SUCURSALES', etl.sync_dimensions),
+            ('EMPLEADOS', etl.sync_employees),
+            ('CATEGORIAS', etl.sync_categories),
+            ('METODOS_PAGO', etl.sync_payment_methods),
+            ('PROVEEDORES', etl.sync_suppliers),
+            ('MARCAS_FULL', etl.sync_brands_full),
+            ('PRODUCTOS', etl.sync_products),
+            ('CLIENTES', etl.sync_customers),
+            ('CITAS', etl.sync_appointments),
+            ('EXAMENES', etl.sync_exams),
+            ('PEDIDOS', etl.sync_orders),
+            ('ORDENES_CRISTALES', etl.sync_glasses_orders),
+            ('VENTAS', etl.sync_invoices_incremental),
+            ('COBROS', etl.sync_collections),
+            ('TESORERIA', etl.sync_treasury),
+            ('PEDIDOS_LAB', etl.sync_laboratory_orders),
+            ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
+            ('INVENTARIO', etl.sync_inventory),
+        ]
+
+        for mod_name, mod_func in remaining_modules:
+            if check_time_limit():
+                break
+            reporte.append(etl.ejecutar_modulo(mod_name, mod_func))
+
+        duration = (time.time() - start_global) / 60
+        etl.enviar_resumen_ciclo_telegram(reporte, duration)
+        logging.info(f"--- [FIN] CICLO ETL COMPLETADO EN {duration:.2f} MIN ---")
+
+        return func.HttpResponse(
+            f"✅ ETL Ejecutado Exitosamente\n\nDuración: {duration:.2f} min\nMódulos: {len(reporte)}\n\nRevisá los logs para detalles.",
+            status_code=200
+        )
+
+    except Exception as e:
+        logging.error(f"Error en ETL manual: {e}")
+        if etl:
+            try:
+                etl.enviar_resumen_ciclo_telegram(reporte, (time.time() - start_global) / 60, error_critico=str(e))
+            except:
+                pass
+        return func.HttpResponse(
+            f"❌ Error en ETL: {str(e)[:500]}",
+            status_code=500
+        )
+    finally:
+        if etl and etl.session:
+            try:
+                etl.session.close()
+            except:
+                pass
+
+
 # --- SECCIÓN 1: DISPARADORES (TIMER TRIGGERS) ---
 # Orquestación Basada en Estados y Horarios CRON para Producción.
 
