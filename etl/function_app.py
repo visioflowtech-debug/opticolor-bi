@@ -1985,24 +1985,34 @@ class GesvisionEtl:
                     skip += limit
                     time.sleep(0.05)
 
-                # Guardar checkpoint después de procesar
+                # Guardar checkpoint después de procesar (DENTRO del contexto de conn)
                 try:
-                    with conn.cursor() as cursor:
-                        # Intenta UPDATE primero
+                    cursor = conn.cursor()
+                    # Intenta UPDATE primero
+                    cursor.execute(
+                        "UPDATE Etl_Checkpoints SET LastValue = ?, FechaActualizacion = GETDATE() WHERE KeyName = ?",
+                        str(skip), 'checkpoint_inventory_skip'
+                    )
+                    rows_updated = cursor.rowcount
+                    logging.info(f"   [CHECKPOINT] UPDATE intentado: {rows_updated} filas afectadas")
+
+                    # Si no actualizó nada, inserta
+                    if rows_updated == 0:
+                        logging.info(f"   [CHECKPOINT] Insertando nuevo checkpoint...")
                         cursor.execute(
-                            "UPDATE Etl_Checkpoints SET LastValue = ?, FechaActualizacion = GETDATE() WHERE KeyName = ?",
-                            str(skip), 'checkpoint_inventory_skip'
+                            "INSERT INTO Etl_Checkpoints (KeyName, LastValue, FechaActualizacion) VALUES (?, ?, GETDATE())",
+                            'checkpoint_inventory_skip', str(skip)
                         )
-                        # Si no actualizó nada, inserta
-                        if cursor.rowcount == 0:
-                            cursor.execute(
-                                "INSERT INTO Etl_Checkpoints (KeyName, LastValue, FechaActualizacion) VALUES (?, ?, GETDATE())",
-                                'checkpoint_inventory_skip', str(skip)
-                            )
-                        conn.commit()
-                        logging.info(f"   [CHECKPOINT] Guardado: checkpoint_inventory_skip = {skip}")
+
+                    conn.commit()
+                    cursor.close()
+                    logging.info(f"   [CHECKPOINT] ✅ Guardado exitoso: checkpoint_inventory_skip = {skip}")
                 except Exception as e:
-                    logging.warning(f"   [CHECKPOINT ERROR] No se pudo guardar checkpoint: {e}")
+                    logging.error(f"   [CHECKPOINT] ❌ ERROR al guardar: {type(e).__name__}: {e}")
+                    try:
+                        conn.rollback()
+                    except:
+                        pass
 
                 return total_processed
 
