@@ -5,13 +5,14 @@ const config: sql.config = {
   database: process.env.AZURE_SQL_DATABASE!,
   user: process.env.AZURE_SQL_USER!,
   password: process.env.AZURE_SQL_PASSWORD!,
-  port: Number(process.env.AZURE_SQL_PORT) || 1433,
   options: {
     encrypt: true,
     trustServerCertificate: false,
+    connectTimeout: 15000,
+    requestTimeout: 30000,
   },
   pool: {
-    max: 10,
+    max: 5,
     min: 0,
     idleTimeoutMillis: 30000,
   },
@@ -20,11 +21,18 @@ const config: sql.config = {
 let pool: sql.ConnectionPool | null = null;
 
 export async function getPool(): Promise<sql.ConnectionPool> {
-  if (!pool) {
-    pool = new sql.ConnectionPool(config);
-    await pool.connect();
+  try {
+    if (!pool || !pool.connected) {
+      pool = new sql.ConnectionPool(config);
+      await pool.connect();
+      console.log('[DB] Conexión a Azure SQL establecida');
+    }
+    return pool;
+  } catch (error) {
+    console.error('[DB] Error conectando a Azure SQL:', error);
+    pool = null;
+    throw error;
   }
-  return pool;
 }
 
 export async function query<T>(

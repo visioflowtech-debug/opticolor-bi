@@ -12,10 +12,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.warn('[NextAuth] Credenciales vacías');
           return null;
         }
 
         try {
+          console.log('[NextAuth] Intentando autenticar:', credentials.email);
+
           const rows = await query<{
             id_usuario: number;
             email: string;
@@ -30,20 +33,29 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             { email: credentials.email }
           );
 
+          console.log('[NextAuth] Query resultado:', rows.length, 'registros');
+
           if (!rows.length) {
+            console.warn('[NextAuth] Usuario no encontrado:', credentials.email);
             return null;
           }
 
           const user = rows[0];
+          console.log('[NextAuth] Usuario encontrado:', user.nombre_completo);
+
           const isValidPassword = await bcrypt.compare(
             credentials.password as string,
             user.password_hash
           );
 
+          console.log('[NextAuth] Password válido:', isValidPassword);
+
           if (!isValidPassword) {
+            console.warn('[NextAuth] Password incorrecto');
             return null;
           }
 
+          console.log('[NextAuth] Autenticación exitosa para:', credentials.email);
           return {
             id: String(user.id_usuario),
             email: user.email,
@@ -53,7 +65,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           };
         } catch (error) {
           console.error('[NextAuth] Error en authorize:', error);
-          return null;
+          throw error;
         }
       },
     }),
