@@ -1988,14 +1988,17 @@ class GesvisionEtl:
                 # Guardar checkpoint después de procesar
                 try:
                     with conn.cursor() as cursor:
-                        cursor.execute("""
-                            IF EXISTS (SELECT 1 FROM Etl_Checkpoints WHERE KeyName = 'checkpoint_inventory_skip')
-                                UPDATE Etl_Checkpoints SET LastValue = ?, FechaActualizacion = GETDATE()
-                                WHERE KeyName = 'checkpoint_inventory_skip'
-                            ELSE
-                                INSERT INTO Etl_Checkpoints (KeyName, LastValue, FechaActualizacion)
-                                VALUES ('checkpoint_inventory_skip', ?, GETDATE())
-                        """, str(skip), str(skip))
+                        # Intenta UPDATE primero
+                        cursor.execute(
+                            "UPDATE Etl_Checkpoints SET LastValue = ?, FechaActualizacion = GETDATE() WHERE KeyName = ?",
+                            str(skip), 'checkpoint_inventory_skip'
+                        )
+                        # Si no actualizó nada, inserta
+                        if cursor.rowcount == 0:
+                            cursor.execute(
+                                "INSERT INTO Etl_Checkpoints (KeyName, LastValue, FechaActualizacion) VALUES (?, ?, GETDATE())",
+                                'checkpoint_inventory_skip', str(skip)
+                            )
                         conn.commit()
                         logging.info(f"   [CHECKPOINT] Guardado: checkpoint_inventory_skip = {skip}")
                 except Exception as e:
