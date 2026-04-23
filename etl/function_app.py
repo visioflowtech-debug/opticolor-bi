@@ -58,14 +58,15 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('EXAMENES', etl.sync_exams),
             ('PEDIDOS', etl.sync_orders),
             ('ORDENES_CRISTALES', etl.sync_glasses_orders),
-            ('VENTAS', etl.sync_invoices_incremental),
+            # VENTAS ejecuta en función separada (EtlVentasRepetitivo) cada minuto hasta completar backfill HISTORICAL
+            # ('VENTAS', etl.sync_invoices_incremental),
             ('COBROS', lambda: f"{etl.sync_collections()[0]} (Total: {etl.sync_collections()[1]})"),
             ('TESORERIA', lambda: f"{etl.sync_treasury()[0]} (Total: {etl.sync_treasury()[1]})"),
             ('PEDIDOS_LAB', etl.sync_laboratory_orders),
             ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
             # INVENTARIO ejecuta en función separada (EtlInventarioRepetitivo) cada minuto
             # ('INVENTARIO', etl.sync_inventory),
-            # ✅ 17/18 MÓDULOS EN CASCADA + 1 ESPECIALIZADO (INVENTARIO cada minuto)
+            # ✅ 16/18 MÓDULOS EN CASCADA + 2 ESPECIALIZADOS (VENTAS + INVENTARIO en funciones temporales)
         ]
 
         for mod_name, mod_func in remaining_modules:
@@ -145,6 +146,68 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 #
 #     finally:
 #         if etl.session: etl.session.close()
+
+
+# --- FUNCIÓN TEMPORAL: VENTAS CADA MINUTO (Backfill HISTORICAL) ---
+# [23 ABRIL 2026] ACTIVA — VENTAS en carga histórica completa hasta terminar (Status 204)
+# Con lock en BD para evitar ejecuciones paralelas (solo 1 a la vez, secuencial)
+@app.timer_trigger(schedule="*/1 * * * *", arg_name="myTimer", run_on_startup=False)
+def EtlVentasRepetitivo(myTimer: func.TimerRequest) -> None:
+    """
+    Ejecutor temporal SOLO VENTAS que se reinicia cada minuto.
+    Estrategia SECUENCIAL: MAX 24 minutos por ejecución, con lock en BD para evitar paralelismo.
+    Una ejecución termina → espera al siguiente minuto → comienza la siguiente.
+    Termina automáticamente cuando API retorna Status 204 (sin más datos).
+    """
+    logging.info("--- [VENTAS-LOOP] Inicio repetitivo (cada minuto) ---")
+    etl = GesvisionEtl()
+    start_time = time.time()
+    lock_acquired = False
+
+    try:
+        # Adquirir lock exclusivo en BD (evitar ejecuciones paralelas)
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+            try:
+                # Intenta adquirir lock (espera máximo 5 segundos)
+                cursor.execute("SELECT * FROM Etl_Checkpoints WITH (XLOCK, READPAST) WHERE KeyName = 'lock_ventas_execution' WAITFOR DELAY '00:00:05'")
+                lock_acquired = True
+                logging.info("   [LOCK] Lock exclusivo adquirido — ejecutando VENTAS secuencialmente")
+            except Exception as lock_err:
+                logging.warning(f"   [LOCK] No se pudo adquirir lock (otra ejecución en progreso): {lock_err}")
+                cursor.close()
+                return
+
+        if not lock_acquired:
+            logging.warning("   [LOCK] Otra ejecución de VENTAS está en progreso. Saltando esta ronda.")
+            return
+
+        if not etl.token: etl.get_token()
+        total_processed = etl.sync_invoices_incremental()
+
+        elapsed = (time.time() - start_time) / 60
+        logging.info(f"--- [VENTAS-LOOP] Procesados: {total_processed} facturas en {elapsed:.1f} min ---")
+
+        # Notificar progreso solo si se procesaron items
+        if total_processed > 0:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT COUNT(*) FROM Ventas_Cabecera")
+                count_ventas = cursor.fetchone()[0]
+                cursor.close()
+            etl.notificar_telegram(f"[VENTAS-LOOP] Progreso: {count_ventas:,} facturas cargadas ({total_processed} en {elapsed:.1f} min)")
+        else:
+            logging.info("   [VENTAS-LOOP] ✅ COMPLETADO - No hay más facturas para procesar (status 204)")
+            etl.notificar_telegram("✅ VENTAS completado - Tabla poblada en su totalidad. Cambiar a cascada normal.")
+
+    except Exception as e:
+        logging.error(f"Error en VENTAS-LOOP: {e}")
+        try:
+            etl.notificar_telegram(f"❌ ERROR VENTAS-LOOP: {str(e)[:200]}")
+        except: pass
+
+    finally:
+        if etl.session: etl.session.close()
 
 
 # --- FUNCIÓN TEMPORAL: INVENTARIO CADA MINUTO (estrategia PRODUCTOS) ---
