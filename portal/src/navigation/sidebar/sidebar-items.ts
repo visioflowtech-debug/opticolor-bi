@@ -1,7 +1,6 @@
 import {
   BarChart3,
   Clock,
-  Fingerprint,
   LayoutDashboard,
   Lock,
   type LucideIcon,
@@ -82,15 +81,6 @@ export const sidebarItems: NavGroup[] = [
         url: "/dashboard/coming-soon",
         icon: Lock,
         comingSoon: true,
-      },
-      {
-        title: "Autenticación",
-        url: "/auth",
-        icon: Fingerprint,
-        subItems: [
-          { title: "Login", url: "/auth/v1/login", newTab: true },
-          { title: "Registro", url: "/auth/v1/register", newTab: true },
-        ],
       },
     ],
   },
