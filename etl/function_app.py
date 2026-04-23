@@ -1860,6 +1860,18 @@ class GesvisionEtl:
             total_processed = 0
 
             with pyodbc.connect(self.conn_str) as conn:
+                # === CHECK PREVIO: ¿VENTAS YA COMPLETADA? ===
+                if self.LOAD_MODE_INVOICES == 'HISTORICAL':
+                    try:
+                        with conn.cursor() as cursor:
+                            cursor.execute("SELECT LastValue FROM Etl_Checkpoints WHERE KeyName = 'checkpoint_invoices_final_detected'")
+                            row = cursor.fetchone()
+                            if row and row[0] == '1':
+                                logging.info("   ✅ [EARLY EXIT] VENTAS ya está COMPLETADA (checkpoint detectado). Abortando.")
+                                return 0
+                    except Exception as e:
+                        logging.warning(f"   [Checkpoint Check] No se pudo verificar completitud: {e}")
+
                 last_id_sql = self.get_last_id(conn, "Ventas_Cabecera", "id_factura")
                 logging.info(f"   [SQL Check] Iniciando sincronización desde ID: {last_id_sql}")
 
@@ -1937,6 +1949,7 @@ class GesvisionEtl:
                             
                             # Salida temprana si final de página
                             if not items or len(items) < 50:
+                                logging.info(f"   [Fin de Datos] Página incompleta con {len(items)} items. Carga completada.")
                                 break
 
                             skip += 50
@@ -1946,9 +1959,26 @@ class GesvisionEtl:
                         except Exception as e:
                             logging.warning(f"   [!] Error en skip {skip}: {e}. Reintentando...")
                             time.sleep(10)
-                    
+
                     if not items or len(items) < 50:
-                        if buffer: self._process_and_save(conn, buffer, "Ventas_Cabecera", "id_factura", self.MAP_VENTA)
+                        # FIN DE DATOS DETECTADO: Guardar buffer y terminar
+                        if buffer:
+                            self._process_and_save(conn, buffer, "Ventas_Cabecera", "id_factura", self.MAP_VENTA)
+
+                        # En HISTORICAL, resetear flag de "no completado" para evitar re-intentos
+                        if self.LOAD_MODE_INVOICES == 'HISTORICAL':
+                            # Guardar checkpoint indicando completitud (ej: skip=-1 = terminado)
+                            try:
+                                with conn.cursor() as cursor:
+                                    cursor.execute("DELETE FROM Etl_Checkpoints WHERE KeyName = 'checkpoint_invoices_final_detected'")
+                                    cursor.execute("INSERT INTO Etl_Checkpoints (KeyName, LastValue) VALUES (?, ?)",
+                                                 'checkpoint_invoices_final_detected', '1')
+                                    conn.commit()
+                                logging.info("   [Checkpoint] Marcado como COMPLETADO para evitar re-intentos.")
+                            except Exception as e:
+                                logging.warning(f"   [Checkpoint] No se pudo marcar completitud: {e}")
+
+                        logging.info(f"   ✅ [VENTAS] CARGA COMPLETADA - Total procesado: {total_processed:,} facturas")
                         break
 
                     if not success_batch:
