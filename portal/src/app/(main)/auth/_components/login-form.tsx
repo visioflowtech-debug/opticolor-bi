@@ -4,7 +4,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -30,17 +29,28 @@ export function LoginForm() {
   });
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
-    const result = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    });
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: data.email,
+          password: data.password,
+        }),
+      });
 
-    if (result?.error) {
-      toast.error("Email o contraseña incorrectos");
-    } else if (result?.ok) {
+      if (!response.ok) {
+        const error = await response.json();
+        toast.error(error.error || "Email o contraseña incorrectos");
+        return;
+      }
+
+      const result = await response.json();
       toast.success("Inicio de sesión exitoso");
       router.push("/dashboard/default");
+    } catch (error) {
+      console.error("Login error:", error);
+      toast.error("Error en el servidor");
     }
   };
 
