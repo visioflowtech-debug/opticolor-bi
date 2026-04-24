@@ -12,6 +12,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+# Forzar el root correcto para Turbopack en monorepo
+ENV TURBOPACK_ROOT=/app
 RUN npm run build
 
 # Stage 3: runner
