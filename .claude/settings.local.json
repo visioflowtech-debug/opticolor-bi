@@ -19,11 +19,20 @@
       "WebFetch(domain:github.com)",
       "Bash(xargs grep *)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(gh api *)"
+      "Bash(gh api *)",
+      "Read(//c/optilux/**)",
+      "Bash(python -m py_compile function_app.py)",
+      "Bash(python -c \"import function_app\")",
+      "Read(//c/c/opticolor-bi/etl/**)",
+      "Bash(taskkill /F /IM \"node.exe\" /T)",
+      "Bash(rm -rf %APPDATA%\\\\azurite)",
+      "Bash(rm -rf ~/.azurite)",
+      "Bash(tasklist)"
     ],
     "additionalDirectories": [
       "\\tmp",
-      "c:\\c\\opticolor-bi\\portal"
+      "c:\\c\\opticolor-bi\\portal",
+      "C:\\opticolor-bi\\etl"
     ]
   }
 }
