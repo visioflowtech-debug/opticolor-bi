@@ -742,10 +742,19 @@ class GesvisionEtl:
         def _notificar_sucursales_pendientes(self, registros, total):
             """Envía notificación Telegram sobre sucursales pendientes de clasificación."""
             try:
-                msg = f"⚠️ SUCURSALES SIN CLASIFICAR: {total}\n"
-                msg += "Las siguientes sucursales llegaron de Gesvision sin estado/zona asignada.\n"
-                msg += "Ingresa al portal → Admin → Sucursales para completar.\n\n"
-                msg += "Top pendientes:\n"
+                # Seleccionar emoji según criticidad del total
+                if total <= 3:
+                    emoji = "⚠️"
+                elif total <= 10:
+                    emoji = "🟠"
+                else:
+                    emoji = "🔴"
+
+                msg = f"{emoji} SUCURSALES SIN CLASIFICAR: {total}\n\n"
+                msg += "Llegaron de Gesvision sin estado/zona asignada.\n"
+                msg += "Campos requeridos: Estado venezolano + Zona gerencial\n"
+                msg += "Campos opcionales: Tipo punto de venta, Coordenadas\n\n"
+                msg += f"Top pendientes ({total} total):\n"
 
                 for reg in registros:
                     id_suc = reg.get('id_sucursal', '?')
@@ -753,10 +762,14 @@ class GesvisionEtl:
                     dias = reg.get('dias_sin_clasificar', 0)
                     msg += f"• #{id_suc} {nombre} — {dias} días sin clasificar\n"
 
-                msg += "\n🔗 Portal: https://app-portal-opticolor-prd.azurecontainerapps.io/admin/sucursales"
+                msg += "\n📋 Pasos:\n"
+                msg += "1. Entra al portal → Admin → Sucursales\n"
+                msg += "2. Busca las marcadas como PENDIENTE 🔴\n"
+                msg += "3. Asigna Estado + Zona → Guardar\n"
+                msg += "\n🔗 https://app-portal-opticolor-prd.livelyglacier-d04261ef.westus3.azurecontainerapps.io/admin/sucursales"
 
                 self.notificar_telegram(msg)
-                logging.info(f"Notificación de sucursales pendientes enviada ({total} pendientes)")
+                logging.info(f"Notificación de sucursales pendientes enviada ({total} pendientes, criticidad: {emoji})")
 
             except Exception as e:
                 logging.warning(f"⚠️ Error notificando sucursales pendientes: {e}")
