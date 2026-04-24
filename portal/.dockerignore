@@ -18,4 +18,3 @@ coverage
 .DS_Store
 README.md
 *.md
-package-lock.json
