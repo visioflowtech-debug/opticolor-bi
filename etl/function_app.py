@@ -24,11 +24,10 @@ app = func.FunctionApp()
 # --- NUEVO MODELO: CASCADA SECUENCIAL (Trigger-to-Trigger) ---
 # Solo la primera función tiene TimerTrigger. Las demás se ejecutan en cadena.
 
-# Horarios Venezuela (UTC-4): 07:50, 09:50, 11:50, 13:50, 15:50, 17:50, 19:50, 21:50
-# Equivalente UTC (+4h):   11:50, 13:50, 15:50, 17:50, 19:50, 21:50, 23:50, 01:50
-# Horarios Venezuela (UTC-4): 8:30, 10:30, 12:30, 14:30, 16:30, 18:30, 20:30, 22:30 (8x/día)
-# [23 ABRIL 2026] COMENTADA TEMPORALMENTE — Solo ejecutar EtlVentasRepetitivo hasta completar backfill HISTÓRICO
-@app.timer_trigger(schedule="0 30 6,8,10,12,14,16,18,20 * * *", arg_name="myTimer", run_on_startup=False)
+# Horarios Venezuela (UTC-4): 8:30 AM, 10:30 AM, 12:30 PM, 2:30 PM, 4:30 PM, 6:30 PM, 8:30 PM, 10:30 PM
+# Equivalente UTC (suma 4h):   12:30 UTC, 14:30 UTC, 16:30 UTC, 18:30 UTC, 20:30 UTC, 22:30 UTC, 0:30 UTC, 2:30 UTC
+# [24 ABRIL 2026] CRON CORREGIDO A HORA VENEZUELA (UTC-4)
+@app.timer_trigger(schedule="0 30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     etl = None
@@ -627,6 +626,11 @@ class GesvisionEtl:
 
                     msg += f"\n⏱️ *Tiempo Total Ciclo:* {duracion_min:.1f} min."
 
+                    # Verificar sucursales pendientes de clasificación (solo en ciclos exitosos)
+                    pendientes = self._verificar_sucursales_pendientes()
+                    if pendientes and pendientes.get('total', 0) > 0:
+                        self._notificar_sucursales_pendientes(pendientes.get('registros', []), pendientes.get('total', 0))
+
                 self.notificar_telegram(msg)
             except Exception as e:
                 logging.error(f"Error generando reporte Telegram: {e}")
@@ -701,7 +705,61 @@ class GesvisionEtl:
             except Exception as e:
                 logging.error(f"Error registrando fin de {modulo}: {e}")
 
+        def _verificar_sucursales_pendientes(self):
+            """Consulta sucursales sin clasificar y retorna count + top 5."""
+            try:
+                with pyodbc.connect(self.conn_str) as conn:
+                    cursor = conn.cursor()
 
+                    # Obtener conteo total de pendientes
+                    cursor.execute("SELECT COUNT(*) FROM Vw_Sucursales_Pendientes_Clasificacion")
+                    total = cursor.fetchone()[0]
+
+                    if total == 0:
+                        return None
+
+                    # Obtener top 5 pendientes
+                    cursor.execute("""
+                        SELECT TOP 5 id_sucursal, nombre_sucursal, dias_sin_clasificar
+                        FROM Vw_Sucursales_Pendientes_Clasificacion
+                        ORDER BY dias_sin_clasificar DESC
+                    """)
+
+                    registros = []
+                    for row in cursor.fetchall():
+                        registros.append({
+                            'id_sucursal': row[0],
+                            'nombre_sucursal': row[1],
+                            'dias_sin_clasificar': row[2]
+                        })
+
+                    return {'total': total, 'registros': registros}
+
+            except Exception as e:
+                logging.warning(f"⚠️ Error verificando sucursales pendientes: {e}")
+                return None
+
+        def _notificar_sucursales_pendientes(self, registros, total):
+            """Envía notificación Telegram sobre sucursales pendientes de clasificación."""
+            try:
+                msg = f"⚠️ SUCURSALES SIN CLASIFICAR: {total}\n"
+                msg += "Las siguientes sucursales llegaron de Gesvision sin estado/zona asignada.\n"
+                msg += "Ingresa al portal → Admin → Sucursales para completar.\n\n"
+                msg += "Top pendientes:\n"
+
+                for reg in registros:
+                    id_suc = reg.get('id_sucursal', '?')
+                    nombre = reg.get('nombre_sucursal', 'Sin nombre')
+                    dias = reg.get('dias_sin_clasificar', 0)
+                    msg += f"• #{id_suc} {nombre} — {dias} días sin clasificar\n"
+
+                msg += "\n🔗 Portal: https://app-portal-opticolor-prd.azurecontainerapps.io/admin/sucursales"
+
+                self.notificar_telegram(msg)
+                logging.info(f"Notificación de sucursales pendientes enviada ({total} pendientes)")
+
+            except Exception as e:
+                logging.warning(f"⚠️ Error notificando sucursales pendientes: {e}")
 
 
         def predecesor_listo(self, modulo_padre):
