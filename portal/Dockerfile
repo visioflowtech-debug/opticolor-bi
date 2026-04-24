@@ -2,14 +2,14 @@
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY portal/package.json portal/package-lock.json ./
+COPY package.json package-lock.json ./
 RUN npm ci
 
 # Stage 2: builder
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY portal/ .
+COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 ENV TURBOPACK_ROOT=/app
