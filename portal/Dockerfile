@@ -2,17 +2,16 @@
 FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-COPY package.json package-lock.json ./
+COPY portal/package.json portal/package-lock.json ./
 RUN npm ci
 
 # Stage 2: builder
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+COPY portal/ .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-# Forzar el root correcto para Turbopack en monorepo
 ENV TURBOPACK_ROOT=/app
 RUN npm run build
 
