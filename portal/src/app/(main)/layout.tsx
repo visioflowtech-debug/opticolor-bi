@@ -17,29 +17,35 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
         if (!isLoginPage && !isDashboard) {
           setIsChecking(false);
-          return; // No protegemos otras rutas
+          return;
         }
 
-        const response = await fetch('/api/debug/middleware-test');
-        const data = await response.json();
-        const hasValidToken = data.logs.some((log: string) => log.includes('✅ JWT válido'));
+        // Verificar sesión via endpoint seguro
+        const response = await fetch('/api/auth/session-check', {
+          method: 'GET',
+          credentials: 'include',
+        });
 
-        setIsAuthed(hasValidToken);
+        const isValid = response.ok && response.status === 200;
 
-        if (isDashboard && !hasValidToken) {
-          console.log('[MainLayout] Redirigiendo a login (sin sesión)');
+        setIsAuthed(isValid);
+
+        if (isDashboard && !isValid) {
           router.push('/auth/v2/login');
-        } else if (isLoginPage && hasValidToken) {
-          console.log('[MainLayout] Redirigiendo a dashboard (con sesión)');
-          router.push('/dashboard/default');
+          return;
         }
-      } catch (error) {
-        console.error('[MainLayout] Error:', error);
+
+        if (isLoginPage && isValid) {
+          router.push('/dashboard/default');
+          return;
+        }
+
+        setIsChecking(false);
+      } catch {
+        setIsChecking(false);
         if (pathname.startsWith('/dashboard')) {
           router.push('/auth/v2/login');
         }
-      } finally {
-        setIsChecking(false);
       }
     };
 
