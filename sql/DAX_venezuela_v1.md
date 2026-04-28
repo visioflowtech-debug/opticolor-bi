@@ -22,21 +22,21 @@ GMT-4 Venezuela. Datos desde 2026. Tabla medidas: _Medidas_Opticolor
 | 11 | Venta Teorica Lista | ✅ 27/04/2026 |
 | 12 | Color Alerta ETL | ✅ 27/04/2026 |
 | 13 | Filtro Mes Actual | ✅ 27/04/2026 |
-| 14 | Monto Pedidos | ⏳ Pendiente |
-| 15 | Monto Saldo Pendiente | ⏳ Pendiente |
-| 16 | Recaudado en Pedidos | ⏳ Pendiente |
-| 17 | % Cobro Inmediato | ⏳ Pendiente |
-| 18 | % Nivel de Abono | ⏳ Pendiente |
-| 19 | Pedidos por Liquidar | ⏳ Pendiente |
-| 20 | Total Exámenes | ⏳ Pendiente |
+| 14 | Monto Pedidos | ✅ 27/04/2026 |
+| 15 | Monto Saldo Pendiente | ✅ 28/04/2026 |
+| 16 | Recaudado en Pedidos | ✅ 28/04/2026 |
+| 17 | % Cobro Inmediato | ✅ 28/04/2026 |
+| 18 | % Nivel de Abono | ✅ 28/04/2026 |
+| 19 | Pedidos por Liquidar | ✅ 28/04/2026 |
+| 20 | Total Exámenes | ✅ 28/04/2026 |
 | 21 | Cantidad Pedidos | ✅ 27/04/2026 |
-| 22 | % Cierre General | ⏳ Pendiente |
-| 23 | Stock Fisico (Unds) | ⏳ Pendiente |
-| 24 | Capital Invertido | ⏳ Pendiente |
-| 25 | Unidades Vendidas | ⏳ Pendiente |
-| 26 | UPT | ⏳ Pendiente |
-| 27 | ASP | ⏳ Pendiente |
-| 28 | Volumen Unidades | ⏳ Pendiente |
+| 22 | % Cierre General | ✅ 28/04/2026 |
+| 23 | Stock Fisico (Unds) | ✅ 28/04/2026 |
+| 24 | Capital Invertido | ✅ 28/04/2026 |
+| 25 | Unidades Vendidas | ✅ 28/04/2026 |
+| 26 | UPT | ✅ 28/04/2026 |
+| 27 | ASP | ✅ 28/04/2026 |
+| 28 | Volumen Unidades | ✅ 28/04/2026 |
 
 ---
 
@@ -629,6 +629,551 @@ SELECT Date, Slicer_Mes, Filtro_Comparativo_Dinamico
 FROM Dim_Tiempo
 WHERE Slicer_Mes = 'Mes Actual'
 ORDER BY Date DESC;
+```
+
+---
+
+## DAX #14 — Monto Pedidos
+
+**Panamá:**
+```dax
+Monto Pedidos = COALESCE(SUM(Fact_Pedidos[monto_total]), 0)
+```
+
+**Venezuela:**
+```dax
+Monto Pedidos = COALESCE(SUM(Fact_Pedidos[monto_total]), 0)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Fact_Pedidos Venezuela tiene monto_total confirmado.
+
+**Validación SQL:**
+```sql
+SELECT periodo_pedido,
+       COUNT(DISTINCT id_pedido) AS pedidos,
+       ROUND(SUM(monto_total), 2) AS monto_total
+FROM Fact_Pedidos
+GROUP BY periodo_pedido
+ORDER BY periodo_pedido DESC;
+```
+
+---
+
+## DAX #15 — Monto Saldo Pendiente
+
+**Panamá:**
+```dax
+Monto Saldo Pendiente = COALESCE(SUM(Fact_Pedidos[saldo_pendiente]), 0)
+```
+
+**Venezuela:**
+```dax
+Monto Saldo Pendiente = COALESCE(SUM(Fact_Pedidos[saldo_pendiente]), 0)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Venezuela tiene saldo_pendiente confirmado en Fact_Pedidos.
+Incluye saldos negativos (sobrepagos) y positivos (deuda).
+
+**Validación SQL:**
+```sql
+SELECT periodo_pedido,
+       COUNT(DISTINCT CASE WHEN saldo_pendiente > 0 
+             THEN id_pedido END) AS pedidos_con_deuda,
+       ROUND(SUM(saldo_pendiente), 2) AS saldo_neto,
+       ROUND(SUM(CASE WHEN saldo_pendiente > 0 
+             THEN saldo_pendiente ELSE 0 END), 2) AS total_por_cobrar
+FROM Fact_Pedidos
+GROUP BY periodo_pedido
+ORDER BY periodo_pedido DESC;
+```
+
+---
+
+## DAX #16 — Recaudado en Pedidos
+
+**Panamá:**
+```dax
+Recaudado en Pedidos = COALESCE(SUM(Fact_Pedidos[monto_pagado]), 0)
+```
+
+**Venezuela:**
+```dax
+Recaudado en Pedidos = COALESCE(SUM(Fact_Pedidos[monto_pagado]), 0)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Fact_Pedidos Venezuela tiene monto_pagado confirmado.
+
+**Validación SQL:**
+```sql
+SELECT periodo_pedido,
+       ROUND(SUM(monto_pagado), 2) AS recaudado,
+       ROUND(SUM(monto_total), 2) AS total_pedidos,
+       ROUND(SUM(monto_pagado) * 100.0 /
+             NULLIF(SUM(monto_total), 0), 2) AS pct_recaudado
+FROM Fact_Pedidos
+GROUP BY periodo_pedido
+ORDER BY periodo_pedido DESC;
+```
+
+---
+
+## DAX #17 — % Cobro Inmediato
+
+**Panamá:**
+```dax
+% Cobro Inmediato = 
+VAR TotalPedidos = DISTINCTCOUNT('Fact_Pedidos'[id_pedido])
+VAR PedidosPagadosFull = 
+    CALCULATE(
+        DISTINCTCOUNT('Fact_Pedidos'[id_pedido]),
+        FILTER('Fact_Pedidos', 'Fact_Pedidos'[saldo_pendiente] = 0)
+    ) 
+RETURN 
+COALESCE(
+    DIVIDE(PedidosPagadosFull, TotalPedidos, 0), 
+    0
+)
+```
+
+**Venezuela:**
+```dax
+% Cobro Inmediato = 
+VAR TotalPedidos = DISTINCTCOUNT('Fact_Pedidos'[id_pedido])
+VAR PedidosPagadosFull = 
+    CALCULATE(
+        DISTINCTCOUNT('Fact_Pedidos'[id_pedido]),
+        FILTER('Fact_Pedidos', 'Fact_Pedidos'[saldo_pendiente] <= 0)
+    ) 
+RETURN 
+COALESCE(
+    DIVIDE(PedidosPagadosFull, TotalPedidos, 0), 
+    0
+)
+```
+
+**Diferencia:** Panamá usa = 0, Venezuela usa <= 0
+para incluir sobrepagos (saldo negativo = pagado de más).
+Confirmado: Venezuela tiene pedidos con saldo negativo.
+
+**Validación SQL:**
+```sql
+SELECT periodo_pedido,
+       COUNT(DISTINCT id_pedido) AS total_pedidos,
+       COUNT(DISTINCT CASE WHEN saldo_pendiente <= 0 
+             THEN id_pedido END) AS pedidos_cobrados,
+       ROUND(COUNT(DISTINCT CASE WHEN saldo_pendiente <= 0 
+             THEN id_pedido END) * 100.0 /
+             NULLIF(COUNT(DISTINCT id_pedido), 0), 2) AS pct_cobro_inmediato
+FROM Fact_Pedidos
+GROUP BY periodo_pedido
+ORDER BY periodo_pedido DESC;
+```
+
+---
+
+## DAX #18 — % Nivel de Abono
+
+**Panamá:**
+```dax
+% Nivel de Abono = 
+COALESCE(
+    DIVIDE([Recaudado en Pedidos], [Monto Pedidos], 0), 
+    0
+)
+```
+
+**Venezuela:**
+```dax
+% Nivel de Abono = 
+COALESCE(
+    DIVIDE([Recaudado en Pedidos], [Monto Pedidos], 0), 
+    0
+)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Depende de DAX #16 Recaudado en Pedidos y DAX #14 Monto Pedidos.
+
+**Validación SQL:**
+```sql
+SELECT periodo_pedido,
+       ROUND(SUM(monto_pagado), 2) AS recaudado,
+       ROUND(SUM(monto_total), 2) AS total_pedidos,
+       ROUND(SUM(monto_pagado) * 100.0 /
+             NULLIF(SUM(monto_total), 0), 2) AS pct_nivel_abono
+FROM Fact_Pedidos
+GROUP BY periodo_pedido
+ORDER BY periodo_pedido DESC;
+```
+
+---
+
+## DAX #19 — Pedidos por Liquidar
+
+**Panamá:**
+```dax
+Pedidos por Liquidar = 
+COALESCE(
+    CALCULATE(
+        DISTINCTCOUNT('Fact_Pedidos'[id_pedido]),
+        FILTER('Fact_Pedidos', 'Fact_Pedidos'[saldo_pendiente] > 0)
+    ), 
+    0
+)
+```
+
+**Venezuela:**
+```dax
+Pedidos por Liquidar = 
+COALESCE(
+    CALCULATE(
+        DISTINCTCOUNT('Fact_Pedidos'[id_pedido]),
+        FILTER('Fact_Pedidos', 'Fact_Pedidos'[saldo_pendiente] > 0)
+    ), 
+    0
+)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Venezuela tiene 280 pedidos por liquidar en abril
+con Bs 6.9M pendiente de cobro.
+
+**Validación SQL:**
+```sql
+SELECT periodo_pedido,
+       COUNT(DISTINCT id_pedido) AS pedidos_por_liquidar,
+       ROUND(SUM(saldo_pendiente), 2) AS total_por_cobrar,
+       ROUND(AVG(saldo_pendiente), 2) AS promedio_saldo
+FROM Fact_Pedidos
+WHERE saldo_pendiente > 0
+GROUP BY periodo_pedido
+ORDER BY periodo_pedido DESC;
+```
+
+---
+
+## DAX #20 — Total Exámenes
+
+**Panamá:**
+```dax
+Total Exámenes = 
+COALESCE(COUNTROWS('Fact_Examenes'), 0)
+```
+
+**Venezuela:**
+```dax
+Total Exámenes = 
+COALESCE(COUNTROWS('Fact_Examenes'), 0)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Venezuela tiene exámenes desde enero 2026.
+Sin tipo_examen (NULL en todos los registros).
+
+**Validación SQL:**
+```sql
+SELECT periodo_examen,
+       COUNT(id_examen) AS total_examenes,
+       COUNT(DISTINCT id_sucursal) AS sucursales_activas,
+       COUNT(DISTINCT id_optometrista) AS optometristas
+FROM Fact_Examenes
+GROUP BY periodo_examen
+ORDER BY periodo_examen DESC;
+```
+
+---
+
+## DAX #22 — % Cierre General
+
+**Panamá:**
+```dax
+% Cierre General = 
+VAR PacientesAtendidos = [Total Exámenes]
+VAR VentasCerradas = [Total Pedidos]
+RETURN
+DIVIDE(VentasCerradas, PacientesAtendidos, 0)
+```
+
+**Venezuela:**
+```dax
+% Cierre General = 
+VAR PacientesAtendidos = [Total Exámenes]
+VAR VentasCerradas = [Cantidad Pedidos]
+RETURN
+DIVIDE(VentasCerradas, PacientesAtendidos, 0)
+```
+
+**Diferencia:** Venezuela usa [Cantidad Pedidos] en lugar de
+[Total Pedidos] porque Total Pedidos depende de 
+Fact_Operaciones_Maestra que en Venezuela no tiene
+estados logísticos. Cantidad Pedidos usa Fact_Pedidos directo.
+Puede superar 100% — válido en Venezuela porque el examen
+no es obligatorio para comprar.
+
+**Validación SQL:**
+```sql
+WITH Pedidos AS (
+    SELECT periodo_pedido AS periodo,
+           COUNT(DISTINCT id_pedido) AS cantidad_pedidos
+    FROM Fact_Pedidos
+    GROUP BY periodo_pedido
+),
+Examenes AS (
+    SELECT periodo_examen AS periodo,
+           COUNT(id_examen) AS total_examenes
+    FROM Fact_Examenes
+    GROUP BY periodo_examen
+)
+SELECT P.periodo,
+       P.cantidad_pedidos,
+       E.total_examenes,
+       ROUND(P.cantidad_pedidos * 100.0 /
+             NULLIF(E.total_examenes, 0), 2) AS pct_cierre
+FROM Pedidos P
+LEFT JOIN Examenes E ON P.periodo = E.periodo
+ORDER BY P.periodo DESC;
+```
+
+---
+
+## DAX #23 — Stock Fisico (Unds)
+
+**Panamá:**
+```dax
+Stock Fisico (Unds) = 
+SUMX(
+    GENERATE(
+        VALUES('Dim_Productos'[SK_Producto]),
+        CALCULATETABLE(Fact_Inventario)
+    ),
+    Fact_Inventario[cantidad_disponible]
+)
+```
+
+**Venezuela:**
+```dax
+Stock Fisico (Unds) = 
+SUMX(
+    GENERATE(
+        VALUES('Dim_Productos'[SK_Producto]),
+        CALCULATETABLE(Fact_Inventario)
+    ),
+    Fact_Inventario[cantidad_disponible]
+)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+⚠️ CONFIGURACIÓN REQUERIDA: Desactivar interacción del 
+slicer Dim_Tiempo con este visual en Power BI.
+El inventario es foto del stock actual — no tiene 
+dimensión temporal. Sin esta configuración muestra (Blank).
+En Power BI: seleccionar visual → Format → Edit interactions
+→ apagar el slicer de fecha para este visual.
+
+**Validación SQL:**
+```sql
+SELECT 
+    COUNT(DISTINCT I.id_producto) AS productos,
+    COUNT(DISTINCT I.id_sucursal) AS sucursales,
+    SUM(I.cantidad_disponible) AS stock_total
+FROM Fact_Inventario I
+INNER JOIN Dim_Productos P ON I.id_producto = P.SK_Producto;
+```
+
+**Resultado validado 27/04/2026:**
+| productos | sucursales | stock_total |
+|---|---|---|
+| 13025 | 28 | 121,325 |
+
+---
+
+## DAX #24 — Capital Invertido
+
+**Panamá:**
+```dax
+Capital Invertido = 
+COALESCE(
+    SUM(Fact_Inventario[valor_total_inventario]), 
+    0
+)
+```
+
+**Venezuela:**
+```dax
+Capital Invertido = 
+COALESCE(
+    SUM(Fact_Inventario[valor_total_inventario]), 
+    0
+)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+⚠️ CONFIGURACIÓN REQUERIDA: Igual que Stock Fisico —
+desactivar interacción del slicer Dim_Tiempo con este visual.
+
+**Validación SQL:**
+```sql
+SELECT 
+    COUNT(DISTINCT id_producto) AS productos,
+    SUM(cantidad_disponible) AS stock_total,
+    ROUND(SUM(valor_total_inventario), 2) AS capital_invertido
+FROM Fact_Inventario
+WHERE valor_total_inventario > 0;
+```
+
+---
+
+## DAX #25 — Unidades Vendidas
+
+**Panamá:**
+```dax
+Unidades Vendidas = 
+COALESCE(
+    SUM(Fact_Ventas_Detalle[cantidad]), 
+    0
+)
+```
+
+**Venezuela:**
+```dax
+Unidades Vendidas = 
+COALESCE(
+    SUM(Fact_Ventas_Detalle[cantidad]), 
+    0
+)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Fact_Ventas_Detalle Venezuela tiene cantidad confirmado.
+
+**Validación SQL:**
+```sql
+SELECT periodo_venta,
+       SUM(cantidad) AS unidades_vendidas,
+       COUNT(DISTINCT id_factura) AS facturas
+FROM Fact_Ventas_Detalle
+GROUP BY periodo_venta
+ORDER BY periodo_venta DESC;
+```
+
+---
+
+## DAX #26 — Unidades por Ticket (UPT)
+
+**Panamá:**
+```dax
+Unidades por Ticket (UPT) = 
+COALESCE(
+    DIVIDE([Unidades Vendidas], [Cantidad Facturas], 0), 
+    0
+)
+```
+
+**Venezuela:**
+```dax
+Unidades por Ticket (UPT) = 
+COALESCE(
+    DIVIDE([Unidades Vendidas], [Cantidad Facturas], 0), 
+    0
+)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Depende de DAX #25 Unidades Vendidas y DAX #4 Cantidad Facturas.
+
+**Validación SQL:**
+```sql
+WITH Unidades AS (
+    SELECT SUM(cantidad) AS unidades_vendidas
+    FROM Fact_Ventas_Detalle
+    WHERE periodo_venta = FORMAT(DATEADD(HOUR,-4,GETUTCDATE()),'yyyy-MM')
+),
+Facturas AS (
+    SELECT COUNT(DISTINCT id_factura) AS cantidad_facturas
+    FROM Fact_Ventas
+    WHERE tipo_transaccion = 'Venta'
+    AND periodo_factura = FORMAT(DATEADD(HOUR,-4,GETUTCDATE()),'yyyy-MM')
+)
+SELECT 
+    U.unidades_vendidas,
+    F.cantidad_facturas,
+    ROUND(U.unidades_vendidas / NULLIF(F.cantidad_facturas, 0), 2) AS upt
+FROM Unidades U, Facturas F;
+```
+
+---
+
+## DAX #27 — ASP (Precio Promedio)
+
+**Panamá:**
+```dax
+ASP (Precio Promedio) = 
+COALESCE(
+    DIVIDE([Venta Neta (Producto)], [Unidades Vendidas], 0), 
+    0
+)
+```
+
+**Venezuela:**
+```dax
+ASP (Precio Promedio) = 
+COALESCE(
+    DIVIDE([Venta Neta (Producto)], [Unidades Vendidas], 0), 
+    0
+)
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Depende de DAX #10 Venta Neta (Producto) y DAX #25 Unidades Vendidas.
+
+**Validación SQL:**
+```sql
+WITH VentaNeta AS (
+    SELECT ROUND(SUM(monto_final_transaccional), 2) AS venta_neta
+    FROM Fact_Ventas_Detalle
+    WHERE periodo_venta = FORMAT(DATEADD(HOUR,-4,GETUTCDATE()),'yyyy-MM')
+),
+Unidades AS (
+    SELECT SUM(cantidad) AS unidades_vendidas
+    FROM Fact_Ventas_Detalle
+    WHERE periodo_venta = FORMAT(DATEADD(HOUR,-4,GETUTCDATE()),'yyyy-MM')
+)
+SELECT 
+    V.venta_neta,
+    U.unidades_vendidas,
+    ROUND(V.venta_neta / NULLIF(U.unidades_vendidas, 0), 2) AS asp
+FROM VentaNeta V, Unidades U;
+```
+
+---
+
+## DAX #28 — Volumen Unidades
+
+**Panamá:**
+```dax
+Volumen Unidades = SUM(Fact_Ventas_Analitico[cantidad])
+```
+
+**Venezuela:**
+```dax
+Volumen Unidades = SUM(Fact_Ventas_Analitico[cantidad])
+```
+
+**Diferencia:** Sin cambios vs Panamá.
+Fact_Ventas_Analitico Venezuela tiene cantidad confirmado.
+subcategoria_lente eliminada por rendimiento — no afecta este DAX.
+
+**Validación SQL:**
+```sql
+SELECT periodo_venta,
+       SUM(cantidad) AS volumen_unidades,
+       COUNT(DISTINCT id_sucursal) AS sucursales
+FROM Fact_Ventas_Analitico
+GROUP BY periodo_venta
+ORDER BY periodo_venta DESC;
 ```
 
 ---
