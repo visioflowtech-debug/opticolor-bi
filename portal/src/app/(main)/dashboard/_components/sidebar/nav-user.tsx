@@ -81,7 +81,7 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push('/dashboard/perfil')}>
                 <CircleUser />
                 Cuenta
               </DropdownMenuItem>
