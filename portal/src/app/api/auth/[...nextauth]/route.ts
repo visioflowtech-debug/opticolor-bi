@@ -77,7 +77,7 @@ export const { handlers, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    jwt({ token, user }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.email = user.email;
@@ -87,11 +87,11 @@ export const { handlers, auth } = NextAuth({
       }
       return token;
     },
-    session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.email = token.email as string;
-        session.user.name = token.name as string;
+    async session({ session, token }) {
+      if (token?.id && session.user) {
+        (session.user as any).id = token.id;
+        (session.user as any).email = token.email;
+        (session.user as any).name = token.name;
         (session.user as any).nombre_rol = token.nombre_rol;
         (session.user as any).nivel_jerarquico = token.nivel_jerarquico;
       }

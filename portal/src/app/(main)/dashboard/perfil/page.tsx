@@ -148,7 +148,7 @@ export default function PerfilPage() {
     const userId = (session?.user as any)?.id as string | undefined;
 
     if (!userId) {
-      setFetchError("No se pudo obtener la sesión activa.");
+      setFetchError("__debug__");
       setLoading(false);
       return;
     }
@@ -177,11 +177,24 @@ export default function PerfilPage() {
           <h1 className="text-3xl font-bold tracking-tight">Mi Perfil</h1>
         </div>
         <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-base text-muted-foreground">{fetchError}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Si el problema persiste, contacta al administrador del sistema.
-            </p>
+          <CardContent className="py-8">
+            {fetchError === "__debug__" ? (
+              <>
+                <p className="text-base font-medium text-destructive">
+                  Error: ID de sesión no encontrado.
+                </p>
+                <pre className="mt-4 max-h-40 overflow-auto rounded bg-muted p-2 text-[10px]">
+                  {JSON.stringify(session, null, 2)}
+                </pre>
+              </>
+            ) : (
+              <>
+                <p className="text-base text-muted-foreground">{fetchError}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Si el problema persiste, contacta al administrador del sistema.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
