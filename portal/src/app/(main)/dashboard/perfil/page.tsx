@@ -222,7 +222,7 @@ export default function PerfilPage() {
 
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="border-b pb-4">
-        <h1 className="text-3xl font-bold tracking-tight">Mi Perfil</h1>
+        <h1 className="text-3xl font-bold tracking-tight">Mi Cuenta</h1>
         <p className="mt-2 text-muted-foreground">
           Información de tu cuenta y accesos en Opticolor BI
         </p>
