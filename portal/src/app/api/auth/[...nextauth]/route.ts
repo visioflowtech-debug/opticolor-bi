@@ -5,7 +5,7 @@ import { query } from '@/lib/db';
 import { MSSQLAdapter } from '@/lib/nextauth-adapter';
 
 export const { handlers, auth } = NextAuth({
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
   providers: [
     Credentials({
       credentials: {
@@ -70,7 +70,7 @@ export const { handlers, auth } = NextAuth({
           console.log('[NextAuth Credentials] Retornando usuario:', result);
           return result;
         } catch (error) {
-          console.error('[NextAuth Credentials] Error en authorize:', error instanceof Error ? error.message : String(error), error);
+          console.error('[NextAuth Credentials] Error en authorize:', error instanceof Error ? error.message : String(error));
           throw error;
         }
       },
@@ -79,7 +79,7 @@ export const { handlers, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id;
+        token.id = user.id || (user as any).id_usuario;
         token.email = user.email;
         token.name = user.name;
         token.nombre_rol = (user as any).nombre_rol;
