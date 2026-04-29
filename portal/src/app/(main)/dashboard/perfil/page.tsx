@@ -174,7 +174,7 @@ export default function PerfilPage() {
     return (
       <div className="flex flex-col gap-4 md:gap-6">
         <div className="border-b pb-4">
-          <h1 className="text-3xl font-bold tracking-tight">Mi Perfil</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Mi Cuenta</h1>
         </div>
         <Card>
           <CardContent className="py-8">
