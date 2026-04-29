@@ -145,7 +145,7 @@ export default function PerfilPage() {
     if (status === "loading") return;
 
     // NextAuth JWT coloca el id en session.user.id (ver callbacks en [...nextauth]/route.ts)
-    const userId = (session?.user as { id?: string } | undefined)?.id;
+    const userId = (session?.user as any)?.id as string | undefined;
 
     if (!userId) {
       setFetchError("No se pudo obtener la sesión activa.");
