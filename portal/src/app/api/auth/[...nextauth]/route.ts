@@ -79,21 +79,17 @@ export const { handlers, auth } = NextAuth({
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.id = user.id || (user as any).id_usuario;
-        token.email = user.email;
-        token.name = user.name;
+        token.id = (user as any).id_usuario || user.id || (user as any).sub;
         token.nombre_rol = (user as any).nombre_rol;
         token.nivel_jerarquico = (user as any).nivel_jerarquico;
       }
       return token;
     },
     async session({ session, token }) {
-      if (token?.id && session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).email = token.email;
-        (session.user as any).name = token.name;
-        (session.user as any).nombre_rol = token.nombre_rol;
-        (session.user as any).nivel_jerarquico = token.nivel_jerarquico;
+      if (session.user) {
+        (session.user as any).id = token.id || null;
+        (session.user as any).nombre_rol = token.nombre_rol || null;
+        (session.user as any).nivel_jerarquico = token.nivel_jerarquico || null;
       }
       return session;
     },

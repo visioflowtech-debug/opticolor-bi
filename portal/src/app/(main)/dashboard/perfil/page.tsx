@@ -181,7 +181,7 @@ export default function PerfilPage() {
             {fetchError === "__debug__" ? (
               <>
                 <p className="text-base font-medium text-destructive">
-                  Error: ID de sesión no encontrado.
+                  Sesión detectada pero sin ID. Datos actuales: {JSON.stringify(session?.user)}
                 </p>
                 <pre className="mt-4 max-h-40 overflow-auto rounded bg-muted p-2 text-[10px]">
                   {JSON.stringify(session, null, 2)}
