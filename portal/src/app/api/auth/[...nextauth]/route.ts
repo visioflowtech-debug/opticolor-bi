@@ -2,7 +2,7 @@ import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import type { JWT } from 'next-auth/jwt';
-import type { User } from 'next-auth';
+import type { Session, User } from 'next-auth';
 import { query } from '@/lib/db';
 
 export const authOptions = {
@@ -89,7 +89,7 @@ export const authOptions = {
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: Session; token: JWT }) {
       if (token && session.user) {
         (session.user as any).id = token.id;
         (session.user as any).email = token.email;
