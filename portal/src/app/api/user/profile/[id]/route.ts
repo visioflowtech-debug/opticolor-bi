@@ -153,7 +153,7 @@ export async function GET(
     }
 
     const sessionUserId    = Number(session.user.id);
-    const sessionNivel     = (session.user as any).nivel_jerarquico as number;
+    const sessionNivel     = session.user.nivel_jerarquico;
     const isSuperAdmin     = sessionNivel === NIVEL_SUPER_ADMIN;
     const isOwnProfile     = sessionUserId === targetId;
 

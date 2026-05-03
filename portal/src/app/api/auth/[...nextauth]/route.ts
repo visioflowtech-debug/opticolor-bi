@@ -92,11 +92,11 @@ export const authOptions = {
     },
     async session({ session, token }: { session: Session; token: JWT }) {
       if (token && session.user) {
-        (session.user as any).id = token.id;
-        (session.user as any).email = token.email;
-        (session.user as any).name = token.name;
-        (session.user as any).nombre_rol = token.nombre_rol;
-        (session.user as any).nivel_jerarquico = token.nivel_jerarquico;
+        session.user.id = token.id;
+        session.user.email = token.email;
+        session.user.name = token.name;
+        session.user.nombre_rol = token.nombre_rol;
+        session.user.nivel_jerarquico = token.nivel_jerarquico;
       }
       return session;
     },
