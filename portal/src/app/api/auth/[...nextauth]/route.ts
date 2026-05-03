@@ -1,6 +1,8 @@
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
+import type { JWT } from 'next-auth/jwt';
+import type { User } from 'next-auth';
 import { query } from '@/lib/db';
 
 export const authOptions = {
@@ -77,7 +79,7 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: JWT; user?: User }) {
       if (user) {
         token.id = user.id || (user as any).id_usuario;
         token.email = user.email;
