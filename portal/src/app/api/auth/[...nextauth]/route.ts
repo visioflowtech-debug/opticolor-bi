@@ -6,6 +6,7 @@ import { MSSQLAdapter } from '@/lib/nextauth-adapter';
 
 export const { handlers, auth } = NextAuth({
   secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     Credentials({
       credentials: {
