@@ -106,6 +106,9 @@ export const { handlers, auth } = NextAuth({
     strategy: 'jwt',
     maxAge: 24 * 60 * 60,
   },
+  jwt: {
+    maxAge: 24 * 60 * 60,
+  },
   cookies: {
     sessionToken: {
       name: process.env.NODE_ENV === 'production'
