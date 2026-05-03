@@ -1,14 +1,13 @@
 import NextAuth from 'next-auth';
-import Credentials from 'next-auth/providers/credentials';
+import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcryptjs';
 import { query } from '@/lib/db';
-import { MSSQLAdapter } from '@/lib/nextauth-adapter';
 
-export const { handlers, auth } = NextAuth({
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  trustHost: true,
+export const authOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
-    Credentials({
+    CredentialsProvider({
+      name: 'Credentials',
       credentials: {
         email: { label: 'Email', type: 'email' },
         password: { label: 'Password', type: 'password' },
@@ -89,7 +88,7 @@ export const { handlers, auth } = NextAuth({
       return token;
     },
     async session({ session, token }) {
-      if (token?.id && session.user) {
+      if (token && session.user) {
         (session.user as any).id = token.id;
         (session.user as any).email = token.email;
         (session.user as any).name = token.name;
@@ -103,10 +102,7 @@ export const { handlers, auth } = NextAuth({
     signIn: '/auth/v2/login',
   },
   session: {
-    strategy: 'jwt',
-    maxAge: 24 * 60 * 60,
-  },
-  jwt: {
+    strategy: 'jwt' as const,
     maxAge: 24 * 60 * 60,
   },
   cookies: {
@@ -117,12 +113,13 @@ export const { handlers, auth } = NextAuth({
       options: {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'lax' as const,
         path: '/',
         maxAge: 24 * 60 * 60,
       },
     },
   },
-});
+};
 
-export const { GET, POST } = handlers;
+const handler = NextAuth(authOptions);
+export { handler as GET, handler as POST };
