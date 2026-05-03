@@ -6,7 +6,8 @@ import type { Session, User } from 'next-auth';
 import { query } from '@/lib/db';
 
 export const authOptions = {
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+  trustHost: true,
   providers: [
     CredentialsProvider({
       name: 'Credentials',
