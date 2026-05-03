@@ -49,7 +49,7 @@ jobs:
           tags: |
             ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:latest
             ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ steps.tag.outputs.tag }}
-          cache-from: type=gha
+          no-cache: true
           cache-to: type=gha,mode=max
 
       - name: Azure CLI Login
