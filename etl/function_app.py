@@ -27,9 +27,8 @@ app = func.FunctionApp()
 # Horarios Venezuela (UTC-4): 8:30 AM, 10:30 AM, 12:30 PM, 2:30 PM, 4:30 PM, 6:30 PM, 8:30 PM, 10:30 PM
 # Equivalente UTC (suma 4h):   12:30 UTC, 14:30 UTC, 16:30 UTC, 18:30 UTC, 20:30 UTC, 22:30 UTC, 0:30 UTC, 2:30 UTC
 # [24 ABRIL 2026] CRON CORREGIDO A HORA VENEZUELA (UTC-4)
-# [DESHABILITADO 05/05/2026] Timer principal desactivado para testing local de Telegram
-# @app.timer_trigger(schedule="0 30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
-def EtlOrquestadorPrincipal_DISABLED(myTimer: func.TimerRequest) -> None:
+@app.timer_trigger(schedule="0 30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
+def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     etl = None
 
@@ -3530,72 +3529,75 @@ class GesvisionEtl:
                 cursor.close()
 
 # ====================================================================================================
-# [TESTING LOCAL] Función temporal para probar envío de Telegram
+# [TESTING LOCAL] Función temporal para probar envío de Telegram - DESHABILITADA 05/05/2026
 # ====================================================================================================
-@app.route(route="test-telegram", methods=["POST"])
-def TestTelegram(req: func.HttpRequest) -> func.HttpResponse:
-    """
-    Función TEMPORAL para probar envío de mensajes a Telegram localmente.
-
-    Uso:
-        POST http://localhost:7071/api/test-telegram
-        Body: {"mensaje": "Tu mensaje aquí"}
-
-    Después de enviar el mensaje, sigue procesando normalmente.
-    """
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    try:
-        # Usar logging en lugar de print para evitar problemas de codificación en Windows
-        logging.info("[TEST TELEGRAM] Iniciando prueba de envio")
-        logging.info(f"Timestamp: {timestamp}")
-
-        # Parsear mensaje del body
-        logging.info("[PASO 1] Parseando mensaje del request...")
-        try:
-            req_body = req.get_json()
-            mensaje_test = req_body.get("mensaje", "Prueba de Telegram - ETL Opticolor funcionando")
-            logging.info(f"Mensaje recibido: {mensaje_test}")
-        except Exception as parse_err:
-            logging.warning(f"No hay JSON, usando mensaje por defecto: {parse_err}")
-            mensaje_test = "Prueba de Telegram - ETL Opticolor funcionando"
-
-        # Verificar variables de entorno
-        logging.info("[PASO 2] Verificando credenciales de Telegram...")
-        token = os.getenv("TELEGRAM_BOT_TOKEN")
-        chat_id = os.getenv("TELEGRAM_CHAT_ID")
-
-        if token:
-            token_display = f"{token[:10]}...{token[-5:]}"
-            logging.info(f"TELEGRAM_BOT_TOKEN configurado: {token_display}")
-        else:
-            logging.error("TELEGRAM_BOT_TOKEN NO CONFIGURADO")
-
-        if chat_id:
-            logging.info(f"TELEGRAM_CHAT_ID configurado: {chat_id}")
-        else:
-            logging.error("TELEGRAM_CHAT_ID NO CONFIGURADO")
-
-        # Crear instancia ETL y enviar mensaje
-        logging.info("[PASO 3] Creando instancia GesvisionEtl...")
-        etl = GesvisionEtl()
-        logging.info("Instancia creada exitosamente")
-
-        logging.info("[PASO 4] Enviando mensaje a Telegram...")
-        etl.notificar_telegram(f"TEST: {mensaje_test}")
-        logging.info(f"Mensaje enviado a Telegram: {mensaje_test}")
-
-        # Respuesta exitosa
-        response_msg = f"OK - Mensaje enviado a Telegram: '{mensaje_test}'\n\nAhora sigue procesando..."
-        logging.info("[TEST COMPLETADO] Telegram funcionando correctamente")
-
-        return func.HttpResponse(response_msg, status_code=200)
-
-    except Exception as e:
-        error_msg = str(e)
-        logging.error(f"Error en TestTelegram: {error_msg}", exc_info=True)
-
-        return func.HttpResponse(
-            f"ERROR: {error_msg}",
-            status_code=500
-        )
+# Deshabilitada después de confirmar que Telegram funciona correctamente
+# Chat ID actualizado a: -1003693182380 (grupo fue upgradeable a supergrupo)
+# Para reactivar, descomenta @app.route y la función TestTelegram
+# @app.route(route="test-telegram", methods=["POST"])
+# def TestTelegram(req: func.HttpRequest) -> func.HttpResponse:
+#     """
+#     Función TEMPORAL para probar envío de mensajes a Telegram localmente.
+#
+#     Uso:
+#         POST http://localhost:7071/api/test-telegram
+#         Body: {"mensaje": "Tu mensaje aquí"}
+#
+#     Después de enviar el mensaje, sigue procesando normalmente.
+#     """
+#     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#
+#     try:
+#         # Usar logging en lugar de print para evitar problemas de codificación en Windows
+#         logging.info("[TEST TELEGRAM] Iniciando prueba de envio")
+#         logging.info(f"Timestamp: {timestamp}")
+#
+#         # Parsear mensaje del body
+#         logging.info("[PASO 1] Parseando mensaje del request...")
+#         try:
+#             req_body = req.get_json()
+#             mensaje_test = req_body.get("mensaje", "Prueba de Telegram - ETL Opticolor funcionando")
+#             logging.info(f"Mensaje recibido: {mensaje_test}")
+#         except Exception as parse_err:
+#             logging.warning(f"No hay JSON, usando mensaje por defecto: {parse_err}")
+#             mensaje_test = "Prueba de Telegram - ETL Opticolor funcionando"
+#
+#         # Verificar variables de entorno
+#         logging.info("[PASO 2] Verificando credenciales de Telegram...")
+#         token = os.getenv("TELEGRAM_BOT_TOKEN")
+#         chat_id = os.getenv("TELEGRAM_CHAT_ID")
+#
+#         if token:
+#             token_display = f"{token[:10]}...{token[-5:]}"
+#             logging.info(f"TELEGRAM_BOT_TOKEN configurado: {token_display}")
+#         else:
+#             logging.error("TELEGRAM_BOT_TOKEN NO CONFIGURADO")
+#
+#         if chat_id:
+#             logging.info(f"TELEGRAM_CHAT_ID configurado: {chat_id}")
+#         else:
+#             logging.error("TELEGRAM_CHAT_ID NO CONFIGURADO")
+#
+#         # Crear instancia ETL y enviar mensaje
+#         logging.info("[PASO 3] Creando instancia GesvisionEtl...")
+#         etl = GesvisionEtl()
+#         logging.info("Instancia creada exitosamente")
+#
+#         logging.info("[PASO 4] Enviando mensaje a Telegram...")
+#         etl.notificar_telegram(f"TEST: {mensaje_test}")
+#         logging.info(f"Mensaje enviado a Telegram: {mensaje_test}")
+#
+#         # Respuesta exitosa
+#         response_msg = f"OK - Mensaje enviado a Telegram: '{mensaje_test}'\n\nAhora sigue procesando..."
+#         logging.info("[TEST COMPLETADO] Telegram funcionando correctamente")
+#
+#         return func.HttpResponse(response_msg, status_code=200)
+#
+#     except Exception as e:
+#         error_msg = str(e)
+#         logging.error(f"Error en TestTelegram: {error_msg}", exc_info=True)
+#
+#         return func.HttpResponse(
+#             f"ERROR: {error_msg}",
+#             status_code=500
+#         )
