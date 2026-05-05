@@ -568,7 +568,9 @@ class GesvisionEtl:
             try:
                 token = os.getenv("TELEGRAM_BOT_TOKEN")
                 chat_id = os.getenv("TELEGRAM_CHAT_ID")
-                if not token or not chat_id: return
+                if not token or not chat_id:
+                    logging.warning("Credenciales Telegram no configuradas")
+                    return
 
                 url = f"https://api.telegram.org/bot{token}/sendMessage"
                 payload = {
@@ -576,9 +578,17 @@ class GesvisionEtl:
                     "text": mensaje,
                     "disable_notification": silencioso
                 }
-                requests.post(url, json=payload, timeout=(10, 30))
+
+                logging.info(f"[TELEGRAM] Enviando a {chat_id}...")
+                response = requests.post(url, json=payload, timeout=(10, 30))
+
+                if response.status_code == 200:
+                    logging.info(f"[TELEGRAM] OK - Mensaje enviado exitosamente")
+                else:
+                    logging.error(f"[TELEGRAM] Error {response.status_code}: {response.text}")
+
             except Exception as e:
-                logging.warning(f"Fallo envío Telegram: {e}")
+                logging.error(f"[TELEGRAM] Excepcion enviando mensaje: {e}", exc_info=True)
 
         def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
             """Envía un reporte consolidado al final del ciclo."""
