@@ -3511,5 +3511,49 @@ class GesvisionEtl:
                 cursor.execute(merge_sql)
                 cursor.execute(f"DROP TABLE {stg}")
                 conn.commit()
+            except Exception as e:
+                logging.error(f"Error en upsert_sql para {table_name}: {e}")
+                conn.rollback()
+                raise
             finally:
                 cursor.close()
+
+# ====================================================================================================
+# [TESTING LOCAL] Función temporal para probar envío de Telegram
+# ====================================================================================================
+@app.route(route="test-telegram", methods=["POST"])
+def TestTelegram(req: func.HttpRequest) -> func.HttpResponse:
+    """
+    Función TEMPORAL para probar envío de mensajes a Telegram localmente.
+
+    Uso:
+        POST http://localhost:7071/api/test-telegram
+        Body: {"mensaje": "Tu mensaje aquí"}
+
+    Después de enviar el mensaje, sigue procesando normalmente.
+    """
+    try:
+        logging.info("🧪 [TEST TELEGRAM] Iniciando prueba de envío...")
+
+        # Parsear mensaje del body
+        try:
+            req_body = req.get_json()
+            mensaje_test = req_body.get("mensaje", "✅ Prueba de Telegram — ETL Opticolor funcionando")
+        except:
+            mensaje_test = "✅ Prueba de Telegram — ETL Opticolor funcionando"
+
+        # Crear instancia ETL y enviar mensaje
+        etl = GesvisionEtl()
+        etl.notificar_telegram(f"🧪 TEST: {mensaje_test}")
+
+        return func.HttpResponse(
+            f"✅ Mensaje enviado a Telegram: '{mensaje_test}'\n\nAhora sigue procesando...",
+            status_code=200
+        )
+
+    except Exception as e:
+        logging.error(f"❌ Error en TestTelegram: {e}")
+        return func.HttpResponse(
+            f"❌ Error: {str(e)}",
+            status_code=500
+        )
