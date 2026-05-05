@@ -41,6 +41,55 @@ Resultados: 3/3 mensajes enviados
 
 ---
 
+## 🎯 OPCIÓN RECOMENDADA: Función HTTP en Azure Functions (Desarrollo Local)
+
+### ⚡ Ejecución Rápida (PowerShell)
+
+**Terminal 1 - Iniciar servidor:**
+```powershell
+# En c:\opticolor-bi\etl\
+.\RUN_TEST_LOCAL.ps1
+
+# O manualmente:
+$env:TELEGRAM_BOT_TOKEN = "tu_token"
+$env:TELEGRAM_CHAT_ID = "tu_chat_id"
+func start
+```
+
+**Terminal 2 - Enviar test:**
+```powershell
+# En c:\opticolor-bi\etl\
+.\SEND_TEST_REQUEST.ps1 -Mensaje "Mi mensaje personalizado"
+
+# O simple:
+.\SEND_TEST_REQUEST.ps1
+```
+
+**Salida esperada en Terminal 1 (consola Azure Functions):**
+```
+🧪 [TEST TELEGRAM] Iniciando prueba de envío — 2026-05-05 14:30:00
+════════════════════════════════════════════════════════════
+
+📝 [PASO 1] Parseando mensaje del request...
+   ✅ Mensaje recibido: ✅ Prueba de Telegram — ETL Opticolor funcionando
+
+🔐 [PASO 2] Verificando credenciales de Telegram...
+   ✅ TELEGRAM_BOT_TOKEN configurado: 123456...xxxxx
+   ✅ TELEGRAM_CHAT_ID configurado: -1001234567890
+
+🤖 [PASO 3] Creando instancia GesvisionEtl...
+   ✅ Instancia creada exitosamente
+
+📤 [PASO 4] Enviando mensaje a Telegram...
+   ✅ Mensaje enviado correctamente
+
+════════════════════════════════════════════════════════════
+✅ [TEST COMPLETADO] 2026-05-05 14:30:00
+════════════════════════════════════════════════════════════
+```
+
+---
+
 ## Opción 2: Función HTTP en Azure Functions (Desarrollo Local)
 
 ### 📋 Requisitos
@@ -91,6 +140,34 @@ curl -X POST http://localhost:7071/api/test-telegram \
   "status": "✅ Mensaje enviado a Telegram: 'Test desde desarrollo local'\n\nAhora sigue procesando..."
 }
 ```
+
+---
+
+## 📊 Logs en Consola
+
+### Dónde Ver los Logs
+
+**En Terminal 1 (Azure Functions):**
+```
+[timestamp] Information: 🧪 [TEST TELEGRAM] Iniciando prueba de envío — 2026-05-05 14:30:00
+[timestamp] Information:    ✅ Mensaje recibido: ✅ Prueba de Telegram...
+[timestamp] Information:    Instancia GesvisionEtl creada
+[timestamp] Information:    Mensaje enviado a Telegram: ✅ Prueba de Telegram...
+[timestamp] Information: ✅ [TEST COMPLETADO] Telegram funcionando correctamente
+```
+
+### Qué Significan los Emojis
+
+| Emoji | Significado | Acción |
+|-------|-------------|--------|
+| 🧪 | Test iniciado | Esperando |
+| 📝 | Parseando mensaje | Normal |
+| 🔐 | Verificando credenciales | Crítico si falla |
+| 🤖 | Creando instancia | Normal |
+| 📤 | Enviando a Telegram | Crítico si falla |
+| ✅ | Éxito | Todo OK |
+| ❌ | Error | Revisar variables |
+| ⚠️ | Advertencia | Usar defaults |
 
 ---
 

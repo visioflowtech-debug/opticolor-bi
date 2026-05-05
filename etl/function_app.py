@@ -27,8 +27,9 @@ app = func.FunctionApp()
 # Horarios Venezuela (UTC-4): 8:30 AM, 10:30 AM, 12:30 PM, 2:30 PM, 4:30 PM, 6:30 PM, 8:30 PM, 10:30 PM
 # Equivalente UTC (suma 4h):   12:30 UTC, 14:30 UTC, 16:30 UTC, 18:30 UTC, 20:30 UTC, 22:30 UTC, 0:30 UTC, 2:30 UTC
 # [24 ABRIL 2026] CRON CORREGIDO A HORA VENEZUELA (UTC-4)
-@app.timer_trigger(schedule="0 30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
-def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
+# [DESHABILITADO 05/05/2026] Timer principal desactivado para testing local de Telegram
+# @app.timer_trigger(schedule="0 30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
+def EtlOrquestadorPrincipal_DISABLED(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     etl = None
 
@@ -3532,28 +3533,73 @@ def TestTelegram(req: func.HttpRequest) -> func.HttpResponse:
 
     Después de enviar el mensaje, sigue procesando normalmente.
     """
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     try:
-        logging.info("🧪 [TEST TELEGRAM] Iniciando prueba de envío...")
+        print("\n" + "="*80)
+        print(f"🧪 [TEST TELEGRAM] Iniciando prueba de envío — {timestamp}")
+        print("="*80)
+        logging.info(f"🧪 [TEST TELEGRAM] Iniciando prueba de envío — {timestamp}")
 
         # Parsear mensaje del body
+        print("\n📝 [PASO 1] Parseando mensaje del request...")
         try:
             req_body = req.get_json()
             mensaje_test = req_body.get("mensaje", "✅ Prueba de Telegram — ETL Opticolor funcionando")
-        except:
+            print(f"   ✅ Mensaje recibido: {mensaje_test}")
+        except Exception as parse_err:
+            print(f"   ⚠️ No hay JSON, usando mensaje por defecto: {parse_err}")
             mensaje_test = "✅ Prueba de Telegram — ETL Opticolor funcionando"
 
-        # Crear instancia ETL y enviar mensaje
-        etl = GesvisionEtl()
-        etl.notificar_telegram(f"🧪 TEST: {mensaje_test}")
+        logging.info(f"   Mensaje a enviar: {mensaje_test}")
 
-        return func.HttpResponse(
-            f"✅ Mensaje enviado a Telegram: '{mensaje_test}'\n\nAhora sigue procesando...",
-            status_code=200
-        )
+        # Verificar variables de entorno
+        print("\n🔐 [PASO 2] Verificando credenciales de Telegram...")
+        token = os.getenv("TELEGRAM_BOT_TOKEN")
+        chat_id = os.getenv("TELEGRAM_CHAT_ID")
+
+        if token:
+            token_display = f"{token[:10]}...{token[-5:]}"
+            print(f"   ✅ TELEGRAM_BOT_TOKEN configurado: {token_display}")
+        else:
+            print(f"   ❌ TELEGRAM_BOT_TOKEN NO CONFIGURADO")
+
+        if chat_id:
+            print(f"   ✅ TELEGRAM_CHAT_ID configurado: {chat_id}")
+        else:
+            print(f"   ❌ TELEGRAM_CHAT_ID NO CONFIGURADO")
+
+        # Crear instancia ETL y enviar mensaje
+        print("\n🤖 [PASO 3] Creando instancia GesvisionEtl...")
+        etl = GesvisionEtl()
+        print(f"   ✅ Instancia creada exitosamente")
+        logging.info("   Instancia GesvisionEtl creada")
+
+        print("\n📤 [PASO 4] Enviando mensaje a Telegram...")
+        etl.notificar_telegram(f"🧪 TEST: {mensaje_test}")
+        print(f"   ✅ Mensaje enviado correctamente")
+        logging.info(f"   Mensaje enviado a Telegram: {mensaje_test}")
+
+        # Respuesta exitosa
+        response_msg = f"✅ Mensaje enviado a Telegram: '{mensaje_test}'\n\nAhora sigue procesando..."
+        print("\n" + "="*80)
+        print(f"✅ [TEST COMPLETADO] {timestamp}")
+        print("="*80 + "\n")
+
+        logging.info(f"✅ [TEST COMPLETADO] Telegram funcionando correctamente")
+
+        return func.HttpResponse(response_msg, status_code=200)
 
     except Exception as e:
-        logging.error(f"❌ Error en TestTelegram: {e}")
+        error_msg = str(e)
+        print("\n" + "="*80)
+        print(f"❌ [ERROR EN TEST] {timestamp}")
+        print(f"   Excepción: {error_msg}")
+        print("="*80 + "\n")
+
+        logging.error(f"❌ Error en TestTelegram: {error_msg}", exc_info=True)
+
         return func.HttpResponse(
-            f"❌ Error: {str(e)}",
+            f"❌ Error: {error_msg}",
             status_code=500
         )
