@@ -626,10 +626,12 @@ class GesvisionEtl:
 
                     msg += f"\n⏱️ *Tiempo Total Ciclo:* {duracion_min:.1f} min."
 
-                    # Verificar sucursales pendientes de clasificación (solo en ciclos exitosos)
-                    pendientes = self._verificar_sucursales_pendientes()
-                    if pendientes and pendientes.get('total', 0) > 0:
-                        self._notificar_sucursales_pendientes(pendientes.get('registros', []), pendientes.get('total', 0))
+                    # ✅ [DESHABILITADO 05/05/2026] Control de sucursales pendientes
+                    # Causa: Vista SQL 'Vw_Sucursales_Pendientes_Clasificacion' fue eliminada
+                    # TODO: Reactivar cuando se restaure tabla de control de nuevas sucursales
+                    # pendientes = self._verificar_sucursales_pendientes()
+                    # if pendientes and pendientes.get('total', 0) > 0:
+                    #     self._notificar_sucursales_pendientes(pendientes.get('registros', []), pendientes.get('total', 0))
 
                 self.notificar_telegram(msg)
             except Exception as e:
