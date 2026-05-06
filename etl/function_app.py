@@ -27,7 +27,7 @@ app = func.FunctionApp()
 # Horarios Venezuela (UTC-4): 8:30 AM, 10:30 AM, 12:30 PM, 2:30 PM, 4:30 PM, 6:30 PM, 8:30 PM, 10:30 PM
 # Equivalente UTC (suma 4h):   12:30 UTC, 14:30 UTC, 16:30 UTC, 18:30 UTC, 20:30 UTC, 22:30 UTC, 0:30 UTC, 2:30 UTC
 # [24 ABRIL 2026] CRON CORREGIDO A HORA VENEZUELA (UTC-4)
-@app.timer_trigger(schedule="0 30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
+@app.timer_trigger(schedule="0 0 0,11,12,14,16,18,20,22 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     etl = None
