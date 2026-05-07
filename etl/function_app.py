@@ -45,6 +45,7 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         # --- ADQUISICIÓN DE LOCK GLOBAL (EVITAR EJECUCIONES PARALELAS) ---
         # Verifica si otra cascada ya está en ejecución
         # Si hay lock, aborta inmediatamente (próxima ejecución en 2 horas)
+        # Declarar ANTES del try para que finally pueda acceder siempre
         lock_acquired = False
         try:
             with pyodbc.connect(etl.conn_str) as conn:
@@ -112,19 +113,37 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             # ✅ 18/18 MÓDULOS EN CASCADA (Todas las temporales desactivadas)
         ]
 
+        # --- BATCHING DE NOTIFICACIONES: AGRUPAR CADA 5 MINUTOS ---
+        batch_modulos = []
+        last_batch_time = time.time()
+        BATCH_INTERVAL = 5 * 60  # 5 minutos
+
         for mod_name, mod_func in remaining_modules:
             if check_time_limit(): break
             resultado_modulo = etl.ejecutar_modulo(mod_name, mod_func)
             reporte.append(resultado_modulo)
 
-            # NOTIFICACIÓN INMEDIATA: Enviar resultado del módulo a Telegram
+            # Agregar resultado al batch
             if resultado_modulo and resultado_modulo.get('status'):
                 status = resultado_modulo.get('status', '⚠️')
                 resultado_info = resultado_modulo.get('resultado', '')
-                msg_modulo = f"  {status} {mod_name}"
+                mod_status = f"{status} {mod_name}"
                 if resultado_info:
-                    msg_modulo += f" → {resultado_info}"
-                etl.notificar_telegram(msg_modulo, silencioso=True)
+                    mod_status += f" → {resultado_info}"
+                batch_modulos.append(mod_status)
+
+                # Enviar batch si pasaron 5 minutos
+                elapsed_batch = time.time() - last_batch_time
+                if elapsed_batch >= BATCH_INTERVAL:
+                    msg_batch = "📊 *Progreso ETL (últimos 5 min):*\n" + "\n".join(batch_modulos)
+                    etl.notificar_telegram(msg_batch, silencioso=True)
+                    batch_modulos = []
+                    last_batch_time = time.time()
+
+        # Enviar batch final (si hay módulos no enviados)
+        if batch_modulos:
+            msg_batch = "📊 *Progreso ETL (últimos módulos):*\n" + "\n".join(batch_modulos)
+            etl.notificar_telegram(msg_batch, silencioso=True)
 
         # --- REPORTE FINAL ---
         duration = (time.time() - start_global) / 60
@@ -1257,12 +1276,12 @@ class GesvisionEtl:
             MAX_EXECUTION_TIME = 24 * 60
             total_processed = 0
 
-            # Lógica Smart Sync: Si no forzamos histórico, traemos solo los últimos 3 días
+            # Lógica Smart Sync: Si no forzamos histórico, traemos solo los últimos 1 día
             # Si LOAD_MODE_CUSTOMERS == 'HISTORICAL': Usa skip = COUNT(*) y sin filtro de fecha (carga total profunda).
-            # Si LOAD_MODE_CUSTOMERS == 'INCREMENTAL': Usa skip = 0 y fechaInicial = Hace 3 días.
+            # Si LOAD_MODE_CUSTOMERS == 'INCREMENTAL': Usa skip = 0 y fechaInicial = Hace 1 día.
             params_base = {}
             if self.LOAD_MODE_CUSTOMERS == 'INCREMENTAL':
-                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
+                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=1)
                 params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                 logging.info(f"   [Smart Sync] Clientes: Buscando cambios desde {params_base['fechaInicial']}")
             elif self.LOAD_MODE_CUSTOMERS == 'HISTORICAL':
@@ -1832,7 +1851,7 @@ class GesvisionEtl:
 
             params_base = {}
             if self.LOAD_MODE_ORDERS == 'INCREMENTAL':
-                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
+                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=1)
                 params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                 logging.info(f"   [Smart Sync] Pedidos: Buscando cambios desde {params_base['fechaInicial']}")
             elif self.LOAD_MODE_ORDERS == 'HISTORICAL':
@@ -2112,11 +2131,11 @@ class GesvisionEtl:
                 # fechaInicial = '2024-01-01 00:00:00'.
                 # skip = (COUNT(*) // 50) * 50. (Auto-Resume para API descendente).
                 # Si LOAD_MODE_INVOICES == 'INCREMENTAL':
-                # fechaInicial = Hace 3 días.
+                # fechaInicial = Hace 1 día.
                 # skip = 0.
                 params_base = {}
                 if self.LOAD_MODE_INVOICES == 'INCREMENTAL':
-                    fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
+                    fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=1)
                     params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                     logging.info(f"   [Smart Sync] Ventas: Buscando cambios desde {params_base['fechaInicial']}")
                 elif self.LOAD_MODE_INVOICES == 'HISTORICAL':
@@ -2716,10 +2735,10 @@ class GesvisionEtl:
                     except Exception as e:
                         logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
                 else:
-                    # Modo Incremental: Ventana de seguridad de 3 días
+                    # Modo Incremental: Ventana de seguridad de 1 día
                     try:
                         last_date = self.get_last_date(conn, "Operaciones_Ordenes_Cristales", "fecha_creacion")
-                        start_date = last_date - datetime.timedelta(days=3)
+                        start_date = last_date - datetime.timedelta(days=1)
                         params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
                         logging.info(f"   [Incremental] Órdenes Cristales: Buscando desde {params_base['fechaInicial']}")
                     except:
