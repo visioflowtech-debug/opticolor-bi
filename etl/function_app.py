@@ -24,12 +24,13 @@ app = func.FunctionApp()
 # --- NUEVO MODELO: CASCADA SECUENCIAL (Trigger-to-Trigger) ---
 # Solo la primera función tiene TimerTrigger. Las demás se ejecutan en cadena.
 
-# CRON: "0 0 0,11,12,14,16,18,20,22 * * *" = Medianoche y 7 horas distribuidas/día
-# Horarios UTC:      00:00, 11:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00 UTC
-# Horarios Venezuela (UTC-4): 20:00 (día anterior), 07:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00 Venezuela
-# Ciclo Precalentamiento: 07:00 Venezuela (11:00 UTC) → antes de apertura operativa
-# [6 MAYO 2026] CRON ACTUALIZADO CON CICLO DE PRECALENTAMIENTO + LOCK GLOBAL
-@app.timer_trigger(schedule="0 0 0,11,12,14,16,18,20,22 * * *", arg_name="myTimer", run_on_startup=False)
+# CRON: "0 11-23,0-3 * * *" = Cada hora de 7 AM a 11 PM Venezuela (11 AM-3 AM UTC)
+# Horarios UTC:      11:00, 12:00, 13:00, ..., 23:00, 00:00, 01:00, 02:00, 03:00 UTC
+# Horarios Venezuela (UTC-4): 07:00, 08:00, 09:00, ..., 19:00, 20:00, 21:00, 22:00, 23:00 Venezuela
+# Total: 17 ejecuciones/día (7 AM - 11 PM Venezuela)
+# Beneficio: Con checkpoint, INVENTARIO puede completarse en múltiples intentos sin gaps
+# [7 MAYO 2026] CRON ACTUALIZADO: CADA HORA (7 AM-11 PM Venezuela) PARA MEJOR COBERTURA INVENTARIO
+@app.timer_trigger(schedule="0 11-23,0-3 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     etl = None
