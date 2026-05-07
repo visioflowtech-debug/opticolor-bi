@@ -140,11 +140,6 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
                     batch_modulos = []
                     last_batch_time = time.time()
 
-        # Enviar batch final (si hay módulos no enviados)
-        if batch_modulos:
-            msg_batch = "📊 *Progreso ETL (últimos módulos):*\n" + "\n".join(batch_modulos)
-            etl.notificar_telegram(msg_batch, silencioso=True)
-
         # --- REPORTE FINAL ---
         duration = (time.time() - start_global) / 60
         etl.enviar_resumen_ciclo_telegram(reporte, duration)
@@ -679,12 +674,11 @@ class GesvisionEtl:
             logging.error(f"[TELEGRAM] ❌ Falló después de {max_retries} intentos. Mensaje NO enviado.")
 
         def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
-            """Envía un reporte consolidado al final del ciclo."""
+            """Envía reporte final minimalista al fin del ciclo."""
             try:
                 fin_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 if error_critico:
-                    # Formato de error
                     msg = f"❌ ETL Opticolor error — {fin_ts} — {error_critico}"
                 else:
                     # Contar registros procesados
@@ -693,44 +687,8 @@ class GesvisionEtl:
                         if isinstance(item.get('resultado'), int):
                             total_registros += item['resultado']
 
-                    # Formato de éxito con conteo
-                    msg = f"✅ ETL Opticolor completado — {fin_ts} — {total_registros} registros procesados\n\n"
-                    msg += f"📊 REPORTE DETALLADO:\n"
-
-                    # Iconos por módulo
-                    iconos = {
-                        'SUCURSALES': '🏢', 'EMPLEADOS': '👔', 'CATEGORIAS': '🏷️', 'METODOS_PAGO': '💳',
-                        'PROVEEDORES': '🚚', 'MARCAS_FULL': '🏷️', 'PRODUCTOS': '📦', 'CLIENTES': '👥',
-                        'CITAS': '📅', 'EXAMENES': '👁️',
-                        'PEDIDOS': '📝', 'ORDENES_CRISTALES': '眼镜', 'VENTAS': '🛒', 'COBROS': '💰', 'TESORERIA': '🏦',
-                        'PEDIDOS_LAB': '🧪', 'INVENTARIO': '📊',
-                        'RECEPCIONES_LAB': '📥'
-                    }
-
-                    for item in reporte:
-                        mod = item['modulo']
-                        ico = iconos.get(mod, '🔹')
-                        status = item['status']
-
-                        # Lógica de Anomalías API
-                        if mod in self.modulos_con_fallo_api:
-                            ico = '🟠'
-                            desc_error = self.modulos_con_fallo_api[mod]
-                            linea = f"{ico} {mod}: {desc_error}"
-                        else:
-                            # Formato compacto estándar
-                            linea = f"{ico} {mod}: {status}"
-
-                        msg += linea + "\n"
-
-                    msg += f"\n⏱️ *Tiempo Total Ciclo:* {duracion_min:.1f} min."
-
-                    # ✅ [DESHABILITADO 05/05/2026] Control de sucursales pendientes
-                    # Causa: Vista SQL 'Vw_Sucursales_Pendientes_Clasificacion' fue eliminada
-                    # TODO: Reactivar cuando se restaure tabla de control de nuevas sucursales
-                    # pendientes = self._verificar_sucursales_pendientes()
-                    # if pendientes and pendientes.get('total', 0) > 0:
-                    #     self._notificar_sucursales_pendientes(pendientes.get('registros', []), pendientes.get('total', 0))
+                    # Formato minimalista: Una sola línea con resumen
+                    msg = f"✅ ETL completado — {fin_ts} — {total_registros} registros totales — {duracion_min:.1f} min"
 
                 self.notificar_telegram(msg)
             except Exception as e:
