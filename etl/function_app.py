@@ -681,14 +681,15 @@ class GesvisionEtl:
                 if error_critico:
                     msg = f"❌ ETL Opticolor error — {fin_ts} — {error_critico}"
                 else:
-                    # Contar registros procesados
-                    total_registros = 0
-                    for item in reporte:
-                        if isinstance(item.get('resultado'), int):
-                            total_registros += item['resultado']
+                    modulos_ok = [i for i in reporte if i and i.get('status', '').startswith('✅')]
+                    modulos_err = [i for i in reporte if i and i.get('status', '').startswith('❌')]
+                    total_registros = sum(i['resultado'] for i in modulos_ok if isinstance(i.get('resultado'), int))
 
-                    # Formato minimalista: Una sola línea con resumen
-                    msg = f"✅ ETL completado — {fin_ts} — {total_registros} registros totales — {duracion_min:.1f} min"
+                    if modulos_err:
+                        fallas = "\n".join(f"  ❌ {i['modulo']}: {i['resultado']}" for i in modulos_err)
+                        msg = f"⚠️ ETL Opticolor — {fin_ts} — {len(modulos_ok)}/{len(reporte)} módulos OK — {duracion_min:.1f} min\nFALLOS:\n{fallas}"
+                    else:
+                        msg = f"✅ ETL completado — {fin_ts} — {total_registros} registros totales — {duracion_min:.1f} min"
 
                 self.notificar_telegram(msg)
             except Exception as e:
@@ -719,8 +720,8 @@ class GesvisionEtl:
                 elapsed_mod = (time.time() - start_mod)
                 logging.error(f"[MÓDULO {nombre_modulo}] Error después de {elapsed_mod:.2f}s: {e}")
                 self.registrar_fin(nombre_modulo, 'ERROR', e)
-                # Re-lanzar excepción para detener la cascada
-                raise Exception(f"Fallo en {nombre_modulo}: {str(e)}")
+                self.notificar_telegram(f"❌ ETL [{nombre_modulo}] FALLÓ en {elapsed_mod:.1f}s\n{str(e)[:300]}")
+                return {'modulo': nombre_modulo, 'status': '❌', 'resultado': f"ERROR: {str(e)[:200]}"}
             finally:
                 self.current_module = None
 
