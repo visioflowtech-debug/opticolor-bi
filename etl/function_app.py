@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 import azure.functions as func
 import os
 import datetime
@@ -415,46 +415,46 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 # --- SECCIÓN 2: CLASE DE LÓGICA GesvisionEtl ---
 
 class GesvisionEtl:
-        # --- TABLERO DE CONTROL DE CARGA (GRANULAR) ---
-        # 'HISTORICAL': Carga masiva/backfill (Fecha fija 2024, Auto-Resume con Count).
-        # 'INCREMENTAL': Mantenimiento diario (Últimos 3 días, Skip 0).
-        # 'FULL': Barrido completo (Para dimensiones pequeñas).
+    # --- TABLERO DE CONTROL DE CARGA (GRANULAR) ---
+    # 'HISTORICAL': Carga masiva/backfill (Fecha fija 2024, Auto-Resume con Count).
+    # 'INCREMENTAL': Mantenimiento diario (Últimos 3 días, Skip 0).
+    # 'FULL': Barrido completo (Para dimensiones pequeñas).
 
-        LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
-        LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
-        LOAD_MODE_INVOICES  = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (2,573 facturas). Ahora INCREMENTAL (últimos 10 días).
-        LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock — Mantenimiento diario post-backfill (146,707 items completados).
-        LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
-        LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
-        LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
-        LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
-        LOAD_MODE_COBROS    = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (4,608 cobros). Ahora INCREMENTAL (últimas 2 horas).
-        LOAD_MODE_TREASURY  = 'INCREMENTAL'  # Movimientos de caja/banco.
-        LOAD_MODE_LAB       = 'INCREMENTAL'  # Pedidos de laboratorio.
-        LOAD_MODE_RECEPCIONES = 'INCREMENTAL' # Carga inicial de recepciones.
-        LOAD_MODE_GLASSES_ORDERS = 'INCREMENTAL' # Carga de órdenes de cristales (Historical/Incremental).
+    LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
+    LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
+    LOAD_MODE_INVOICES  = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (2,573 facturas). Ahora INCREMENTAL (últimos 10 días).
+    LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock — Mantenimiento diario post-backfill (146,707 items completados).
+    LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
+    LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
+    LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
+    LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
+    LOAD_MODE_COBROS    = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (4,608 cobros). Ahora INCREMENTAL (últimas 2 horas).
+    LOAD_MODE_TREASURY  = 'INCREMENTAL'  # Movimientos de caja/banco.
+    LOAD_MODE_LAB       = 'INCREMENTAL'  # Pedidos de laboratorio.
+    LOAD_MODE_RECEPCIONES = 'INCREMENTAL' # Carga inicial de recepciones.
+    LOAD_MODE_GLASSES_ORDERS = 'INCREMENTAL' # Carga de órdenes de cristales (Historical/Incremental).
 
-        # --- CONSTANTES DE MAPEO CENTRALIZADO PARA MANTENIBILIDAD ---
-        # --- CONSTANTES DE MAPEO ACTUALIZADAS ---
-        MAP_SUCURSAL = { 'id': 'id_sucursal', 'name': 'nombre_sucursal', 'alias': 'alias_sucursal', 'municipality': 'municipio_raw', 'locality': 'localidad_raw', 'street': 'direccion_raw' }
-        MAP_CLIENTE = {
-        'id': 'id_cliente', 
-        'name': 'nombre', 
-        'lastName': 'apellido',
-        'birthDate': 'fecha_nacimiento', 
-        'genre': 'genero',                # <--- Nuevo campo para segmentación del KPI 1
-        'creationDate': 'fecha_creacion_cliente',
-        'telefono_principal': 'telefono_principal', 
-        'email': 'email',
-        'codigo_postal': 'codigo_postal', 
-        'ciudad': 'ciudad',
-        'idCard': 'cedula'                # <--- Documento de identidad para cruce GHL-Gesvision
-        }
-        MAP_EMPLEADO = {
+    # --- CONSTANTES DE MAPEO CENTRALIZADO PARA MANTENIBILIDAD ---
+    # --- CONSTANTES DE MAPEO ACTUALIZADAS ---
+    MAP_SUCURSAL = { 'id': 'id_sucursal', 'name': 'nombre_sucursal', 'alias': 'alias_sucursal', 'municipality': 'municipio_raw', 'locality': 'localidad_raw', 'street': 'direccion_raw' }
+    MAP_CLIENTE = {
+    'id': 'id_cliente', 
+    'name': 'nombre', 
+    'lastName': 'apellido',
+    'birthDate': 'fecha_nacimiento', 
+    'genre': 'genero',                # <--- Nuevo campo para segmentación del KPI 1
+    'creationDate': 'fecha_creacion_cliente',
+    'telefono_principal': 'telefono_principal', 
+    'email': 'email',
+    'codigo_postal': 'codigo_postal', 
+    'ciudad': 'ciudad',
+    'idCard': 'cedula'                # <--- Documento de identidad para cruce GHL-Gesvision
+    }
+    MAP_EMPLEADO = {
             'id': 'id_empleado', 'warehouse': 'id_sucursal', 'type': 'tipo_empleado',
             'nombre_empleado': 'nombre_empleado' # Campo transformado
-        }
-        MAP_PRODUCTO = {
+    }
+    MAP_PRODUCTO = {
             'id': 'id_producto', 'description': 'nombre_producto', 'reference': 'referencia',
             'barCode': 'codigo_barras', 'pricePurchase': 'costo_compra', 'priceWithVAT': 'precio_venta',
             'brand': 'id_marca', 'category': 'id_categoria', 'inventoriable': 'es_inventariable',
@@ -465,16 +465,16 @@ class GesvisionEtl:
             'color_comercial': 'color_comercial',
             'tipo_montura': 'tipo_montura',
             'group': 'id_grupo'
-        }
-        MAP_MARCA = {'id': 'id_marca', 'name': 'nombre_marca', 'code': 'codigo_marca'}
-        MAP_CATEGORIA = {
+    }
+    MAP_MARCA = {'id': 'id_marca', 'name': 'nombre_marca', 'code': 'codigo_marca'}
+    MAP_CATEGORIA = {
             'id': 'id_categoria',
             'name': 'nombre_categoria',
             'parent': 'id_categoria_padre',
             'enable': 'esta_activo',
             'lastUpdateDate': 'fecha_actualizacion'
-        }
-        MAP_METODO_PAGO = {
+    }
+    MAP_METODO_PAGO = {
             'id': 'id_metodo_pago',
             'name': 'nombre_metodo',
             'description': 'descripcion',
@@ -483,8 +483,8 @@ class GesvisionEtl:
             'useInExpenses': 'usa_en_gastos',
             'enabled': 'es_activo',
             'payType': 'tipo_pago_codigo'
-        }
-        MAP_PROVEEDOR = {
+    }
+    MAP_PROVEEDOR = {
             'id': 'id_proveedor',
             'name': 'nombre_proveedor',
             'idCard': 'ruc_proveedor',
@@ -493,29 +493,29 @@ class GesvisionEtl:
             'mobile': 'telefono_contacto',
             'countryCode': 'pais',
             'creationDate': 'fecha_creacion_origen'
-        }
-        MAP_EXAMEN = {
+    }
+    MAP_EXAMEN = {
             'id': 'id_examen', 'customer': 'id_cliente', 'warehouse': 'id_sucursal',
             'optometrist': 'id_empleado', 'date': 'fecha_examen', 'observations': 'observaciones',
             'examType': 'tipo_examen'
-        }
-        MAP_VENTA = {
-        'id': 'id_factura', 
-        'customer': 'id_cliente', 
-        'warehouse': 'id_sucursal',
-        'invoiceDate': 'fecha_factura', 
-        'totalPay': 'monto_total', 
-        'employee': 'id_empleado',      # CAMBIADO: Antes decía 'seller'
-        'optometrist': 'id_optometrista' # AGREGADO: Para medir productividad clínica
-        }
-        MAP_PEDIDO = {
+    }
+    MAP_VENTA = {
+    'id': 'id_factura', 
+    'customer': 'id_cliente', 
+    'warehouse': 'id_sucursal',
+    'invoiceDate': 'fecha_factura', 
+    'totalPay': 'monto_total', 
+    'employee': 'id_empleado',      # CAMBIADO: Antes decía 'seller'
+    'optometrist': 'id_optometrista' # AGREGADO: Para medir productividad clínica
+    }
+    MAP_PEDIDO = {
             'id': 'id_pedido', 'number': 'numero_pedido', 'date': 'fecha_pedido',
             'warehouse': 'id_sucursal', 'employee': 'id_empleado', 'customer': 'id_cliente',
             'monto_total': 'monto_total', 'monto_pagado': 'monto_pagado',
             'saldo_pendiente': 'saldo_pendiente', 'estado_pedido': 'estado_pedido',
             'documentStatus': 'id_estado_orden'
-        }
-        MAP_INVENTARIO = {
+    }
+    MAP_INVENTARIO = {
             'product': 'id_producto',
             'warehouse': 'id_sucursal',
             'quantity': 'cantidad_disponible',
@@ -523,8 +523,8 @@ class GesvisionEtl:
             'minStock': 'stock_minimo',
             'lastPurchasePrice': 'costo_promedio',
             'lastUpdated': 'fecha_actualizacion'
-        }
-        MAP_CITAS = {
+    }
+    MAP_CITAS = {
             'cliente_id': 'id_cliente',
             'startDate': 'fecha_cita_inicio',
             'endDate': 'fecha_cita_fin',
@@ -534,28 +534,28 @@ class GesvisionEtl:
             'creationDate': 'fecha_creacion_cita',
             'lastUpdateDate': 'fecha_actualizacion_api',
             'nombre_cliente': 'nombre_cliente'
-        }
-        MAP_COBROS = {
+    }
+    MAP_COBROS = {
             'id': 'id_cobro', 'customer': 'id_cliente', 'invoice_id': 'id_factura',
             'order': 'id_pedido', 'warehouse': 'id_sucursal', 'amount': 'monto_cobrado',
             'payType': 'metodo_pago_nombre', 'delivery': 'monto_entrega',
             'moneyExchange': 'monto_cambio', 'date': 'fecha_cobro',
             'createdBy': 'usuario_creacion'
-        }
-        MAP_TREASURY = {
+    }
+    MAP_TREASURY = {
             'id': 'id_pago_tesoreria', 'warehouse': 'id_sucursal', 'date': 'fecha_movimiento',
             'amount': 'monto', 'description': 'descripcion', 'type': 'tipo_movimiento',
             'payType': 'metodo_pago_nombre', 'paymentAccount': 'id_cuenta_contable',
             'createdBy': 'usuario_creacion'
-        }
-        MAP_LAB = {
+    }
+    MAP_LAB = {
             'id': 'id_pedido_lab', 'glassesOrderId': 'id_pedido_origen',
             'reasonSocialThird': 'proveedor_nombre', 'warehouse': 'id_sucursal',
             'date': 'fecha_solicitud', 'total': 'monto_costo',
             'dateLastChangeFabricationState': 'estatus_proceso',
             'manufacturingDate': 'fecha_fabricacion', 'createdBy': 'usuario_creacion'
-        }
-        MAP_RECEPCION_LAB = {
+    }
+    MAP_RECEPCION_LAB = {
             'id_recepcion_linea': 'id_recepcion_linea',
             'id_albaran': 'id_albaran',
             'numero_albaran': 'numero_albaran',
@@ -564,8 +564,8 @@ class GesvisionEtl:
             'fecha_recepcion': 'fecha_recepcion',
             'fecha_recepcion_exacta': 'fecha_recepcion_exacta',
             'costo_linea_recepcion': 'costo_linea_recepcion'
-        }
-        MAP_ORDENES_CRISTALES = {
+    }
+    MAP_ORDENES_CRISTALES = {
             'id': 'id_orden_cristal', 'code': 'codigo_orden', 'number': 'numero_orden',
             'customerId': 'id_cliente', 'warehouseId': 'id_sucursal',
             'issuedOrderId': 'id_pedido_venta', 'receivedOrderId': 'id_pedido_compra',
@@ -574,9 +574,9 @@ class GesvisionEtl:
             'od_esfera': 'od_esfera', 'od_cilindro': 'od_cilindro', 'od_eje': 'od_eje', 'od_adicion': 'od_adicion', 'od_altura': 'od_altura',
             'oi_tipo_lente': 'oi_tipo_lente', 'oi_material': 'oi_material',
             'oi_esfera': 'oi_esfera', 'oi_cilindro': 'oi_cilindro', 'oi_eje': 'oi_eje', 'oi_adicion': 'oi_adicion', 'oi_altura': 'oi_altura'
-        }
+    }
 
-        def __init__(self):
+    def __init__(self):
             # --- Gesvision API ---
             self.base_url = os.getenv("GESVISION_BASE_URL", "https://app.gesvision.com/gesmo/rest/api")
             self.user = os.getenv("GESVISION_USER")
@@ -592,14 +592,14 @@ class GesvisionEtl:
             self.modulos_con_fallo_api = {}  # {modulo: "tipo de error"}
             self.current_module = None
 
-        def get_token(self):
+    def get_token(self):
             """Gestiona la autenticación con la API de Gesvision."""
             url = f"{self.base_url}/auth/signin"
             resp = self.session.post(url, json={"username": self.user, "password": self.password}, timeout=(15, 90))
             content = resp.text.strip()
             self.token = content.replace("Bearer ", "").strip() if content.startswith("Bearer ") else content
 
-        def _safe_parse_json(self, resp, endpoint_name="unknown"):
+    def _safe_parse_json(self, resp, endpoint_name="unknown"):
             """Parseo defensivo (Fail-Safe) de respuestas JSON de la API.
             
             Valida que el cuerpo no esté vacío antes de llamar a .json().
@@ -631,7 +631,7 @@ class GesvisionEtl:
                     self.modulos_con_fallo_api[self.current_module] = error_msg
                 return []
 
-        def notificar_telegram(self, mensaje, silencioso=False):
+    def notificar_telegram(self, mensaje, silencioso=False):
             """Envía notificaciones a Telegram con reintentos exponenciales."""
             token = os.getenv("TELEGRAM_BOT_TOKEN")
             chat_id = os.getenv("TELEGRAM_CHAT_ID")
@@ -673,7 +673,7 @@ class GesvisionEtl:
             # Si llegamos aquí, todos los intentos fallaron
             logging.error(f"[TELEGRAM] ❌ Falló después de {max_retries} intentos. Mensaje NO enviado.")
 
-        def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
+    def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
             """Envía reporte final minimalista al fin del ciclo."""
             try:
                 fin_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -694,7 +694,7 @@ class GesvisionEtl:
             except Exception as e:
                 logging.error(f"Error generando reporte Telegram: {e}")
 
-        def ejecutar_modulo(self, nombre_modulo, funcion_sync):
+    def ejecutar_modulo(self, nombre_modulo, funcion_sync):
             """Wrapper para ejecutar un módulo, registrar estado y manejar errores."""
             start_mod = time.time()
             logging.info(f"[MÓDULO {nombre_modulo}] Iniciando...")
@@ -724,7 +724,7 @@ class GesvisionEtl:
             finally:
                 self.current_module = None
 
-        def registrar_inicio(self, modulo):
+    def registrar_inicio(self, modulo):
             """Marca el inicio de ejecución en la tabla de control."""
             try:
                 with pyodbc.connect(self.conn_str) as conn:
@@ -753,7 +753,7 @@ class GesvisionEtl:
             except Exception as e:
                 logging.error(f"Error registrando inicio de {modulo}: {e}")
 
-        def registrar_fin(self, modulo, estatus, error=None):
+    def registrar_fin(self, modulo, estatus, error=None):
             """Marca el fin de ejecución."""
             try:
                 with pyodbc.connect(self.conn_str) as conn:
@@ -767,7 +767,7 @@ class GesvisionEtl:
             except Exception as e:
                 logging.error(f"Error registrando fin de {modulo}: {e}")
 
-        def _verificar_sucursales_pendientes(self):
+    def _verificar_sucursales_pendientes(self):
             """Consulta sucursales sin clasificar y retorna count + top 5."""
             try:
                 with pyodbc.connect(self.conn_str) as conn:
@@ -801,7 +801,7 @@ class GesvisionEtl:
                 logging.warning(f"⚠️ Error verificando sucursales pendientes: {e}")
                 return None
 
-        def _notificar_sucursales_pendientes(self, registros, total):
+    def _notificar_sucursales_pendientes(self, registros, total):
             """Envía notificación Telegram sobre sucursales pendientes de clasificación."""
             try:
                 # Seleccionar emoji según criticidad del total
@@ -837,7 +837,7 @@ class GesvisionEtl:
                 logging.warning(f"⚠️ Error notificando sucursales pendientes: {e}")
 
 
-        def predecesor_listo(self, modulo_padre):
+    def predecesor_listo(self, modulo_padre):
             """Verifica si el módulo padre completó exitosamente."""
             if not modulo_padre: return True
             try:
@@ -852,7 +852,7 @@ class GesvisionEtl:
                 logging.error(f"Error verificando predecesor {modulo_padre}: {e}")
                 return False
 
-        def get_last_date(self, conn, table_name, date_column):
+    def get_last_date(self, conn, table_name, date_column):
             """Consulta fecha máxima. Lanza error si falla para proteger la integridad."""
             try:
                 with conn.cursor() as cursor:
@@ -880,7 +880,7 @@ class GesvisionEtl:
                 logging.error(f"Fallo de acceso a tabla {table_name} para fecha: {e}")
                 raise
 
-        def get_last_id(self, conn, table_name, id_column):
+    def get_last_id(self, conn, table_name, id_column):
             """Obtiene el ID máximo actual en SQL para carga incremental."""
             try:
                 with conn.cursor() as cursor:
@@ -891,7 +891,7 @@ class GesvisionEtl:
                 logging.warning(f"No se pudo determinar último ID en {table_name}: {e}")
                 return 0
 
-        def _sanitize_sucursal(self, item):
+    def _sanitize_sucursal(self, item):
             """Limpia datos de sucursales: mayúsculas, sin caracteres especiales, espacios extras."""
             import unicodedata
             import re
@@ -913,7 +913,7 @@ class GesvisionEtl:
             item['street'] = clean_text(item.get('street'))
             return item
 
-        def _sanitize_empleado(self, item):
+    def _sanitize_empleado(self, item):
             """Limpia datos de empleados: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -933,7 +933,7 @@ class GesvisionEtl:
             item['type'] = clean_text(item.get('type'))
             return item
 
-        def _sanitize_categoria(self, item):
+    def _sanitize_categoria(self, item):
             """Limpia datos de categorías: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -951,7 +951,7 @@ class GesvisionEtl:
             item['name'] = clean_text(item.get('name'))
             return item
 
-        def _sanitize_metodo_pago(self, item):
+    def _sanitize_metodo_pago(self, item):
             """Limpia datos de métodos de pago: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -971,7 +971,7 @@ class GesvisionEtl:
             item['code'] = clean_text(item.get('code'))
             return item
 
-        def _sanitize_proveedor(self, item):
+    def _sanitize_proveedor(self, item):
             """Limpia datos de proveedores: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -990,7 +990,7 @@ class GesvisionEtl:
             item['code'] = clean_text(item.get('code'))
             return item
 
-        def _sanitize_marca(self, item):
+    def _sanitize_marca(self, item):
             """Limpia datos de marcas: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -1009,7 +1009,7 @@ class GesvisionEtl:
             item['code'] = clean_text(item.get('code'))
             return item
 
-        def _sanitize_producto(self, item):
+    def _sanitize_producto(self, item):
             """Limpia datos de productos: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -1034,7 +1034,7 @@ class GesvisionEtl:
             item['tipo_montura'] = clean_text(item.get('tipo_montura'))
             return item
 
-        def _sanitize_cliente(self, item):
+    def _sanitize_cliente(self, item):
             """Limpia datos de clientes: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -1054,7 +1054,7 @@ class GesvisionEtl:
             item['ciudad'] = clean_text(item.get('ciudad'))
             return item
 
-        def _sanitize_cita(self, item):
+    def _sanitize_cita(self, item):
             """Limpia datos de citas: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -1074,7 +1074,7 @@ class GesvisionEtl:
             item['nombre_cliente'] = clean_text(item.get('nombre_cliente'))
             return item
 
-        def _sanitize_examen(self, item):
+    def _sanitize_examen(self, item):
             """Limpia datos de exámenes: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -1093,7 +1093,7 @@ class GesvisionEtl:
             item['observations'] = clean_text(item.get('observations'))
             return item
 
-        def sync_dimensions(self):
+    def sync_dimensions(self):
             """Sincroniza almacenes/sucursales."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1108,7 +1108,7 @@ class GesvisionEtl:
                 return len(items)
             return 0
 
-        def sync_categories(self):
+    def sync_categories(self):
             """Sincroniza categorías de productos (Full Upsert)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1139,7 +1139,7 @@ class GesvisionEtl:
                     time.sleep(wait_time)
             return 0
 
-        def sync_payment_methods(self):
+    def sync_payment_methods(self):
             """Sincroniza métodos de pago (Full Upsert)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1169,7 +1169,7 @@ class GesvisionEtl:
                     time.sleep(wait_time)
             return 0
 
-        def sync_suppliers(self):
+    def sync_suppliers(self):
             """Sincroniza proveedores (Full Paginado)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1225,7 +1225,7 @@ class GesvisionEtl:
             
             return total_processed
 
-        def sync_customers(self):
+    def sync_customers(self):
             """Sincroniza clientes con estrategia Híbrida (Smart Sync)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1316,7 +1316,7 @@ class GesvisionEtl:
                     time.sleep(0.05)
                 return total_processed
 
-        def sync_employees(self):
+    def sync_employees(self):
             """Sincroniza empleados con privacidad y paginación."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1371,7 +1371,7 @@ class GesvisionEtl:
                         break
                 return total_processed
 
-        def sync_brands_full(self):
+    def sync_brands_full(self):
             """
             Descarga forzada y completa de todas las marcas (Full Load).
             Estrategia: Recorrer todo el endpoint paginado para asegurar integridad referencial.
@@ -1425,7 +1425,7 @@ class GesvisionEtl:
             logging.info(f"--- [FIN] Total Marcas Sincronizadas: {total_procesado} ---")
             return total_procesado
 
-        def sync_brands(self, brand_ids_list, conn, known_brands_cache):
+    def sync_brands(self, brand_ids_list, conn, known_brands_cache):
             """Sincroniza marcas usando Cache en Memoria para evitar Timeouts."""
             if not brand_ids_list: return
 
@@ -1472,7 +1472,7 @@ class GesvisionEtl:
                 self._process_and_save(conn, new_brands, "Maestro_Marcas", "id_marca", self.MAP_MARCA)
                 conn.commit()
 
-        def sync_products(self):
+    def sync_products(self):
             """Sincroniza productos con Checkpoint para soportar grandes volúmenes sin reiniciar."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1612,7 +1612,7 @@ class GesvisionEtl:
                 logging.info(f"   [Fin] PRODUCTOS procesados: {total_processed} registros")
                 return total_processed
 
-        def sync_exams(self):
+    def sync_exams(self):
             """Sincroniza exámenes con un Barrido Diario Exhaustivo hacia atrás para manejar días de alta densidad."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1743,7 +1743,7 @@ class GesvisionEtl:
 
                 return total_processed
 
-        def _sync_exams_by_customer(self, conn, customer_id, headers):
+    def _sync_exams_by_customer(self, conn, customer_id, headers):
             """Descarga historial completo de exámenes para un cliente específico."""
             # Blindaje de tipo de dato para ID de cliente
             cid_clean = str(int(float(customer_id)))
@@ -1762,7 +1762,7 @@ class GesvisionEtl:
                 raise Exception(f"API Error {resp.status_code}")
             return 0
 
-        def _get_checkpoint(self, conn, key):
+    def _get_checkpoint(self, conn, key):
             """Lee valor de tabla de control Etl_Checkpoints."""
             try:
                 cursor = conn.cursor()
@@ -1779,7 +1779,7 @@ class GesvisionEtl:
                 return 0
             except: return 0
 
-        def _update_checkpoint(self, conn, key, value):
+    def _update_checkpoint(self, conn, key, value):
             """Actualiza valor en tabla de control."""
             try:
                 cursor = conn.cursor()
@@ -1797,7 +1797,7 @@ class GesvisionEtl:
 
 
 
-        def sync_orders(self):
+    def sync_orders(self):
             """Sincroniza pedidos de venta con estrategia Híbrida (Smart Sync) y Checkpoint Explícito."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1934,7 +1934,7 @@ class GesvisionEtl:
                     break
             return total_processed
 
-        def sync_appointments(self):
+    def sync_appointments(self):
             """Sincroniza citas con estrategia de Autocuración Inversa (Optimista)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2055,7 +2055,7 @@ class GesvisionEtl:
                     logging.info(f"✅ Citas: {total_processed} registros nuevos procesados. Total en BD: {skip}")
                 return total_processed
 
-        def sync_invoices_incremental(self):
+    def sync_invoices_incremental(self):
             """Sincronización de facturas agnóstica al orden de la API."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2196,7 +2196,7 @@ class GesvisionEtl:
                         break
                 return total_processed
 
-        def sync_inventory(self):
+    def sync_inventory(self):
             """Sincroniza niveles de inventario con estrategia Híbrida. Ejecutada en función separada EtlInventarioRepetitivo."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2222,6 +2222,9 @@ class GesvisionEtl:
                         logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
                 else:
                     start_date = self.get_last_date(conn, "Operaciones_Inventario", "fecha_actualizacion")
+                    # LIMIT: Máximo 1 día atrás para evitar timeout (inventario muy voluminoso)
+                    one_day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+                    start_date = max(start_date, one_day_ago)
                     params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
                     logging.info(f"   [Smart Sync] Inventario: Buscando cambios desde {start_date}")
 
@@ -2315,7 +2318,7 @@ class GesvisionEtl:
 
                 return total_processed
 
-        def sync_collections(self):
+    def sync_collections(self):
             """Sincroniza cobros con estrategia Dual (Historical/Incremental)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2444,7 +2447,7 @@ class GesvisionEtl:
 
             return total_processed, total_amount
 
-        def sync_treasury(self):
+    def sync_treasury(self):
             """Sincroniza movimientos de tesorería (Pagos/Caja) con estrategia Dual."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2532,7 +2535,7 @@ class GesvisionEtl:
 
                 return total_processed, total_amount
 
-        def sync_laboratory_orders(self):
+    def sync_laboratory_orders(self):
             """Sincroniza pedidos de laboratorio (receivedOrders)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2656,7 +2659,7 @@ class GesvisionEtl:
 
                 return total_processed
 
-        def sync_glasses_orders(self):
+    def sync_glasses_orders(self):
             """Sincroniza órdenes de cristales (Fases: Historical vs Incremental)."""
             # Validación de Predecesor
             if not self.predecesor_listo('PEDIDOS'):
@@ -2812,7 +2815,7 @@ class GesvisionEtl:
 
             return total_processed
 
-        def sync_received_delivery_notes(self):
+    def sync_received_delivery_notes(self):
             """Sincroniza recepciones de laboratorio (Albaranes) con aplanamiento de líneas."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2959,7 +2962,7 @@ class GesvisionEtl:
 
 
 
-        def fetch_chronological(self, conn, endpoint, table_name, pk_cols, start_date, end_date, window_minutes, rename_map):
+    def fetch_chronological(self, conn, endpoint, table_name, pk_cols, start_date, end_date, window_minutes, rename_map):
             """Barrido de ventanas temporales para exámenes clínicos."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2995,7 +2998,7 @@ class GesvisionEtl:
 
                 current_start = current_end
 
-        def _process_and_save(self, conn, data_list, table_name, pk_cols, rename_map):
+    def _process_and_save(self, conn, data_list, table_name, pk_cols, rename_map):
             """Transformación: Extracción de objetos y blindaje Booleano para el producto 8204."""
             raw_list = data_list.copy() if table_name == "Ventas_Cabecera" else None
 
@@ -3406,7 +3409,7 @@ class GesvisionEtl:
             if table_name == "Ventas_Cabecera" and raw_list:
                 self._extract_sales_details(conn, raw_list)
 
-        def _extract_sales_details(self, conn, invoices_list):
+    def _extract_sales_details(self, conn, invoices_list):
             """Maneja el detalle de facturas con protección contra objetos anidados."""
             details = []
             for inv in invoices_list:
@@ -3504,7 +3507,7 @@ class GesvisionEtl:
                 df_det['fecha_carga_etl'] = datetime.datetime.now()
                 self.upsert_sql(conn, df_det, "Ventas_Detalle", ["id_factura", "id_linea"])
 
-        def upsert_sql(self, conn, df, table_name, pk_cols):
+    def upsert_sql(self, conn, df, table_name, pk_cols):
             """CARGA FINAL: Versión simplificada y robusta para SQL Azure."""
             pks = [pk_cols] if isinstance(pk_cols, str) else pk_cols
             cursor = conn.cursor()
