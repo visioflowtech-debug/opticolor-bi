@@ -24,9 +24,11 @@ app = func.FunctionApp()
 # --- NUEVO MODELO: CASCADA SECUENCIAL (Trigger-to-Trigger) ---
 # Solo la primera función tiene TimerTrigger. Las demás se ejecutan en cadena.
 
-# Horarios Venezuela (UTC-4): 8:30 AM, 10:30 AM, 12:30 PM, 2:30 PM, 4:30 PM, 6:30 PM, 8:30 PM, 10:30 PM
-# Equivalente UTC (suma 4h):   12:30 UTC, 14:30 UTC, 16:30 UTC, 18:30 UTC, 20:30 UTC, 22:30 UTC, 0:30 UTC, 2:30 UTC
-# [24 ABRIL 2026] CRON CORREGIDO A HORA VENEZUELA (UTC-4)
+# CRON: "0 0 0,11,12,14,16,18,20,22 * * *" = Medianoche y 7 horas distribuidas/día
+# Horarios UTC:      00:00, 11:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00 UTC
+# Horarios Venezuela (UTC-4): 20:00 (día anterior), 07:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00 Venezuela
+# Ciclo Precalentamiento: 07:00 Venezuela (11:00 UTC) → antes de apertura operativa
+# [6 MAYO 2026] CRON ACTUALIZADO CON CICLO DE PRECALENTAMIENTO + LOCK GLOBAL
 @app.timer_trigger(schedule="0 0 0,11,12,14,16,18,20,22 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
@@ -39,6 +41,39 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         start_global = time.time()
         inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         MAX_DURATION_MINS = 24  # Límite de seguridad Azure
+
+        # --- ADQUISICIÓN DE LOCK GLOBAL (EVITAR EJECUCIONES PARALELAS) ---
+        # Verifica si otra cascada ya está en ejecución
+        # Si hay lock, aborta inmediatamente (próxima ejecución en 2 horas)
+        lock_acquired = False
+        try:
+            with pyodbc.connect(etl.conn_str) as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        IF NOT EXISTS (SELECT * FROM Etl_Checkpoints
+                                       WHERE KeyName = 'LOCK_CASCADA_GLOBAL')
+                        BEGIN
+                            INSERT INTO Etl_Checkpoints (KeyName, LastValue)
+                            VALUES ('LOCK_CASCADA_GLOBAL', '1')
+                            SELECT 1
+                        END
+                        ELSE
+                        BEGIN
+                            SELECT 0
+                        END
+                    """)
+                    result = cursor.fetchone()
+                    lock_acquired = result[0] == 1 if result else False
+                    conn.commit()
+        except Exception as lock_err:
+            logging.error(f"Error al adquirir lock: {lock_err}")
+            return
+
+        if not lock_acquired:
+            logging.info("⚠️ [LOCK] Cascada ya en ejecución. Abortando esta instancia.")
+            return
+
+        logging.info("✅ [LOCK] Lock global adquirido. Ejecutando cascada...")
 
         # Notificación de inicio
         etl.notificar_telegram(f"✅ ETL Opticolor iniciado — {inicio_ts}")
@@ -98,6 +133,17 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         else:
             logging.error(f"Error fatal en cascada (etl no inicializado): {e}")
     finally:
+        # --- LIBERACIÓN DE LOCK GLOBAL ---
+        if lock_acquired:
+            try:
+                with pyodbc.connect(etl.conn_str) as conn:
+                    with conn.cursor() as cursor:
+                        cursor.execute("DELETE FROM Etl_Checkpoints WHERE KeyName = 'LOCK_CASCADA_GLOBAL'")
+                        conn.commit()
+                logging.info("✅ [LOCK] Lock global liberado")
+            except Exception as e:
+                logging.error(f"Error al liberar lock: {e}")
+
         if etl and etl.session:
             try:
                 etl.session.close()
@@ -563,31 +609,46 @@ class GesvisionEtl:
                 return []
 
         def notificar_telegram(self, mensaje, silencioso=False):
-            """Envía notificaciones a Telegram sin interrumpir el flujo principal."""
-            try:
-                token = os.getenv("TELEGRAM_BOT_TOKEN")
-                chat_id = os.getenv("TELEGRAM_CHAT_ID")
-                if not token or not chat_id:
-                    logging.warning("Credenciales Telegram no configuradas")
-                    return
+            """Envía notificaciones a Telegram con reintentos exponenciales."""
+            token = os.getenv("TELEGRAM_BOT_TOKEN")
+            chat_id = os.getenv("TELEGRAM_CHAT_ID")
+            if not token or not chat_id:
+                logging.warning("Credenciales Telegram no configuradas")
+                return
 
-                url = f"https://api.telegram.org/bot{token}/sendMessage"
-                payload = {
-                    "chat_id": chat_id,
-                    "text": mensaje,
-                    "disable_notification": silencioso
-                }
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {
+                "chat_id": chat_id,
+                "text": mensaje,
+                "disable_notification": silencioso
+            }
 
-                logging.info(f"[TELEGRAM] Enviando a {chat_id}...")
-                response = requests.post(url, json=payload, timeout=(10, 30))
+            # Reintentos exponenciales: 1s, 2s, 4s (máximo 3 intentos)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logging.info(f"[TELEGRAM] Intento {attempt+1}/{max_retries} — enviando a {chat_id}...")
+                    response = requests.post(url, json=payload, timeout=(5, 10))
 
-                if response.status_code == 200:
-                    logging.info(f"[TELEGRAM] OK - Mensaje enviado exitosamente")
-                else:
-                    logging.error(f"[TELEGRAM] Error {response.status_code}: {response.text}")
+                    if response.status_code == 200:
+                        logging.info(f"[TELEGRAM] ✅ OK — Mensaje enviado en intento {attempt+1}")
+                        return  # ÉXITO, salir
+                    else:
+                        logging.warning(f"[TELEGRAM] Error {response.status_code}: {response.text}")
 
-            except Exception as e:
-                logging.error(f"[TELEGRAM] Excepcion enviando mensaje: {e}", exc_info=True)
+                except requests.exceptions.Timeout:
+                    logging.warning(f"[TELEGRAM] Timeout en intento {attempt+1}")
+                except Exception as e:
+                    logging.warning(f"[TELEGRAM] Excepción en intento {attempt+1}: {e}")
+
+                # Reintentar con espera exponencial (1s, 2s, 4s)
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logging.info(f"[TELEGRAM] Esperando {wait_time}s antes de reintentar...")
+                    time.sleep(wait_time)
+
+            # Si llegamos aquí, todos los intentos fallaron
+            logging.error(f"[TELEGRAM] ❌ Falló después de {max_retries} intentos. Mensaje NO enviado.")
 
         def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
             """Envía un reporte consolidado al final del ciclo."""
@@ -649,25 +710,28 @@ class GesvisionEtl:
 
         def ejecutar_modulo(self, nombre_modulo, funcion_sync):
             """Wrapper para ejecutar un módulo, registrar estado y manejar errores."""
-            logging.info(f"--- [INICIO] MÓDULO: {nombre_modulo} ---")
+            start_mod = time.time()
+            logging.info(f"[MÓDULO {nombre_modulo}] Iniciando...")
             self.registrar_inicio(nombre_modulo)
             self.current_module = nombre_modulo
-            
+
             try:
                 resultado = funcion_sync()
+                elapsed_mod = (time.time() - start_mod)
                 self.registrar_fin(nombre_modulo, 'COMPLETADO')
-                logging.info(f"--- [FIN] MÓDULO: {nombre_modulo} ---")
-                
+
                 # Enriquecer estatus con resultado si es posible (ej: recuento de registros)
                 status_final = '✅'
                 if isinstance(resultado, int):
                     status_final = f"✅ ({resultado} registros)"
                 elif isinstance(resultado, str) and 'Total:' in resultado:
                     status_final = f"✅ {resultado}"
-                
+
+                logging.info(f"[MÓDULO {nombre_modulo}] Completado en {elapsed_mod:.2f}s — {status_final}")
                 return {'modulo': nombre_modulo, 'status': status_final, 'resultado': resultado}
             except Exception as e:
-                logging.error(f"Error en {nombre_modulo}: {e}")
+                elapsed_mod = (time.time() - start_mod)
+                logging.error(f"[MÓDULO {nombre_modulo}] Error después de {elapsed_mod:.2f}s: {e}")
                 self.registrar_fin(nombre_modulo, 'ERROR', e)
                 # Re-lanzar excepción para detener la cascada
                 raise Exception(f"Fallo en {nombre_modulo}: {str(e)}")
