@@ -114,7 +114,17 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 
         for mod_name, mod_func in remaining_modules:
             if check_time_limit(): break
-            reporte.append(etl.ejecutar_modulo(mod_name, mod_func))
+            resultado_modulo = etl.ejecutar_modulo(mod_name, mod_func)
+            reporte.append(resultado_modulo)
+
+            # NOTIFICACIÓN INMEDIATA: Enviar resultado del módulo a Telegram
+            if resultado_modulo and resultado_modulo.get('status'):
+                status = resultado_modulo.get('status', '⚠️')
+                resultado_info = resultado_modulo.get('resultado', '')
+                msg_modulo = f"  {status} {mod_name}"
+                if resultado_info:
+                    msg_modulo += f" → {resultado_info}"
+                etl.notificar_telegram(msg_modulo, silencioso=True)
 
         # --- REPORTE FINAL ---
         duration = (time.time() - start_global) / 60
