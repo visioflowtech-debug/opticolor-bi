@@ -2198,31 +2198,50 @@ class GesvisionEtl:
                 return total_processed
 
     def sync_inventory(self):
-            """Sincroniza inventario por warehouse (sucursal). Estrategia optimizada: itera por cada warehouse y pagina items con skip."""
+            """Sincroniza inventario por warehouse (sucursal) con checkpoint para evitar huecos si hay timeout."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
 
             start_time = time.time()
             MAX_EXECUTION_TIME = 24 * 60  # 24 min (margen Azure 30min - 6min buffer)
             total_processed = 0
+            warehouses_completados = 0
+            warehouses_pendientes = 0
+            checkpoint_key = 'checkpoint_inventory_last_wh'
 
             with pyodbc.connect(self.conn_str) as conn:
-                # Obtener lista de sucursales desde BD
+                # 1. Obtener lista de sucursales desde BD
                 cursor = conn.cursor()
                 cursor.execute("SELECT id_sucursal FROM Maestro_Sucursales ORDER BY id_sucursal")
-                warehouse_ids = [row[0] for row in cursor.fetchall()]
+                all_warehouse_ids = [row[0] for row in cursor.fetchall()]
                 cursor.close()
 
-                if not warehouse_ids:
+                if not all_warehouse_ids:
                     logging.warning("   [INVENTARIO] No se encontraron sucursales en BD. Abortando.")
                     return 0
 
-                logging.info(f"   [INVENTARIO] Procesando {len(warehouse_ids)} sucursales: {warehouse_ids}")
+                # 2. Leer checkpoint: último warehouse completado en ejecución anterior
+                last_completed_wh = self._get_checkpoint(conn, checkpoint_key)
+                logging.info(f"   [INVENTARIO] Checkpoint leído: último warehouse completado = {last_completed_wh}")
 
-                # Iterar por cada warehouse
+                # 3. Filtrar solo warehouses pendientes (los que vienen después del último completado)
+                if last_completed_wh > 0:
+                    warehouse_ids = [wh for wh in all_warehouse_ids if wh > last_completed_wh]
+                    logging.info(f"   [INVENTARIO] Retomando desde warehouse {last_completed_wh+1}. Pendientes: {len(warehouse_ids)} de {len(all_warehouse_ids)}")
+                else:
+                    warehouse_ids = all_warehouse_ids
+                    logging.info(f"   [INVENTARIO] Iniciando desde cero. Total sucursales: {len(warehouse_ids)}")
+
+                warehouses_pendientes = len(warehouse_ids)
+
+                # 4. Iterar por cada warehouse
                 for wh_id in warehouse_ids:
                     if (time.time() - start_time) > MAX_EXECUTION_TIME:
-                        logging.warning(f"   [TIMEOUT PREVENTIVO] Límite alcanzado procesando warehouse {wh_id}.")
+                        # TIMEOUT: Guardar checkpoint + alerta Telegram
+                        remaining = len(warehouse_ids) - warehouses_completados
+                        logging.warning(f"   [TIMEOUT PREVENTIVO] Límite alcanzado en warehouse {wh_id}. {remaining} warehouses sin procesar.")
+                        msg_timeout = f"⏱️ ETL INVENTARIO timeout — Completados: {warehouses_completados}/{warehouses_pendientes} warehouses. Pendientes: {remaining}\nPróxima ejecución retomará desde warehouse {wh_id}"
+                        self.notificar_telegram(msg_timeout)
                         break
 
                     skip = 0
@@ -2231,6 +2250,7 @@ class GesvisionEtl:
 
                     while True:
                         if (time.time() - start_time) > MAX_EXECUTION_TIME:
+                            # Inner timeout: salir de loop de pages para pasar al siguiente warehouse
                             break
 
                         params = {"warehouseId": wh_id, "skip": skip}
@@ -2269,6 +2289,16 @@ class GesvisionEtl:
 
                         skip += limit
                         time.sleep(0.05)
+
+                    # Actualizar checkpoint después de completar cada warehouse
+                    self._update_checkpoint(conn, checkpoint_key, str(wh_id))
+                    warehouses_completados += 1
+                    logging.info(f"   [CHECKPOINT] Warehouse {wh_id} completado. Checkpoint actualizado.")
+
+                # 5. Si completamos TODOS los warehouses, limpiar checkpoint (reset a '0')
+                if warehouses_completados == warehouses_pendientes and warehouses_pendientes > 0:
+                    self._update_checkpoint(conn, checkpoint_key, '0')
+                    logging.info(f"   [CHECKPOINT] ✅ INVENTARIO COMPLETADO. Checkpoint reseteado a '0'. Total registros procesados: {total_processed}")
 
             return total_processed
 
