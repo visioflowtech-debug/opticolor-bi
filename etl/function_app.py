@@ -49,31 +49,30 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         try:
             with pyodbc.connect(etl.conn_str) as conn:
                 with conn.cursor() as cursor:
-                    cursor.execute("""
-                        IF NOT EXISTS (SELECT * FROM Etl_Checkpoints
-                                       WHERE KeyName = 'LOCK_CASCADA_GLOBAL')
-                        BEGIN
+                    # Paso 1: Verificar si lock ya existe
+                    cursor.execute("SELECT LastValue FROM Etl_Checkpoints WHERE KeyName = 'LOCK_CASCADA_GLOBAL'")
+                    existing_lock = cursor.fetchone()
+
+                    if existing_lock:
+                        # Lock existe, otra cascada está en ejecución
+                        lock_acquired = False
+                        logging.info("⚠️ [LOCK] Cascada ya en ejecución. Abortando esta instancia.")
+                    else:
+                        # Lock no existe, crear uno
+                        cursor.execute("""
                             INSERT INTO Etl_Checkpoints (KeyName, LastValue)
                             VALUES ('LOCK_CASCADA_GLOBAL', '1')
-                            SELECT 1
-                        END
-                        ELSE
-                        BEGIN
-                            SELECT 0
-                        END
-                    """)
-                    result = cursor.fetchone()
-                    lock_acquired = result[0] == 1 if result else False
-                    conn.commit()
+                        """)
+                        conn.commit()
+                        lock_acquired = True
+                        logging.info("✅ [LOCK] Lock global adquirido. Ejecutando cascada...")
+
         except Exception as lock_err:
             logging.error(f"Error al adquirir lock: {lock_err}")
             return
 
         if not lock_acquired:
-            logging.info("⚠️ [LOCK] Cascada ya en ejecución. Abortando esta instancia.")
             return
-
-        logging.info("✅ [LOCK] Lock global adquirido. Ejecutando cascada...")
 
         # Notificación de inicio
         etl.notificar_telegram(f"✅ ETL Opticolor iniciado — {inicio_ts}")
