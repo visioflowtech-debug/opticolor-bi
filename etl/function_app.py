@@ -2223,11 +2223,14 @@ class GesvisionEtl:
                         logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
                 else:
                     start_date = self.get_last_date(conn, "Operaciones_Inventario", "fecha_actualizacion")
-                    # LIMIT: Máximo 1 día atrás para evitar timeout (inventario muy voluminoso)
+                    # LIMIT: Máximo 1 día atrás para evitar timeout (inventario muy voluminoso: 40K+ items/día)
                     one_day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
-                    start_date = max(start_date, one_day_ago)
+                    if start_date < one_day_ago:
+                        start_date = one_day_ago
+                        logging.info(f"   [Smart Sync] Inventario: Última fecha en BD era anterior a 1 día. Limitando búsqueda a {start_date}")
+                    else:
+                        logging.info(f"   [Smart Sync] Inventario: Buscando cambios desde {start_date}")
                     params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
-                    logging.info(f"   [Smart Sync] Inventario: Buscando cambios desde {start_date}")
 
                 limit = 50
                 empty_pages = 0
