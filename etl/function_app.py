@@ -2198,7 +2198,7 @@ class GesvisionEtl:
                 return total_processed
 
     def sync_inventory(self):
-            """Sincroniza niveles de inventario con estrategia Híbrida. Ejecutada en función separada EtlInventarioRepetitivo."""
+            """Sincroniza inventario por warehouse (sucursal). Estrategia optimizada: itera por cada warehouse y pagina items con skip."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
 
@@ -2207,120 +2207,70 @@ class GesvisionEtl:
             total_processed = 0
 
             with pyodbc.connect(self.conn_str) as conn:
-                # Estrategia de Fechas
-                params_base = {}
-                skip = 0
+                # Obtener lista de sucursales desde BD
+                cursor = conn.cursor()
+                cursor.execute("SELECT id_sucursal FROM Maestro_Sucursales ORDER BY id_sucursal")
+                warehouse_ids = [row[0] for row in cursor.fetchall()]
+                cursor.close()
 
-                if self.LOAD_MODE_INVENTORY == 'HISTORICAL':
-                    try:
-                        with conn.cursor() as cursor:
-                            cursor.execute("SELECT COUNT(*) FROM Operaciones_Inventario")
-                            row = cursor.fetchone()
-                            total_rows = row[0] if row else 0
-                            skip = (total_rows // 50) * 50
-                            logging.info(f"   [Historical Load] Inventario: Retomando carga histórica desde skip {skip} (Total en BD: {total_rows}).")
-                    except Exception as e:
-                        logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
-                else:
-                    start_date = self.get_last_date(conn, "Operaciones_Inventario", "fecha_actualizacion")
-                    # LIMIT: Máximo 1 día atrás para evitar timeout (inventario muy voluminoso: 40K+ items/día)
-                    one_day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
-                    if start_date < one_day_ago:
-                        start_date = one_day_ago
-                        logging.info(f"   [Smart Sync] Inventario: Última fecha en BD era anterior a 1 día. Limitando búsqueda a {start_date}")
-                    else:
-                        logging.info(f"   [Smart Sync] Inventario: Buscando cambios desde {start_date}")
-                    params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
+                if not warehouse_ids:
+                    logging.warning("   [INVENTARIO] No se encontraron sucursales en BD. Abortando.")
+                    return 0
 
-                limit = 50
-                empty_pages = 0
+                logging.info(f"   [INVENTARIO] Procesando {len(warehouse_ids)} sucursales: {warehouse_ids}")
 
-                while True:
+                # Iterar por cada warehouse
+                for wh_id in warehouse_ids:
                     if (time.time() - start_time) > MAX_EXECUTION_TIME:
-                        logging.warning("   [TIMEOUT PREVENTIVO] Se alcanzó el límite de 24 minutos en Inventario.")
-                        return total_processed
+                        logging.warning(f"   [TIMEOUT PREVENTIVO] Límite alcanzado procesando warehouse {wh_id}.")
+                        break
 
-                    params = params_base.copy()
-                    params["skip"] = skip
+                    skip = 0
+                    limit = 50
+                    wh_processed = 0
 
-                    success_batch = False
-                    items = []
-                    for retry in range(3):
-                        try:
-                            resp = self.session.get(f"{self.base_url}/inventory", headers=headers, params=params, timeout=(15, 90))
-                            logging.info(f"   -> [REQ] skip: {skip} | URL: {resp.url}")
-
-                            if resp.status_code == 204:
-                                # Salida inmediata
-                                logging.info(f"   -> [RES] Status: 204 | Count: 0")
-                                return total_processed
-
-                            items = self._safe_parse_json(resp, "inventory")
-                            logging.info(f"   -> [RES] Status: {resp.status_code} | Count: {len(items)}")
-
-                            # Lógica de detección de huecos
-                            if not items:
-                                empty_pages += 1
-                                if empty_pages <= 10:
-                                    logging.warning(f"⚠️ Hueco detectado ({empty_pages}/10). Saltando...")
-                                    skip += limit
-                                    time.sleep(0.05)
-                                    success_batch = True
-                                    break # Salir del retry, continuar loop outer con siguiente skip
-                                else:
-                                    return total_processed
-
-                            success_batch = True
+                    while True:
+                        if (time.time() - start_time) > MAX_EXECUTION_TIME:
                             break
-                        except Exception as e:
-                            logging.warning(f"   [!] Reintento {retry+1} en inventario (Skip {skip}): {e}")
-                            time.sleep(5)
 
-                    if not success_batch:
-                        logging.error(f"Fallo definitivo en inventario lote {skip}.")
-                        break
-                    
-                    if items:
-                        empty_pages = 0
-                        self._process_and_save(conn, items, "Operaciones_Inventario", ["id_producto", "id_sucursal"], self.MAP_INVENTARIO)
-                        total_processed += len(items)
+                        params = {"warehouseId": wh_id, "skip": skip}
 
-                    if not items or len(items) < limit:
-                        break
+                        items = []
+                        success = False
+                        for retry in range(3):
+                            try:
+                                resp = self.session.get(f"{self.base_url}/inventory", headers=headers, params=params, timeout=(15, 90))
+                                logging.info(f"   -> [WH {wh_id}] skip: {skip} | status: {resp.status_code}")
 
-                    skip += limit
-                    time.sleep(0.05)
+                                if resp.status_code == 204:
+                                    success = True
+                                    break
 
-                # Guardar checkpoint después de procesar (DENTRO del contexto de conn)
-                try:
-                    cursor = conn.cursor()
-                    # Intenta UPDATE primero
-                    cursor.execute(
-                        "UPDATE Etl_Checkpoints SET LastValue = ? WHERE KeyName = ?",
-                        str(skip), 'checkpoint_inventory_skip'
-                    )
-                    rows_updated = cursor.rowcount
-                    logging.info(f"   [CHECKPOINT] UPDATE intentado: {rows_updated} filas afectadas")
+                                items = self._safe_parse_json(resp, "inventory")
+                                logging.info(f"   -> [WH {wh_id}] Count: {len(items)}")
+                                success = True
+                                break
+                            except Exception as e:
+                                logging.warning(f"   [!] Reintento {retry+1} WH {wh_id} skip {skip}: {e}")
+                                time.sleep(5)
 
-                    # Si no actualizó nada, inserta
-                    if rows_updated == 0:
-                        logging.info(f"   [CHECKPOINT] Insertando nuevo checkpoint...")
-                        cursor.execute(
-                            "INSERT INTO Etl_Checkpoints (KeyName, LastValue) VALUES (?, ?)",
-                            'checkpoint_inventory_skip', str(skip)
-                        )
+                        if not success:
+                            logging.error(f"Fallo definitivo WH {wh_id} skip {skip}.")
+                            break
 
-                    conn.commit()
-                    cursor.close()
-                    logging.info(f"   [CHECKPOINT] ✅ Guardado exitoso: checkpoint_inventory_skip = {skip}")
-                except Exception as e:
-                    logging.error(f"   [CHECKPOINT] ❌ ERROR al guardar: {type(e).__name__}: {e}")
-                    try:
-                        conn.rollback()
-                    except:
-                        pass
+                        if items:
+                            self._process_and_save(conn, items, "Operaciones_Inventario", ["id_producto", "id_sucursal"], self.MAP_INVENTARIO)
+                            wh_processed += len(items)
+                            total_processed += len(items)
 
-                return total_processed
+                        if not items or len(items) < limit:
+                            logging.info(f"   -> [WH {wh_id}] Completado: {wh_processed} items")
+                            break
+
+                        skip += limit
+                        time.sleep(0.05)
+
+            return total_processed
 
     def sync_collections(self):
             """Sincroniza cobros con estrategia Dual (Historical/Incremental)."""
