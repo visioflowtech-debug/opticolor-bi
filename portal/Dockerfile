@@ -10,7 +10,8 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-# Deshabilitar telemetría de Next.js durante el build
+# Asegurar que la carpeta public existe aunque Git no la haya subido
+RUN mkdir -p public
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
@@ -20,11 +21,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Crear usuario de seguridad
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
+# Copiamos la carpeta public (que ahora sí existe seguro)
 COPY --from=builder /app/public ./public
+# El output standalone de Next.js
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
@@ -32,5 +34,4 @@ USER nextjs
 EXPOSE 3000
 ENV PORT=3000
 
-# Next.js standalone corre con 'node server.js'
 CMD ["node", "server.js"]
