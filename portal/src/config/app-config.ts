@@ -3,12 +3,12 @@ import packageJson from "../../package.json";
 const currentYear = new Date().getFullYear();
 
 export const APP_CONFIG = {
-  name: "Opticolor - BI",
+  name: "OPTICOLOR - BI",
   version: packageJson.version,
   copyright: `© ${currentYear}, Opticolor - BI.`,
   meta: {
-    title: "Opticolor - BI",
+    title: "OPTICOLOR - BI",
     description:
-      "Sistema integrado de análisis y reportería para OPTI-COLOR.",
+      "OPTICOLOR - BI panel administrativo.",
   },
 };

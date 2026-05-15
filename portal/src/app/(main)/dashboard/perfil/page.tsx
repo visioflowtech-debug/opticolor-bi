@@ -1,472 +1,216 @@
-"use client";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { Clock, History, Key, MapPin, Shield, ShieldAlert, ShieldCheck } from "lucide-react";
 
-import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
-import {
-  Activity,
-  Building2,
-  CalendarDays,
-  Globe,
-  KeyRound,
-  MapPin,
-  MonitorSmartphone,
-  Shield,
-  User,
-} from "lucide-react";
-
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { getConnection } from "@/lib/db";
+import { getInitials } from "@/lib/utils";
+import { ChangePasswordModal } from "./_components/change-password-modal";
 
-import type { UserProfile } from "@/lib/types";
-import { cn, getInitials } from "@/lib/utils";
+export default async function PerfilPage() {
+  const session = await getServerSession(authOptions);
 
-// ─── Constantes ───────────────────────────────────────────────────────────────
-
-const NIVEL_MAX = 5;
-
-// Misma clase de gradiente que usa metric-cards.tsx en dashboard/default
-const CARD_GRADIENT =
-  "*:data-[slot=card]:bg-linear-to-t *:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card *:data-[slot=card]:shadow-xs dark:*:data-[slot=card]:bg-card";
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function fmt(
-  dateStr: string | null | undefined,
-  style: "member" | "short" | "full",
-): string {
-  if (!dateStr) return "—";
-  const d = new Date(dateStr);
-  if (Number.isNaN(d.getTime())) return "—";
-  switch (style) {
-    case "member":
-      return new Intl.DateTimeFormat("es-VE", {
-        month: "long",
-        year: "numeric",
-      }).format(d);
-    case "short":
-      return new Intl.DateTimeFormat("es-VE", {
-        day: "2-digit",
-        month: "long",
-        year: "numeric",
-      }).format(d);
-    case "full":
-      return new Intl.DateTimeFormat("es-VE", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }).format(d);
+  if (!session?.user?.email) {
+    redirect("/login");
   }
-}
 
-function parseUA(ua: string | null | undefined): string {
-  if (!ua) return "Dispositivo desconocido";
-  const browsers: [RegExp, string][] = [
-    [/Edg\//, "Edge"],
-    [/OPR\/|Opera/, "Opera"],
-    [/Chrome\//, "Chrome"],
-    [/Firefox\//, "Firefox"],
-    [/Safari\//, "Safari"],
-  ];
-  const browser = browsers.find(([re]) => re.test(ua))?.[1] ?? "Navegador";
-  const os = /Windows/.test(ua)
-    ? "Windows"
-    : /Mac OS X/.test(ua)
-      ? "macOS"
-      : /Android/.test(ua)
-        ? "Android"
-        : /iPhone|iPad/.test(ua)
-          ? "iOS"
-          : /Linux/.test(ua)
-            ? "Linux"
-            : "";
-  return os ? `${browser} en ${os}` : browser;
-}
+  const pool = await getConnection();
+  const email = session.user.email;
 
-// ─── Skeleton de carga ────────────────────────────────────────────────────────
-
-function ProfileSkeleton() {
-  return (
-    <div className="flex flex-col gap-4 md:gap-6">
-      <div className="space-y-2 border-b pb-4">
-        <Skeleton className="h-9 w-44" />
-        <Skeleton className="h-5 w-80" />
-      </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        <Skeleton className="h-44 rounded-xl" />
-        <Skeleton className="h-44 rounded-xl lg:col-span-2" />
-      </div>
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Skeleton className="h-52 rounded-xl" />
-        <Skeleton className="h-52 rounded-xl" />
-      </div>
-      <Skeleton className="h-64 rounded-xl" />
-    </div>
-  );
-}
-
-// ─── Icono de sección (patrón del dashboard default) ─────────────────────────
-
-function SectionIcon({ icon: Icon }: { icon: React.ElementType }) {
-  return (
-    <div className="flex size-7 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
-      <Icon className="size-4" />
-    </div>
-  );
-}
-
-// ─── Página ───────────────────────────────────────────────────────────────────
-
-export default function PerfilPage() {
-  const { data: session, status } = useSession();
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (status === "loading") return;
-
-    // NextAuth JWT coloca el id en session.user.id (ver callbacks en [...nextauth]/route.ts)
-    const userId = session?.user?.id;
-
-    if (!userId) {
-      setFetchError("__debug__");
-      setLoading(false);
-      return;
-    }
-
-    fetch(`/api/user/profile/${userId}`)
-      .then((res) => res.json())
-      .then((json) => {
-        if (json.success && json.data) {
-          setProfile(json.data as UserProfile);
-        } else {
-          setFetchError("No se pudo cargar la información del perfil.");
-        }
-      })
-      .catch(() => setFetchError("Error de conexión. Intenta recargar la página."))
-      .finally(() => setLoading(false));
-  }, [session, status]);
-
-  // ── Estado de carga ────────────────────────────────────────────────────────
-  if (status === "loading" || loading) return <ProfileSkeleton />;
-
-  // ── Estado de error ────────────────────────────────────────────────────────
-  if (fetchError) {
-    return (
-      <div className="flex flex-col gap-4 md:gap-6">
-        <div className="border-b pb-4">
-          <h1 className="text-3xl font-bold tracking-tight">Mi Cuenta</h1>
-        </div>
-        <Card>
-          <CardContent className="py-8">
-            {fetchError === "__debug__" ? (
-              <>
-                <p className="text-base font-medium text-destructive">
-                  Error: ID de sesión no encontrado.
-                </p>
-                <pre className="mt-4 max-h-40 overflow-auto rounded bg-muted p-2 text-[10px]">
-                  {JSON.stringify(session, null, 2)}
-                </pre>
-              </>
-            ) : (
-              <>
-                <p className="text-base text-muted-foreground">{fetchError}</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Si el problema persiste, contacta al administrador del sistema.
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
-      </div>
+  // 1. Obtener información del usuario, rol y jerarquía
+  const userQuery = await pool
+    .request()
+    .input("email", email)
+    .query(
+      `
+      SELECT 
+        u.id_usuario, 
+        u.nombre_completo, 
+        u.email, 
+        u.ultima_sesion, 
+        u.fecha_creacion,
+        r.nombre_rol, 
+        r.nivel_jerarquico
+      FROM dbo.Seguridad_Usuarios u
+      LEFT JOIN dbo.Seguridad_Usuarios_Roles ur ON u.id_usuario = ur.id_usuario AND ur.esta_vigente = 1
+      LEFT JOIN dbo.Seguridad_Roles r ON ur.id_rol = r.id_rol
+      WHERE u.email = @email AND u.esta_activo = 1
+    `,
     );
+
+  const user = userQuery.recordset[0];
+
+  if (!user) {
+    redirect("/login");
   }
 
-  if (!profile) return null;
+  // 2. Traer sucursales asignadas
+  const sucursalesQuery = await pool
+    .request()
+    .input("id_usuario", user.id_usuario)
+    .query(
+      `
+      SELECT ms.nombre_sucursal
+      FROM dbo.Seguridad_Usuarios_Sucursales us
+      INNER JOIN dbo.Maestro_Sucursales ms ON us.id_sucursal = ms.id_sucursal
+      WHERE us.id_usuario = @id_usuario AND us.esta_vigente = 1
+    `,
+    );
 
-  const nivel = profile.nivel_jerarquico;
-  const isNacional = nivel <= 2; // SUPER_ADMIN (1) o MASTER (2) → sin filtro geográfico
+  const sucursales = sucursalesQuery.recordset;
 
-  // Permisos agrupados por módulo para renderizar como chips
-  const permisosPorModulo = profile.permisos.reduce<Record<string, string[]>>(
-    (acc, p) => {
-      const key = p.modulo || "General";
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(p.nombre_permiso);
-      return acc;
-    },
-    {},
-  );
+  // 3. Traer últimos 5 registros de auditoría
+  const auditQuery = await pool
+    .request()
+    .input("id_usuario", user.id_usuario)
+    .query(
+      `
+      SELECT TOP 5 accion, fecha_accion, ip_origen
+      FROM dbo.Seguridad_Auditoria
+      WHERE id_usuario = @id_usuario
+      ORDER BY fecha_accion DESC
+    `,
+    );
+
+  const auditoria = auditQuery.recordset;
+
+  const formatDate = (date: Date | string) => {
+    if (!date) return "N/A";
+    const d = new Date(date);
+    return format(d, "dd 'de' MMMM, yyyy - HH:mm", { locale: es });
+  };
+
+  const isAccessTotal = user.nivel_jerarquico === 1 || user.nivel_jerarquico === 2;
+  const isSupervisor = user.nivel_jerarquico === 4;
 
   return (
-    <div className="flex flex-col gap-4 md:gap-6">
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+      <h1 className="text-3xl font-bold tracking-tight">Mi Perfil</h1>
 
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="border-b pb-4">
-        <h1 className="text-3xl font-bold tracking-tight">Mi Cuenta</h1>
-        <p className="mt-2 text-muted-foreground">
-          Información de tu cuenta y accesos en Opticolor BI
-        </p>
-      </div>
-
-      {/* ── Fila 1: Identidad (1/3) + Rol y Acceso (2/3) ─────────────────── */}
-      <div className={cn("grid gap-4 lg:grid-cols-3", CARD_GRADIENT)}>
-
-        {/* Sección 1 — Identidad */}
-        <Card>
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+        {/* Identidad */}
+        <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>
-              <SectionIcon icon={User} />
-            </CardTitle>
-            <CardDescription>Identidad</CardDescription>
+            <CardTitle>Información Personal</CardTitle>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <Avatar className="size-14 rounded-xl">
-                <AvatarFallback className="rounded-xl text-lg font-semibold">
-                  {getInitials(profile.nombre_completo)}
-                </AvatarFallback>
-              </Avatar>
-              <div className="min-w-0 flex flex-col gap-0.5">
-                <span className="truncate font-semibold leading-tight">
-                  {profile.nombre_completo}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {profile.email}
-                </span>
+          <CardContent className="flex flex-col items-center gap-6 md:flex-row">
+            <Avatar className="h-24 w-24 border-2 border-primary/20">
+              <AvatarFallback className="bg-primary/10 text-2xl text-primary">
+                {getInitials(user.nombre_completo || "U")}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex flex-col items-center gap-1 md:items-start">
+              <h2 className="text-2xl font-semibold">{user.nombre_completo}</h2>
+              <p className="text-muted-foreground">{user.email}</p>
+              <div className="mt-2 flex items-center gap-2">
+                <Badge variant={isAccessTotal ? "default" : "secondary"}>{user.nombre_rol || "USUARIO"}</Badge>
+                {isAccessTotal && (
+                  <Badge variant="outline" className="gap-1 border-green-500 text-green-600 dark:text-green-400">
+                    <ShieldCheck className="h-3 w-3" /> Acceso Total
+                  </Badge>
+                )}
               </div>
-            </div>
-
-            <Badge
-              variant={profile.esta_activo ? "default" : "destructive"}
-              className="w-fit"
-            >
-              {profile.esta_activo ? "Activo" : "Inactivo"}
-            </Badge>
-
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CalendarDays className="size-3.5 shrink-0" />
-              <span>Miembro desde {fmt(profile.fecha_creacion, "member")}</span>
             </div>
           </CardContent>
         </Card>
 
-        {/* Sección 2 — Rol y Acceso */}
-        <Card className="lg:col-span-2">
+        {/* Seguridad */}
+        <Card>
           <CardHeader>
-            <CardTitle>
-              <SectionIcon icon={Shield} />
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-primary" /> Seguridad
             </CardTitle>
-            <CardDescription>Rol y Acceso</CardDescription>
           </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-2xl font-semibold leading-none">
-                {profile.nombre_rol}
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-col gap-1">
+              <span className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                <Clock className="h-4 w-4" /> Última Sesión
               </span>
-              <Badge variant="secondary">
-                Nivel {nivel} de {NIVEL_MAX}
-              </Badge>
+              <span className="text-sm">{formatDate(user.ultima_sesion)}</span>
             </div>
-
-            {profile.descripcion_rol && (
-              <p className="text-sm text-muted-foreground">{profile.descripcion_rol}</p>
-            )}
-
-            <Separator />
-
-            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <CalendarDays className="size-3.5 shrink-0" />
-              <span>Asignado el {fmt(profile.fecha_asignacion_rol, "short")}</span>
+            <div className="flex flex-col gap-1">
+              <span className="flex items-center gap-1 text-sm font-medium text-muted-foreground">
+                <Clock className="h-4 w-4" /> Miembro desde
+              </span>
+              <span className="text-sm">{formatDate(user.fecha_creacion)}</span>
             </div>
           </CardContent>
+          <CardFooter>
+            <ChangePasswordModal />
+          </CardFooter>
         </Card>
       </div>
 
-      {/* ── Fila 2: Alcance Geográfico + Sesión Actual ────────────────────── */}
-      <div className={cn("grid gap-4 lg:grid-cols-2", CARD_GRADIENT)}>
-
-        {/* Sección 3 — Alcance Geográfico */}
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Organización / Sucursales */}
         <Card>
           <CardHeader>
-            <CardTitle>
-              <SectionIcon icon={Building2} />
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5 text-primary" /> Sucursales Asignadas
             </CardTitle>
-            <CardDescription>Alcance Geográfico</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            {isNacional ? (
-              <div className="flex items-center gap-2">
-                <Globe className="size-4 shrink-0 text-muted-foreground" />
-                <Badge variant="secondary">
-                  Acceso nacional — todas las sucursales
-                </Badge>
-              </div>
-            ) : profile.sucursales.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Sin sucursales asignadas.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {profile.sucursales.map((s) => (
-                  <li key={s.id_sucursal} className="flex items-start gap-2">
-                    <MapPin className="mt-0.5 size-3.5 shrink-0 text-muted-foreground" />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium leading-tight">
-                        {s.nombre_sucursal}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {s.ciudad}, {s.estado}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Sección 5 — Sesión Actual */}
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <SectionIcon icon={MonitorSmartphone} />
-            </CardTitle>
-            <CardDescription>Sesión Actual</CardDescription>
+            <CardDescription>Ubicaciones a las que tienes acceso.</CardDescription>
           </CardHeader>
           <CardContent>
-            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-              <dt className="text-muted-foreground">Última conexión</dt>
-              <dd className="font-medium">{fmt(profile.ultima_sesion, "full")}</dd>
-
-              {profile.ultima_sesion_detalle && (
-                <>
-                  <dt className="text-muted-foreground">IP de origen</dt>
-                  <dd className="font-medium tabular-nums">
-                    {profile.ultima_sesion_detalle.ip_origen || "—"}
-                  </dd>
-
-                  <dt className="text-muted-foreground">Dispositivo</dt>
-                  <dd className="font-medium">
-                    {parseUA(profile.ultima_sesion_detalle.user_agent)}
-                  </dd>
-
-                  <dt className="text-muted-foreground">Sesión vence</dt>
-                  <dd className="font-medium">
-                    {fmt(profile.ultima_sesion_detalle.fecha_expiracion, "full")}
-                  </dd>
-                </>
+            <div className="flex flex-wrap gap-2">
+              {sucursales.length > 0 ? (
+                sucursales.map((s, idx) => (
+                  <Badge key={idx} variant="secondary" className="px-3 py-1 text-sm font-normal">
+                    {s.nombre_sucursal}
+                  </Badge>
+                ))
+              ) : (
+                <div className="flex w-full flex-col items-center justify-center p-6 text-center text-muted-foreground">
+                  <MapPin className="mb-2 h-8 w-8 opacity-20" />
+                  <p className="text-sm">Sin sucursales asignadas.</p>
+                </div>
               )}
-            </dl>
+            </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Sección 4 — Permisos (solo SUPER_ADMIN / MASTER) */}
-      {isNacional && Object.keys(permisosPorModulo).length > 0 && (
-        <div className={CARD_GRADIENT}>
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                <SectionIcon icon={KeyRound} />
-              </CardTitle>
-              <CardDescription>Permisos</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {Object.entries(permisosPorModulo).map(([modulo, permisos]) => (
-                <div key={modulo} className="flex flex-col gap-2">
-                  <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    {modulo}
-                  </span>
-                  <div className="flex flex-wrap gap-1.5">
-                    {permisos.map((nombre) => (
-                      <Badge key={nombre} variant="outline" className="font-normal">
-                        {nombre}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Sección 6 — Actividad Reciente */}
-      <div className={CARD_GRADIENT}>
+        {/* Actividad / Auditoría */}
         <Card>
           <CardHeader>
-            <CardTitle>
-              <SectionIcon icon={Activity} />
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-5 w-5 text-primary" /> Actividad Reciente
             </CardTitle>
-            <CardDescription>Actividad Reciente</CardDescription>
+            <CardDescription>Tus últimos 5 movimientos registrados.</CardDescription>
           </CardHeader>
-          <CardContent className="p-0">
-            {profile.auditoria_reciente.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                Sin actividad registrada.
-              </p>
-            ) : (
+          <CardContent>
+            {auditoria.length > 0 ? (
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Acción</TableHead>
-                    <TableHead>Módulo</TableHead>
-                    <TableHead>Resultado</TableHead>
-                    <TableHead>Fecha</TableHead>
+                    <TableHead className="text-right">Fecha</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {profile.auditoria_reciente.map((a, i) => (
-                    // biome-ignore lint/suspicious/noArrayIndexKey: lista inmutable de max 5 elementos
+                  {auditoria.map((log, i) => (
                     <TableRow key={i}>
-                      <TableCell className="font-medium">{a.accion}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {a.tabla_afectada}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className={cn(
-                            "border-transparent",
-                            a.resultado === "EXITO"
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                              : "bg-destructive/10 text-destructive dark:bg-destructive/20",
-                          )}
-                        >
-                          {a.resultado}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="tabular-nums text-muted-foreground">
-                        {fmt(a.fecha_accion, "full")}
+                      <TableCell className="text-sm font-medium">{log.accion}</TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground">
+                        {formatDate(log.fecha_accion)}
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+            ) : (
+              <div className="flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
+                <History className="mb-2 h-8 w-8 opacity-20" />
+                <p className="text-sm">No hay registros de actividad.</p>
+              </div>
             )}
           </CardContent>
         </Card>
       </div>
-
     </div>
   );
 }

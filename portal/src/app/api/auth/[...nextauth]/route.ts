@@ -1,128 +1,136 @@
-import NextAuth from 'next-auth';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import bcrypt from 'bcryptjs';
-import type { JWT } from 'next-auth/jwt';
-import type { Session, User } from 'next-auth';
-import { query } from '@/lib/db';
+import { getConnection } from "@/lib/db";
+import { headers } from "next/headers";
+import bcrypt from "bcryptjs";
+import NextAuth, { NextAuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 
-export const authOptions = {
-  secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  trustHost: true,
+export const authOptions: NextAuthOptions = {
   providers: [
     CredentialsProvider({
-      name: 'Credentials',
+      name: "Credentials",
       credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' },
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        console.log('[NextAuth Credentials] authorize called with:', { email: credentials?.email });
-
         if (!credentials?.email || !credentials?.password) {
-          console.warn('[NextAuth Credentials] Credenciales vacías');
-          return null;
+          throw new Error("Por favor, ingresa tu correo y contraseña.");
         }
 
         try {
-          console.log('[NextAuth Credentials] Intentando autenticar:', credentials.email);
+          const pool = await getConnection();
 
-          const rows = await query<{
-            id_usuario: number;
-            email: string;
-            nombre_completo: string;
-            password_hash: string;
-            nombre_rol: string;
-            nivel_jerarquico: number;
-          }>(
-            `SELECT id_usuario, email, nombre_completo, password_hash, nombre_rol, nivel_jerarquico
-             FROM Vw_Usuario_Accesos
-             WHERE email = @email`,
-            { email: credentials.email }
-          );
+          // Buscar el usuario por email
+          const userResult = await pool.request()
+            .input("email", credentials.email)
+            .query(`
+              SELECT 
+                u.id_usuario, 
+                u.nombre_completo, 
+                u.email, 
+                u.password_hash,
+                r.nombre_rol,
+                r.nivel_jerarquico
+              FROM dbo.Seguridad_Usuarios u
+              LEFT JOIN dbo.Seguridad_Usuarios_Roles ur ON u.id_usuario = ur.id_usuario
+              LEFT JOIN dbo.Seguridad_Roles r ON ur.id_rol = r.id_rol
+              WHERE u.email = @email
+            `);
 
-          console.log('[NextAuth Credentials] Query resultado:', rows.length, 'registros');
+          const user = userResult.recordset[0];
 
-          if (!rows.length) {
-            console.warn('[NextAuth Credentials] Usuario no encontrado:', credentials.email);
-            return null;
+          if (!user) {
+            throw new Error("Usuario no encontrado.");
           }
 
-          const user = rows[0];
-          console.log('[NextAuth Credentials] Usuario encontrado:', user.nombre_completo, 'ID:', user.id_usuario);
+          // Validar la contraseña usando bcryptjs
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password_hash);
 
-          const isValidPassword = await bcrypt.compare(
-            credentials.password as string,
-            user.password_hash
-          );
-
-          console.log('[NextAuth Credentials] Password válido:', isValidPassword);
-
-          if (!isValidPassword) {
-            console.warn('[NextAuth Credentials] Password incorrecto');
-            return null;
+          if (!isPasswordValid) {
+            throw new Error("Contraseña incorrecta.");
           }
 
-          console.log('[NextAuth Credentials] Autenticación exitosa para:', credentials.email, '- ID:', user.id_usuario);
-          const result = {
-            id: String(user.id_usuario),
-            email: user.email,
+          // Retornar la información del usuario para la sesión
+          return {
+            id: user.id_usuario.toString(),
             name: user.nombre_completo,
-            nombre_rol: user.nombre_rol,
-            nivel_jerarquico: user.nivel_jerarquico,
+            email: user.email,
+            rol: user.nombre_rol || "USUARIO",
+            nivel: user.nivel_jerarquico || 0,
           };
-          console.log('[NextAuth Credentials] Retornando usuario:', result);
-          return result;
-        } catch (error) {
-          console.error('[NextAuth Credentials] Error en authorize:', error instanceof Error ? error.message : String(error));
-          throw error;
+        } catch (error: any) {
+          console.error("Error en autorización:", error);
+          throw new Error(error.message || "Error al autenticar al usuario.");
         }
       },
     }),
   ],
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 días
+  },
+  pages: {
+    signIn: "/login",
+  },
   callbacks: {
-    async jwt({ token, user }: { token: JWT; user?: User }) {
+    async jwt({ token, user }) {
       if (user) {
-        token.id = user.id || (user as any).id_usuario;
-        token.email = user.email;
-        token.name = user.name;
-        token.nombre_rol = (user as any).nombre_rol;
-        token.nivel_jerarquico = (user as any).nivel_jerarquico;
+        token.id = user.id;
+        token.rol = user.rol;
+        token.nivel = user.nivel;
       }
       return token;
     },
-    async session({ session, token }: { session: Session; token: JWT }) {
+    async session({ session, token }) {
       if (token && session.user) {
-        session.user.id = token.id;
-        session.user.email = token.email;
-        session.user.name = token.name;
-        session.user.nombre_rol = token.nombre_rol;
-        session.user.nivel_jerarquico = token.nivel_jerarquico;
+        session.user.id = token.id as string;
+        session.user.rol = token.rol as string;
+        session.user.nivel = token.nivel as number;
       }
       return session;
     },
   },
-  pages: {
-    signIn: '/auth/v2/login',
-  },
-  session: {
-    strategy: 'jwt' as const,
-    maxAge: 24 * 60 * 60,
-  },
-  cookies: {
-    sessionToken: {
-      name: process.env.NODE_ENV === 'production'
-        ? '__Secure-next-auth.session-token'
-        : 'next-auth.session-token',
-      options: {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax' as const,
-        path: '/',
-        maxAge: 24 * 60 * 60,
-      },
+  events: {
+    async signIn({ user }) {
+      try {
+        const pool = await getConnection();
+        
+        // Acción A: Actualización de Usuario
+        await pool.request()
+          .input("id_usuario", user.id)
+          .query(`
+            UPDATE dbo.Seguridad_Usuarios 
+            SET ultima_sesion = GETDATE() 
+            WHERE id_usuario = @id_usuario
+          `);
+
+        // Obtener IP
+        const headersList = await headers();
+        const ip = headersList.get("x-forwarded-for") || headersList.get("x-real-ip") || "Desconocida";
+
+        // Acción B: Inserción en Auditoría
+        await pool.request()
+          .input("id_usuario", user.id)
+          .input("email_usuario", user.email)
+          .input("accion", "LOGIN")
+          .input("tabla_afectada", "Seguridad_Usuarios")
+          .input("registro_id", user.id)
+          .input("resultado", "EXITOSO")
+          .input("ip_origen", ip)
+          .query(`
+            INSERT INTO dbo.Seguridad_Auditoria (
+              id_usuario, email_usuario, accion, tabla_afectada, registro_id, resultado, ip_origen, fecha_accion
+            ) VALUES (
+              @id_usuario, @email_usuario, @accion, @tabla_afectada, @registro_id, @resultado, @ip_origen, GETDATE()
+            )
+          `);
+      } catch (error) {
+        console.error("Error en evento signIn de auditoría:", error);
+      }
     },
   },
 };
 
 const handler = NextAuth(authOptions);
+
 export { handler as GET, handler as POST };

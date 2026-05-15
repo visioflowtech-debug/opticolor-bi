@@ -8,18 +8,19 @@ import { SIDEBAR_COLLAPSIBLE_VALUES, SIDEBAR_VARIANT_VALUES } from "@/lib/prefer
 import { cn } from "@/lib/utils";
 import { getPreference } from "@/server/server-actions";
 
-import { LayoutControls } from "./_components/sidebar/layout-controls";
-import { SearchDialog } from "./_components/sidebar/search-dialog";
-import { ThemeSwitcher } from "./_components/sidebar/theme-switcher";
-import { DashboardBreadcrumb } from "./_components/sidebar/dashboard-breadcrumb";
+import { SessionWatcher } from "@/components/auth/SessionWatcher";
+
+import { getMisSucursales } from "./_actions/get-mis-sucursales";
+import { DashboardHeader } from "./_components/navbar/dashboard-header";
 
 export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
 
-  const [variant, collapsible] = await Promise.all([
+  const [variant, collapsible, sucursalesResult] = await Promise.all([
     getPreference("sidebar_variant", SIDEBAR_VARIANT_VALUES, "inset"),
     getPreference("sidebar_collapsible", SIDEBAR_COLLAPSIBLE_VALUES, "icon"),
+    getMisSucursales(),
   ]);
 
   return (
@@ -40,29 +41,9 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
           "peer-data-[variant=inset]:border",
         )}
       >
-        <header
-          className={cn(
-            "flex h-12 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
-            // Handle sticky navbar style with conditional classes so blur, background, z-index, and rounded corners remain consistent across all SidebarVariant layouts.
-            "[html[data-navbar-style=sticky]_&]:sticky [html[data-navbar-style=sticky]_&]:top-0 [html[data-navbar-style=sticky]_&]:z-50 [html[data-navbar-style=sticky]_&]:overflow-hidden [html[data-navbar-style=sticky]_&]:rounded-t-[inherit] [html[data-navbar-style=sticky]_&]:bg-background/50 [html[data-navbar-style=sticky]_&]:backdrop-blur-md",
-          )}
-        >
-          <div className="flex w-full items-center justify-between px-4 lg:px-6">
-            <div className="flex items-center gap-1 lg:gap-2">
-              <SearchDialog />
-            </div>
-            <div className="flex items-center gap-2">
-              <LayoutControls />
-              <ThemeSwitcher />
-            </div>
-          </div>
-        </header>
-        <div className="h-full overflow-auto">
-          <div className="p-4 md:p-6">
-            <DashboardBreadcrumb />
-            {children}
-          </div>
-        </div>
+        <SessionWatcher />
+        <DashboardHeader sucursales={sucursalesResult.data} />
+        <div className="h-full p-4 md:p-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

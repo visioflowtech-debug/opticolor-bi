@@ -1,10 +1,12 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import { signIn } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
-import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,6 +21,8 @@ const formSchema = z.object({
 
 export function LoginForm() {
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -29,28 +33,31 @@ export function LoginForm() {
   });
 
   const onSubmit = async (data: z.infer<typeof formSchema>) => {
+    setIsLoading(true);
     try {
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password,
-        }),
+      const result = await signIn("credentials", {
+        redirect: false,
+        email: data.email,
+        password: data.password,
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        toast.error(error.error || "Email o contraseña incorrectos");
-        return;
+      if (result?.error) {
+        toast.error("Error de autenticación", {
+          description: "Las credenciales son incorrectas.",
+        });
+      } else {
+        toast.success("¡Bienvenido!", {
+          description: "Inicio de sesión exitoso.",
+        });
+        router.push("/dashboard/resumen-comercial");
+        router.refresh();
       }
-
-      const result = await response.json();
-      toast.success("Inicio de sesión exitoso");
-      router.push("/dashboard/default");
     } catch (error) {
-      console.error("Login error:", error);
-      toast.error("Error en el servidor");
+      toast.error("Error del servidor", {
+        description: "Ocurrió un error inesperado al intentar iniciar sesión.",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -62,12 +69,12 @@ export function LoginForm() {
           name="email"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="login-email">Email Address</FieldLabel>
+              <FieldLabel htmlFor="login-email">Correo Electronico</FieldLabel>
               <Input
                 {...field}
                 id="login-email"
                 type="email"
-                placeholder="you@example.com"
+                placeholder="tucorreo@opticolor.com"
                 autoComplete="email"
                 aria-invalid={fieldState.invalid}
               />
@@ -80,7 +87,7 @@ export function LoginForm() {
           name="password"
           render={({ field, fieldState }) => (
             <Field className="gap-1.5" data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="login-password">Password</FieldLabel>
+              <FieldLabel htmlFor="login-password">Contraseña</FieldLabel>
               <Input
                 {...field}
                 id="login-password"
@@ -93,30 +100,10 @@ export function LoginForm() {
             </Field>
           )}
         />
-        <Controller
-          control={form.control}
-          name="remember"
-          render={({ field, fieldState }) => (
-            <Field orientation="horizontal" data-invalid={fieldState.invalid}>
-              <Checkbox
-                id="login-remember"
-                name={field.name}
-                checked={field.value}
-                onCheckedChange={(checked) => field.onChange(Boolean(checked))}
-                aria-invalid={fieldState.invalid}
-              />
-              <FieldContent>
-                <FieldLabel htmlFor="login-remember" className="font-normal">
-                  Remember me for 30 days
-                </FieldLabel>
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </FieldContent>
-            </Field>
-          )}
-        />
+
       </FieldGroup>
-      <Button className="w-full" type="submit">
-        Login
+      <Button className="w-full" type="submit" disabled={isLoading}>
+        {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
       </Button>
     </form>
   );

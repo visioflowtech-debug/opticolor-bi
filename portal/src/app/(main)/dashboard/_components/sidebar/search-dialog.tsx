@@ -1,8 +1,12 @@
 "use client";
+
 import * as React from "react";
 
-import { ChartBar, Forklift, Gauge, GraduationCap, Search, ShoppingBag } from "lucide-react";
+import { useRouter } from "next/navigation";
 
+import { Search } from "lucide-react";
+
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -14,76 +18,139 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
+import type { NavMainItem } from "@/navigation/sidebar/sidebar-items";
+import { sidebarItems } from "@/navigation/sidebar/sidebar-items";
 
-interface SearchItem {
+type SearchItem = {
   group: string;
-  icon: React.ComponentType<{ className?: string }>;
   label: string;
-  href: string;
+  url: string;
+  icon?: NavMainItem["icon"];
+  disabled?: boolean;
+  newTab?: boolean;
+};
+
+const sidebarGroupLabels = new Set(sidebarItems.flatMap((group) => (group.label ? [group.label] : [])));
+
+function getSubItemGroup(groupLabel: string | undefined, itemTitle: string) {
+  return sidebarGroupLabels.has(itemTitle) ? (groupLabel ?? "Other") : itemTitle;
 }
 
-const searchItems: SearchItem[] = [
-  { group: "Informes", icon: ChartBar, label: "Resumen Comercial", href: "/dashboard/resumen-comercial" },
-  { group: "Informes", icon: Gauge, label: "Eficiencia de Órdenes", href: "/dashboard/eficiencia-ordenes" },
-  { group: "Informes", icon: ShoppingBag, label: "Control de Cartera", href: "/dashboard/control-cartera" },
-  { group: "Informes", icon: GraduationCap, label: "Desempeño Clínico", href: "/dashboard/desempenio-clinico" },
-  { group: "Informes", icon: Forklift, label: "Inventario", href: "/dashboard/inventario" },
-];
+const searchItems: SearchItem[] = sidebarItems.flatMap((group) =>
+  group.items.flatMap((item) => {
+    if (item.subItems) {
+      return item.subItems.map((sub) => ({
+        group: getSubItemGroup(group.label, item.title),
+        label: sub.title,
+        url: sub.url,
+        icon: item.icon,
+        disabled: sub.comingSoon,
+        newTab: sub.newTab,
+      }));
+    }
+    return [
+      {
+        group: group.label ?? "Other",
+        label: item.title,
+        url: item.url,
+        icon: item.icon,
+        disabled: item.comingSoon,
+        newTab: item.newTab,
+      },
+    ];
+  }),
+);
+
+function getAvailableItems(items: SearchItem[]) {
+  return items.filter((item) => !item.disabled && !item.url.includes("coming-soon"));
+}
+
+const recommendations = getAvailableItems(searchItems);
+
+function groupBy(items: SearchItem[]) {
+  const groups = [...new Set(items.map((item) => item.group))];
+  return groups.map((group) => ({
+    group,
+    items: items.filter((item) => item.group === group),
+  }));
+}
 
 export function SearchDialog() {
   const [open, setOpen] = React.useState(false);
-  const groups = [...new Set(searchItems.map((item) => item.group))];
+  const [query, setQuery] = React.useState("");
+  const router = useRouter();
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "j" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((open) => !open);
+        setOpen((prev) => !prev);
       }
     };
     document.addEventListener("keydown", down);
     return () => document.removeEventListener("keydown", down);
   }, []);
 
+  const handleOpenChange = (value: boolean) => {
+    setOpen(value);
+    if (!value) setQuery("");
+  };
+
+  const handleSelect = (item: SearchItem) => {
+    if (item.disabled) return;
+    handleOpenChange(false);
+    if (item.newTab) {
+      window.open(item.url, "_blank", "noopener,noreferrer");
+    } else {
+      router.push(item.url);
+    }
+  };
+
+  const renderGroups = (items: SearchItem[]) =>
+    groupBy(items).map(({ group, items: groupItems }, index) => (
+      <React.Fragment key={group}>
+        {index > 0 && <CommandSeparator />}
+        <CommandGroup heading={group}>
+          {groupItems.map((item) => (
+            <CommandItem
+              disabled={item.disabled}
+              key={`${group}-${item.url}-${item.label}`}
+              value={`${item.group} ${item.label}`}
+              onSelect={() => handleSelect(item)}
+            >
+              {item.icon && <item.icon />}
+              <span>{item.label}</span>
+
+              {item.disabled && (
+                <Badge variant="outline" className="text-xs">
+                  Soon
+                </Badge>
+              )}
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </React.Fragment>
+    ));
+
   return (
     <>
       <Button
-        onClick={() => setOpen(true)}
+        onClick={() => handleOpenChange(true)}
         variant="link"
         className="px-0! font-normal text-muted-foreground hover:no-underline"
       >
         <Search data-icon="inline-start" />
-        Buscar
+        Search
         <kbd className="inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-medium text-[10px]">
           <span className="text-xs">⌘</span>J
         </kbd>
       </Button>
-      <CommandDialog open={open} onOpenChange={setOpen}>
+      <CommandDialog open={open} onOpenChange={handleOpenChange}>
         <Command>
-          <CommandInput placeholder="Buscar informes…" />
+          <CommandInput placeholder="Search dashboards, users, and more…" value={query} onValueChange={setQuery} />
           <CommandList>
-            <CommandEmpty>No se encontraron resultados.</CommandEmpty>
-            {groups.map((group, index) => (
-              <React.Fragment key={group}>
-                {index > 0 && <CommandSeparator />}
-                <CommandGroup heading={group}>
-                  {searchItems
-                    .filter((item) => item.group === group)
-                    .map((item) => (
-                      <CommandItem
-                        key={item.label}
-                        onSelect={() => {
-                          window.location.href = item.href;
-                          setOpen(false);
-                        }}
-                      >
-                        {item.icon && <item.icon />}
-                        <span>{item.label}</span>
-                      </CommandItem>
-                    ))}
-                </CommandGroup>
-              </React.Fragment>
-            ))}
+            <CommandEmpty>No results found.</CommandEmpty>
+            {query ? renderGroups(searchItems) : renderGroups(recommendations)}
           </CommandList>
         </Command>
       </CommandDialog>

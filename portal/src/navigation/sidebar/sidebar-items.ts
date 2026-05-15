@@ -1,12 +1,12 @@
 import {
-  BarChart3,
-  Clock,
+  ClipboardCheck,
   LayoutDashboard,
-  Lock,
-  type LucideIcon,
+  MapPin,
   Package,
-  TrendingUp,
+  Stethoscope,
+  Users,
   Wallet,
+  type LucideIcon,
 } from "lucide-react";
 
 export interface NavSubItem {
@@ -37,7 +37,7 @@ export interface NavGroup {
 export const sidebarItems: NavGroup[] = [
   {
     id: 1,
-    label: "Informes Opticolor",
+    label: "Reportes",
     items: [
       {
         title: "Resumen Comercial",
@@ -45,19 +45,19 @@ export const sidebarItems: NavGroup[] = [
         icon: LayoutDashboard,
       },
       {
-        title: "Eficiencia de Órdenes",
-        url: "/dashboard/eficiencia-ordenes",
-        icon: Clock,
-      },
-      {
-        title: "Control de Cartera",
-        url: "/dashboard/control-cartera",
+        title: "Control de Cartera y Saldos",
+        url: "/dashboard/cartera",
         icon: Wallet,
       },
       {
+        title: "Eficiencia de Órdenes",
+        url: "/dashboard/eficiencia",
+        icon: ClipboardCheck,
+      },
+      {
         title: "Desempeño Clínico",
-        url: "/dashboard/desempenio-clinico",
-        icon: TrendingUp,
+        url: "/dashboard/clinico",
+        icon: Stethoscope,
       },
       {
         title: "Inventario",
@@ -68,19 +68,17 @@ export const sidebarItems: NavGroup[] = [
   },
   {
     id: 2,
-    label: "Administración",
+    label: "Configuración",
     items: [
       {
         title: "Usuarios",
-        url: "/dashboard/coming-soon",
-        icon: BarChart3,
-        comingSoon: true,
+        url: "/dashboard/usuarios",
+        icon: Users,
       },
       {
-        title: "Roles",
-        url: "/dashboard/coming-soon",
-        icon: Lock,
-        comingSoon: true,
+        title: "Sucursales",
+        url: "/dashboard/sucursales",
+        icon: MapPin,
       },
     ],
   },
