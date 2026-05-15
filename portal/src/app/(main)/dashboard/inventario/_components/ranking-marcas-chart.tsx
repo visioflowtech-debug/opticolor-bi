@@ -105,7 +105,7 @@ export function RankingMarcasChart({ data }: Props) {
             content={({ active, payload }) => (
               <RankingTooltip
                 active={active}
-                payload={payload as Array<{ value: number }>}
+                payload={payload as unknown as Array<{ value: number }>}
                 label={payload?.[0]?.payload?.marca}
               />
             )}
