@@ -3,28 +3,21 @@
 import { useEffect, useState } from "react";
 
 interface SafeChartContainerProps {
-  /** Height applied to both the skeleton and the live chart wrapper. */
+  /** Tailwind height class like "h-[350px]" or "h-[500px]". Also applied as
+   *  inline style so Recharts ResizeObserver always gets a non-zero dimension,
+   *  even before Tailwind CSS finishes hydrating. */
   height?: string;
   /** Extra Tailwind classes merged into the outer div (e.g. 'w-52 shrink-0'). */
   className?: string;
   children: React.ReactNode;
 }
 
-/**
- * SafeChartContainer
- *
- * Recharts' ResponsiveContainer reads its parent's pixel dimensions via the
- * ResizeObserver API, which is unavailable during SSR and may report
- * width=-1 / height=-1 on the first client render before the browser has
- * painted the layout.
- *
- * This wrapper:
- *  1. Renders a placeholder skeleton during SSR and before hydration.
- *  2. Swaps in the real chart (with an explicit pixel-height container) only
- *     after the component is mounted on the client — guaranteeing that the
- *     ResizeObserver will always find non-zero dimensions.
- *  3. Uses a subtle fade-in so the transition feels intentional, not jarring.
- */
+/** Parses "h-[350px]" → "350px". Returns undefined for non-pixel patterns. */
+function toInlineHeight(cls: string): string | undefined {
+  const m = cls.match(/h-\[(\d+(?:\.\d+)?(?:px|rem|vh))\]/);
+  return m ? m[1] : undefined;
+}
+
 export function SafeChartContainer({
   height = "h-[350px]",
   className = "",
@@ -36,10 +29,14 @@ export function SafeChartContainer({
     setIsMounted(true);
   }, []);
 
+  const inlineHeight = toInlineHeight(height);
+  const heightStyle = inlineHeight ? { height: inlineHeight } : undefined;
+
   if (!isMounted) {
     return (
       <div
         className={`${height} ${className} animate-pulse rounded-xl bg-muted`}
+        style={heightStyle}
         aria-hidden="true"
       />
     );
@@ -48,7 +45,7 @@ export function SafeChartContainer({
   return (
     <div
       className={`${height} ${className} transition-opacity duration-300 ease-in`}
-      style={{ opacity: 1 }}
+      style={heightStyle}
     >
       {children}
     </div>

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 @plugin "tailwindcss-animate";
+
+/* Restricts Tailwind v4 content scanning to portal/src only.
+   Without this, @tailwindcss/postcss walks up to the monorepo root (opticolor-bi/)
+   and may anchor scanning there instead of /portal — breaking class generation. */
+@source "../../src/**/*.{js,ts,jsx,tsx,mdx}";
 /* @import "shadcn/tailwind.css"; */
 
 /* Theme preset styles: these override CSS variables based on the selected data-theme-preset */
@@ -85,8 +90,8 @@ These serve as the fallback; there is no separate default.css file. */
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* fonts */
-  --font-sans: var(--font-geist-sans);
+  /* fonts — registry.ts registers Geist as --font-geist, not --font-geist-sans */
+  --font-sans: var(--font-geist);
   --font-mono: var(--font-geist-mono);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
