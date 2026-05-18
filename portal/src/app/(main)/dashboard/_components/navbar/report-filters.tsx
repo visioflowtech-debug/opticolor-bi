@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { startOfMonth } from "date-fns";
 import type { DateRange } from "react-day-picker";
@@ -57,16 +57,56 @@ export function ReportFilters({ sucursales }: Props) {
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
+  const [localDateRange, setLocalDateRange] = useState<DateRange>({
+    from: fromParam ? new Date(fromParam) : startOfMonth(new Date()),
+    to:   toParam   ? new Date(toParam)   : new Date(),
+  });
+
+  // (El useEffect de sincronización cruzada fue removido para evitar el bucle de "Double-Fetch")
+
+  // 1. Declarar la referencia del temporizador
+  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
+
   const handleDateChange = useCallback(
     (range: DateRange | undefined) => {
       if (!range?.from) return;
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("from", range.from.toISOString());
-      if (range.to) params.set("to", range.to.toISOString());
-      else params.delete("to");
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+      const fromDate = range.from;
+      const toDate = range.to;
+
+      const newFromStr = fromDate.toISOString();
+      const newToStr = toDate ? toDate.toISOString() : null;
+
+      // Leer la URL actual directo del navegador para evitar cierres (closures) obsoletos
+      const currentParams = new URLSearchParams(window.location.search);
+      const currentFrom = currentParams.get("from");
+      const currentTo = currentParams.get("to");
+
+      // Control Estricto: Abortar si las fechas seleccionadas son idénticas a las ya activas en la URL
+      if (currentFrom === newFromStr && currentTo === newToStr) {
+        return;
+      }
+
+      // Actualizar el estado visual local inmediatamente (UX reactivo)
+      setLocalDateRange(range);
+
+      // Regla de Oro: Cancelar inmediatamente el temporizador de la petición anterior si existía
+      if (debounceTimer.current) {
+        clearTimeout(debounceTimer.current);
+      }
+
+      // Crear el temporizador de 500ms antes de disparar la navegación/fetch a SQL
+      debounceTimer.current = setTimeout(() => {
+        // Volvemos a leer params frescos justo antes de navegar para evitar colisiones
+        const freshParams = new URLSearchParams(window.location.search);
+        freshParams.set("from", newFromStr);
+        if (newToStr) freshParams.set("to", newToStr);
+        else freshParams.delete("to");
+        
+        router.replace(`${pathname}?${freshParams.toString()}`, { scroll: false });
+      }, 500);
     },
-    [pathname, router, searchParams],
+    // Limpiamos dependencias volátiles (como searchParams) para estabilizar el timer
+    [pathname, router],
   );
 
   const handleSucursalChange = useCallback(
@@ -104,7 +144,7 @@ export function ReportFilters({ sucursales }: Props) {
 
       {/* ── Permanentes: siempre visibles en cualquier ruta de /dashboard ── */}
       <div className="shrink-0">
-        <DateRangePicker value={dateRange} onChange={handleDateChange} />
+        <DateRangePicker value={localDateRange} onChange={handleDateChange} />
       </div>
 
       <Select value={sucursalParam ?? "all"} onValueChange={handleSucursalChange}>
