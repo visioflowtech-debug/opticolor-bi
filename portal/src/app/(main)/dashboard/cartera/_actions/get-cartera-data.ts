@@ -2,9 +2,11 @@
 
 import { unstable_cache } from "next/cache";
 
+import * as mssql from "mssql";
 import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
+import { getUserAllowedSucursales } from "@/lib/security";
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -56,7 +58,7 @@ type Params = {
   sucursalId: number | null;
 };
 
-type FetchParams = Params & { userId: number; isSupervisor: boolean };
+type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
@@ -71,7 +73,7 @@ type ClienteDeudorRow = { nombre_sucursal: string; nombre_completo: string; mont
 
 const fetchCarteraData = unstable_cache(
   async (params: FetchParams): Promise<CarteraData> => {
-    const { startDate, endDate, sucursalId, userId, isSupervisor } = params;
+    const { startDate, endDate, sucursalId, allowedSucursales, isSupervisor } = params;
 
     const pool = await getConnection();
 
@@ -87,7 +89,7 @@ const fetchCarteraData = unstable_cache(
         .input("startYM",      startYM)
         .input("endYM",        endYM)
         .input("sucursalId",   sucursalId)
-        .input("userId",       userId)
+        .input("allowedSucursales", mssql.VarChar, allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
 
     // ── 10 queries en paralelo ───────────────────────────────────────────────
@@ -273,9 +275,11 @@ export async function getCarteraData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
 
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+
     const data = await fetchCarteraData({
       ...params,
-      userId:       auth.userId,
+      allowedSucursales,
       isSupervisor: auth.isSupervisor,
     });
     return { success: true, data };

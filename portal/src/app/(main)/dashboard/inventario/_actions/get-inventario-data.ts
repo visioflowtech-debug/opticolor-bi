@@ -2,9 +2,11 @@
 
 import { unstable_cache } from "next/cache";
 
+import * as mssql from "mssql"; // Forzar recarga limpia
 import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
+import { getUserAllowedSucursales } from "@/lib/security";
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -43,7 +45,7 @@ type Params = {
   grupoFilter: string | null;
 };
 
-type FetchParams = Params & { userId: number; isSupervisor: boolean };
+type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
@@ -77,7 +79,7 @@ const EXCLUSION = `AND dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS')`;
 // tiene su propio slot; userId/isSupervisor aseguran aislamiento entre usuarios.
 const fetchInventarioData = unstable_cache(
   async (params: FetchParams): Promise<InventarioData> => {
-    const { startDate, endDate, sucursalId, marcaFilter, grupoFilter, userId, isSupervisor } = params;
+    const { startDate, endDate, sucursalId, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
 
     const pool = await getConnection();
 
@@ -97,7 +99,7 @@ const fetchInventarioData = unstable_cache(
         .input("startDate",    startDate)
         .input("endDate",      endDate)
         .input("sucursalId",   sucursalId)
-        .input("userId",       userId)
+        .input("allowedSucursales", mssql.VarChar, allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
       if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
       if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
@@ -265,9 +267,11 @@ export async function getInventarioData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
 
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+
     const data = await fetchInventarioData({
       ...params,
-      userId:       auth.userId,
+      allowedSucursales,
       isSupervisor: auth.isSupervisor,
     });
     return { success: true, data };

@@ -4,21 +4,12 @@ export function buildSucursalFilter(tableAlias = ""): string {
     AND (
       (
         @isSupervisor = 1
-        AND ${col} IN (
-          SELECT id_sucursal
-          FROM dbo.Seguridad_Usuarios_Sucursales
-          WHERE id_usuario = @userId AND esta_vigente = 1
-        )
+        AND ${col} IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@allowedSucursales, ','))
       )
       OR (
         @isSupervisor = 0
-        AND ${col} IN (
-          SELECT id_sucursal
-          FROM dbo.Seguridad_Usuarios_Sucursales
-          WHERE id_usuario = @userId
-            AND esta_vigente = 1
-            AND (@sucursalId IS NULL OR id_sucursal = @sucursalId)
-        )
+        AND ${col} IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@allowedSucursales, ','))
+        AND (@sucursalId IS NULL OR ${col} = @sucursalId)
       )
     )`;
 }

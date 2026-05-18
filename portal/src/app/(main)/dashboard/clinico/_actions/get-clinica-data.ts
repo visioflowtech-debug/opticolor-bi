@@ -2,9 +2,11 @@
 
 import { unstable_cache } from "next/cache";
 
+import * as mssql from "mssql";
 import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
+import { getUserAllowedSucursales } from "@/lib/security";
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -60,7 +62,7 @@ type Params = {
   sucursalId: number | null;
 };
 
-type FetchParams = Params & { userId: number; isSupervisor: boolean };
+type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
@@ -90,7 +92,7 @@ const MESES = [
 
 const fetchClinicaData = unstable_cache(
   async (params: FetchParams): Promise<ClinicaData> => {
-    const { startDate, endDate, sucursalId, userId, isSupervisor } = params;
+    const { startDate, endDate, sucursalId, allowedSucursales, isSupervisor } = params;
 
     const pool = await getConnection();
 
@@ -100,7 +102,7 @@ const fetchClinicaData = unstable_cache(
         .input("startDate",    startDate)
         .input("endDate",      endDate)
         .input("sucursalId",   sucursalId)
-        .input("userId",       userId)
+        .input("allowedSucursales", mssql.VarChar, allowedSucursales) // Seguridad parametrizada globalmente
         .input("isSupervisor", isSupervisor ? 1 : 0);
 
     // ── 6 queries en paralelo (reducido desde 7) ─────────────────────────────
@@ -276,9 +278,11 @@ export async function getClinicaData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
 
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+
     const data = await fetchClinicaData({
       ...params,
-      userId:       auth.userId,
+      allowedSucursales,
       isSupervisor: auth.isSupervisor,
     });
     return { success: true, data };
