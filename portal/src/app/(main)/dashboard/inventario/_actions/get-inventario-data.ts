@@ -81,12 +81,15 @@ const fetchInventarioData = unstable_cache(
 
     const pool = await getConnection();
 
-    // Filtros opcionales para la tabla agregada (columnas nativas: marca, grupo)
-    const marcaSqlAgg = marcaFilter ? "AND da.marca = @marcaFilter" : "";
-    const grupoSqlAgg = grupoFilter ? "AND da.grupo = @grupoFilter" : "";
+    // Blindaje de Filtros Vacíos/Globales ("TODOS", "%")
+    const isAll = (val: string | null) => !val || val.toUpperCase() === 'TODOS' || val === '%';
+
+    // Filtros opcionales para la tabla de inventario (columnas nativas: marca, grupo)
+    const marcaSqlAgg = !isAll(marcaFilter) ? "AND fi.Marca = @marcaFilter" : "";
+    const grupoSqlAgg = !isAll(grupoFilter) ? "AND fi.Segmento_Comercial = @grupoFilter" : "";
 
     // Filtro opcional para Dash_Ventas_Resumen (columna via JOIN Dim_Productos)
-    const marcaSql = marcaFilter ? "AND dp.Marca = @marcaFilter" : "";
+    const marcaSql = !isAll(marcaFilter) ? "AND dp.Marca = @marcaFilter" : "";
 
     const req = () => {
       let r = pool
@@ -119,36 +122,32 @@ const fetchInventarioData = unstable_cache(
       facturasRes,    // Conteo de facturas únicas (denominador UPT)
     ] = await Promise.all([
 
-      // ── [QUERY 1] Inventario por Marca (Dash_Inventario_Agregado) ───────────
+      // ── [QUERY 1] Inventario por Marca (Fact_Inventario optimizada) ───────────
       //
-      // Fuente: tabla de totales pre-calculados — sin JOIN con Dim_Productos,
-      // sin GROUPING SETS, sin derived tables. Una lectura directa sobre el
-      // snapshot más reciente ≤ @endDate.
-      //
-      // @snapshotDate: MAX(fecha_foto DATE) ≤ @endDate.
-      // El total global (stock + capital) se calcula en TypeScript O(n)
-      // sumando todas las filas por marca — cero round-trips adicionales.
+      // Fuente: Fact_Inventario — lectura directa sobre el snapshot
+      // más reciente <= @endDate (usando la nueva columna nativa fecha_foto_date).
+      // Catálogo embebido, sin JOINs a Dim_Productos.
       req().query(`
         DECLARE @snapshotDate DATE = (
-          SELECT MAX(da_inner.fecha_foto)
-          FROM dbo.Dash_Inventario_Agregado da_inner
-          WHERE da_inner.fecha_foto <= CAST(@endDate AS DATE)
-            AND da_inner.grupo NOT IN ('LENTES', 'TRATAMIENTOS')
-            ${buildSucursalFilter("da_inner")}
+          SELECT MAX(fi_inner.fecha_foto_date)
+          FROM dbo.Fact_Inventario fi_inner
+          WHERE fi_inner.fecha_foto_date <= @endDate
+            AND fi_inner.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS')
+            ${buildSucursalFilter("fi_inner")}
         );
 
         SELECT
-          da.marca                              AS marca,
-          ISNULL(SUM(da.stock_total),  0)       AS stockFisico,
-          ISNULL(SUM(da.valor_total),  0)       AS capitalInvertido
-        FROM dbo.Dash_Inventario_Agregado da
-        WHERE da.fecha_foto = @snapshotDate
-          AND da.grupo NOT IN ('LENTES', 'TRATAMIENTOS')
+          fi.Marca                                      AS marca,
+          ISNULL(SUM(fi.cantidad_disponible),  0)       AS stockFisico,
+          ISNULL(SUM(fi.valor_total_inventario),  0)    AS capitalInvertido
+        FROM dbo.Fact_Inventario fi
+        WHERE fi.fecha_foto_date = @snapshotDate
+          AND fi.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS')
           ${marcaSqlAgg}
           ${grupoSqlAgg}
-          ${buildSucursalFilter("da")}
-        GROUP BY da.marca
-        ORDER BY SUM(da.stock_total) DESC
+          ${buildSucursalFilter("fi")}
+        GROUP BY fi.Marca
+        ORDER BY SUM(fi.cantidad_disponible) DESC
       `),
 
       // ── [QUERY 2] Ventas fusionadas: Por Marca + Por Grupo (flujo) ──────────
