@@ -39,11 +39,12 @@ export default async function Layout({ children }: Readonly<{ children: ReactNod
           "[html[data-content-layout=centered]_&>*]:w-full",
           "[html[data-content-layout=centered]_&>*]:max-w-screen-2xl",
           "peer-data-[variant=inset]:border",
+          "flex flex-1 flex-col min-w-0 overflow-hidden",
         )}
       >
         <SessionWatcher />
         <DashboardHeader sucursales={sucursalesResult.data} />
-        <div className="h-full p-4 md:p-6">{children}</div>
+        <div className="h-full pt-4 md:pt-6">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );

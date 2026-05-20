@@ -68,11 +68,14 @@ function TreemapCell(props: {
   if (depth === 0) return <g />;
 
   const color = PALETTE[index % PALETTE.length];
-  const showLabel = width > 64 && height > 44;
-  const showPct   = width > 64 && height > 66;
+  const showLabel = width > 80 && height > 48;
+  const showPct   = width > 80 && height > 72;
 
   return (
     <g>
+      <clipPath id={`tc-${index}`}>
+        <rect x={x + 4} y={y + 4} width={width - 8} height={height - 8} />
+      </clipPath>
       <rect
         x={x + 2}
         y={y + 2}
@@ -85,11 +88,12 @@ function TreemapCell(props: {
       />
       {showLabel && (
         <text
+          clipPath={`url(#tc-${index})`}
           x={x + width / 2}
           y={y + height / 2 + (showPct ? -8 : 5)}
           textAnchor="middle"
           fill="white"
-          fontSize={12}
+          fontSize={10}
           fontWeight={600}
           className="select-none"
         >
@@ -98,11 +102,12 @@ function TreemapCell(props: {
       )}
       {showPct && (
         <text
+          clipPath={`url(#tc-${index})`}
           x={x + width / 2}
           y={y + height / 2 + 10}
           textAnchor="middle"
           fill="rgba(255,255,255,0.75)"
-          fontSize={11}
+          fontSize={10}
           className="select-none"
         >
           {porcentaje.toFixed(1)}%

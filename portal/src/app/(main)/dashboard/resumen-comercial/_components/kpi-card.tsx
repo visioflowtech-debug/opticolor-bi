@@ -92,7 +92,7 @@ export function KpiCard({
   const ValueEl = (
     <p
       className={cn(
-        "mt-4 text-2xl font-bold tabular-nums leading-none",
+        "mt-4 text-2xl md:text-3xl font-bold tabular-nums leading-none",
         fullValue && "cursor-default underline decoration-dashed decoration-muted-foreground/40 underline-offset-4",
         highlight && "text-foreground",
       )}

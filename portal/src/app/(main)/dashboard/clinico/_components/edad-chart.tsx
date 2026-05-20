@@ -87,10 +87,12 @@ export function EdadChart({ data }: Props) {
           dataKey="rango_edad_descripcion"
           type="category"
           tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-          tickLine={false}
-          axisLine={false}
           angle={-45}
           textAnchor="end"
+          height={70}
+          interval={0}
+          tickLine={false}
+          axisLine={false}
         />
         <YAxis
           type="number"

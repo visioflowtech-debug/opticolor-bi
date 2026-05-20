@@ -88,6 +88,7 @@ export function VolumenConversionChart({ data }: Props) {
         <XAxis
           dataKey="mes_examen_nombre"
           tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          angle={-45} textAnchor="end" height={70} interval={0}
           tickLine={false}
           axisLine={false}
           tickMargin={10}

@@ -1,4 +1,7 @@
-import mssql from "mssql";
+import * as mssql from "mssql";
+
+export const VarChar = mssql.VarChar;
+export const Int = mssql.Int;
 
 declare global {
   // Permite que sqlPool coexista en el espacio global de ejecución en entornos Serverless/Node

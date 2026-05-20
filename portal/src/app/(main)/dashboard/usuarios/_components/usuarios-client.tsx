@@ -121,7 +121,7 @@ export default function UsuariosClient({ data, roles, sucursales, currentUserId 
         </div>
 
         {/* Tabla */}
-        <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
+        <div className="w-full overflow-x-auto pb-2">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50 hover:bg-muted/50">

@@ -1,11 +1,11 @@
-import * as mssql from "mssql";
+import { Int } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import { getConnection } from "@/lib/db";
 
 async function fetchUserAllowedSucursales(userId: number): Promise<string> {
   const pool = await getConnection();
   const result = await pool.request()
-    .input("userId", mssql.Int, userId)
+    .input("userId", Int, userId)
     .query(`
       SELECT id_sucursal
       FROM dbo.Seguridad_Usuarios_Sucursales

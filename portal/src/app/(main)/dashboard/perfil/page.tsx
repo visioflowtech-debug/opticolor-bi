@@ -90,7 +90,7 @@ export default async function PerfilPage() {
   const isSupervisor = user.nivel_jerarquico === 4;
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-6">
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       <h1 className="text-3xl font-bold tracking-tight">Mi Perfil</h1>
 
       <div className="grid grid-cols-1 gap-6 md:grid-cols-3">

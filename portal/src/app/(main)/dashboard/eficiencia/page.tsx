@@ -49,7 +49,7 @@ export default async function EficienciaPage({
   const { kpis } = data;
 
   return (
-    <div className="flex flex-col gap-6 overflow-hidden pb-10">
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
@@ -58,7 +58,7 @@ export default async function EficienciaPage({
       )}
 
       {/* ── Fila 1: KPIs ────────── */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Órdenes Hoy"
           value={kpis.ordenesHoy.toLocaleString("en-US")}
@@ -94,8 +94,8 @@ export default async function EficienciaPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-            <TendenciaOrdenesChart data={data.tendencia} />
-          </CardContent>
+          <TendenciaOrdenesChart data={data.tendencia} />
+        </CardContent>
       </Card>
 
       {/* ── Fila 3: Detalle por Tipo y Órdenes por Sucursal ────────── */}

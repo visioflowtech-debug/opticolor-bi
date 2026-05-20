@@ -36,14 +36,7 @@ export default async function UsuariosPage() {
   ]);
 
   return (
-    <div className="flex h-full w-full flex-col gap-6">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-bold tracking-tight">Gestión de Usuarios</h1>
-        <p className="text-muted-foreground text-sm">
-          Administra usuarios, roles y accesos a sucursales del sistema.
-        </p>
-      </div>
-
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       <UsuariosClient
         data={usuariosResult.data}
         roles={rolesResult.data}

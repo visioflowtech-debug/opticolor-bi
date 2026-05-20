@@ -2,7 +2,6 @@
 
 import { unstable_cache } from "next/cache";
 
-import * as mssql from "mssql";
 import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
@@ -99,7 +98,7 @@ const fetchResumenData = unstable_cache(
         .input("startYM", startYM)
         .input("endYM", endYM)
         .input("sucursalId", sucursalId)
-        .input("allowedSucursales", mssql.VarChar, allowedSucursales)
+        .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
 
     // ── 7 consultas en paralelo (reducidas desde 11) ─────────────────────────

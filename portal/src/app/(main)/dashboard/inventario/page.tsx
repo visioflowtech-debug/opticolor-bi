@@ -69,7 +69,7 @@ export default async function InventarioPage({
     kpis.unidadesVendidas > 0 ? kpis.ventaNetaProducto / kpis.unidadesVendidas : 0;
 
   return (
-    <div className="flex flex-col gap-6 overflow-hidden">
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
@@ -79,7 +79,7 @@ export default async function InventarioPage({
 
       {/* ── Fila 1: 5 KPI Cards ────────────────────────────────────────────────
           grid-cols-1 → sm:grid-cols-2 → lg:grid-cols-3 → xl:grid-cols-5       */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <KpiCard
           title="Stock Físico"
           value={formatCompactNumber(kpis.stockFisico)}

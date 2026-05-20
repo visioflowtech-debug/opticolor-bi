@@ -36,7 +36,7 @@ const IsComingSoon = () => (
 
 export function NavMain({ items }: NavMainProps) {
   const pathname = usePathname();
-  const { state, isMobile } = useSidebar();
+  const { state, isMobile, setOpenMobile } = useSidebar();
 
   const isItemActive = (url: string, subItems?: NavMainItem["subItems"]) => {
     if (subItems?.length) {
@@ -64,7 +64,7 @@ export function NavMain({ items }: NavMainProps) {
                         tooltip={item.title}
                         isActive={pathname === item.url}
                       >
-                        <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined}>
+                        <Link prefetch={false} href={item.url} target={item.newTab ? "_blank" : undefined} onClick={() => { if (isMobile) setOpenMobile(false); }}>
                           {item.icon && <item.icon />}
                           <span>{item.title}</span>
                           {item.comingSoon && <IsComingSoon />}
@@ -98,7 +98,7 @@ export function NavMain({ items }: NavMainProps) {
                                 aria-disabled={subItem.comingSoon}
                                 isActive={pathname === subItem.url}
                               >
-                                <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
+                                <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined} onClick={() => { if (isMobile) setOpenMobile(false); }}>
                                   {subItem.icon && <subItem.icon className="[&>svg]:text-sidebar-foreground" />}
                                   <span>{subItem.title}</span>
                                   {subItem.comingSoon && <IsComingSoon />}
@@ -132,7 +132,7 @@ export function NavMain({ items }: NavMainProps) {
                           {item.subItems.map((subItem) => (
                             <SidebarMenuSubItem key={subItem.title}>
                               <SidebarMenuSubButton aria-disabled={subItem.comingSoon} isActive={pathname === subItem.url} asChild>
-                                <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined}>
+                                <Link prefetch={false} href={subItem.url} target={subItem.newTab ? "_blank" : undefined} onClick={() => { if (isMobile) setOpenMobile(false); }}>
                                   {subItem.icon && <subItem.icon />}
                                   <span>{subItem.title}</span>
                                   {subItem.comingSoon && <IsComingSoon />}

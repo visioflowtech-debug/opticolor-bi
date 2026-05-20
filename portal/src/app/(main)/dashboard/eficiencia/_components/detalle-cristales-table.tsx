@@ -28,8 +28,8 @@ export function DetalleCristalesTable({ data }: Props) {
   const sortedData = [...data].sort((a, b) => b.volumen_ordenes - a.volumen_ordenes);
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-      <Table>
+    <div className="w-full overflow-x-auto pb-2">
+      <Table className="min-w-[520px]">
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead className="font-semibold text-xs uppercase tracking-wider">Tipo de Lente</TableHead>

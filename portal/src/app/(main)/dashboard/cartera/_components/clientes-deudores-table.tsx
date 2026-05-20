@@ -31,8 +31,8 @@ export function ClientesDeudoresTable({ data }: Props) {
   }
 
   return (
-    <div className="rounded-xl border bg-card shadow-sm overflow-hidden">
-      <Table>
+    <div className="w-full overflow-x-auto pb-2">
+      <Table className="min-w-[700px]">
         <TableHeader>
           <TableRow className="bg-muted/50 hover:bg-muted/50">
             <TableHead className="font-semibold text-xs uppercase tracking-wider">Sucursal</TableHead>

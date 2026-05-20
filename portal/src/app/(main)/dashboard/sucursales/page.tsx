@@ -35,11 +35,7 @@ export default async function SucursalesPage() {
   const sucursales = await getSucursales();
 
   return (
-    <div className="flex h-full w-full flex-col p-6 gap-6">
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight">Gestión de Sucursales</h1>
-
-      </div>
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       <SucursalesClient data={sucursales} />
     </div>
   );

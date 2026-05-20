@@ -50,7 +50,7 @@ export default async function ClinicaPage({
   const { kpis } = data;
 
   return (
-    <div className="flex flex-col gap-6 overflow-hidden pb-10">
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
@@ -59,7 +59,7 @@ export default async function ClinicaPage({
       )}
 
       {/* ── Fila 1: KPIs ────────── */}
-      <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           title="Exámenes Hoy"
           value={kpis.examenesHoy.toLocaleString("en-US")}
@@ -106,9 +106,7 @@ export default async function ClinicaPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[500px]">
-            <TendenciaExamenesChart data={data.tendencia} />
-          </div>
+          <TendenciaExamenesChart data={data.tendencia} />
         </CardContent>
       </Card>
 
@@ -121,9 +119,7 @@ export default async function ClinicaPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[500px]">
-              <GeneroChart data={data.genero} />
-            </div>
+            <GeneroChart data={data.genero} />
           </CardContent>
         </Card>
 
@@ -134,9 +130,7 @@ export default async function ClinicaPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[500px]">
-              <EdadChart data={data.edad} />
-            </div>
+            <EdadChart data={data.edad} />
           </CardContent>
         </Card>
       </div>
@@ -152,9 +146,7 @@ export default async function ClinicaPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[500px]">
-              <TopSucursalesClinicaChart data={data.topSucursales} />
-            </div>
+            <TopSucursalesClinicaChart data={data.topSucursales} />
           </CardContent>
         </Card>
 
@@ -165,9 +157,7 @@ export default async function ClinicaPage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="h-[500px]">
-              <VolumenConversionChart data={data.volumenConversion} />
-            </div>
+            <VolumenConversionChart data={data.volumenConversion} />
           </CardContent>
         </Card>
       </div>

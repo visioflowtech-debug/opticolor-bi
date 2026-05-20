@@ -1,4 +1,4 @@
-import { format, subDays, startOfMonth } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -58,7 +58,7 @@ export default async function ResumenComercialPage({
   const pendienteCobro = kpis.ventaNeta - kpis.totalCobrado;
 
   return (
-    <div className="flex flex-col gap-6 overflow-hidden">
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
@@ -66,9 +66,8 @@ export default async function ResumenComercialPage({
         </div>
       )}
 
-      {/* ── Fila 1: KPIs monetarios (5 columnas máximo en desktop) ──────────
-          grid-cols-1 → sm:grid-cols-2 → lg:grid-cols-3 → xl:grid-cols-5       */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      {/* ── KPIs Principales (8 Tarjetas) ────────── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <KpiCard
           title="Venta Neta"
           value={formatCompactCurrency(kpis.ventaNeta)}
@@ -106,11 +105,6 @@ export default async function ResumenComercialPage({
           fullValue={formatCurrency(kpis.ventaNetaYTD)}
           iconName="dollar-sign"
         />
-      </div>
-
-      {/* ── Fila 2: KPIs de conteo (3 columnas máximo en desktop) ────────────
-          grid-cols-1 → sm:grid-cols-2 → xl:grid-cols-3                        */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         <KpiCard
           title="Ordenes Facturadas"
           value={formatCompactNumber(kpis.cantidadPedidos)}
@@ -164,9 +158,7 @@ export default async function ResumenComercialPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-72">
-            <VentasChart data={data.ventasDiarias} />
-          </div>
+          <VentasChart data={data.ventasDiarias} />
         </CardContent>
       </Card>
     </div>

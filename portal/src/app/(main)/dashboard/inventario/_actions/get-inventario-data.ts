@@ -2,7 +2,6 @@
 
 import { unstable_cache } from "next/cache";
 
-import * as mssql from "mssql"; // Forzar recarga limpia
 import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
@@ -99,7 +98,7 @@ const fetchInventarioData = unstable_cache(
         .input("startDate",    startDate)
         .input("endDate",      endDate)
         .input("sucursalId",   sucursalId)
-        .input("allowedSucursales", mssql.VarChar, allowedSucursales)
+        .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
       if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
       if (grupoFilter) r = r.input("grupoFilter", grupoFilter);

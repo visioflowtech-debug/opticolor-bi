@@ -28,11 +28,13 @@ export default async function UsuarioDetallePage({ params }: Props) {
   if (!usuarioResult.success || !usuarioResult.data) notFound();
 
   return (
-    <UsuarioDetalleClient
-      usuario={usuarioResult.data}
-      roles={rolesResult.data}
-      todasSucursales={sucursalesResult.data}
-      currentUserId={Number(session.user.id)}
-    />
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
+      <UsuarioDetalleClient
+        usuario={usuarioResult.data}
+        roles={rolesResult.data}
+        todasSucursales={sucursalesResult.data}
+        currentUserId={Number(session.user.id)}
+      />
+    </div>
   );
 }

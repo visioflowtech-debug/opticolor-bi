@@ -22,15 +22,15 @@ interface Props {
 }
 
 export function ReportFilters({ sucursales }: Props) {
-  const router      = useRouter();
-  const pathname    = usePathname();
+  const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const fromParam     = searchParams.get("from");
-  const toParam       = searchParams.get("to");
+  const fromParam = searchParams.get("from");
+  const toParam = searchParams.get("to");
   const sucursalParam = searchParams.get("sucursal");
-  const marcaParam    = searchParams.get("marca");
-  const grupoParam    = searchParams.get("grupo");
+  const marcaParam = searchParams.get("marca");
+  const grupoParam = searchParams.get("grupo");
 
   const isInventario = pathname.startsWith("/dashboard/inventario");
 
@@ -47,19 +47,14 @@ export function ReportFilters({ sucursales }: Props) {
           setGrupos(data.grupos);
         }
       })
-      .catch(() => {/* fail silently — los selects simplemente no aparecen */});
+      .catch(() => {/* fail silently — los selects simplemente no aparecen */ });
   }, [isInventario]);
-
-  const dateRange: DateRange = {
-    from: fromParam ? new Date(fromParam) : startOfMonth(new Date()),
-    to:   toParam   ? new Date(toParam)   : new Date(),
-  };
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
   const [localDateRange, setLocalDateRange] = useState<DateRange>({
     from: fromParam ? new Date(fromParam) : startOfMonth(new Date()),
-    to:   toParam   ? new Date(toParam)   : new Date(),
+    to: toParam ? new Date(toParam) : new Date(),
   });
 
   // (El useEffect de sincronización cruzada fue removido para evitar el bucle de "Double-Fetch")
@@ -101,7 +96,7 @@ export function ReportFilters({ sucursales }: Props) {
         freshParams.set("from", newFromStr);
         if (newToStr) freshParams.set("to", newToStr);
         else freshParams.delete("to");
-        
+
         router.replace(`${pathname}?${freshParams.toString()}`, { scroll: false });
       }, 500);
     },
@@ -140,61 +135,68 @@ export function ReportFilters({ sucursales }: Props) {
   );
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 overflow-x-auto pb-1 sm:w-auto sm:pb-0">
+    <div className="flex w-full items-center gap-2 overflow-x-auto pb-0.5 xl:overflow-visible xl:flex-nowrap md:w-auto">
 
       {/* ── Permanentes: siempre visibles en cualquier ruta de /dashboard ── */}
-      <div className="shrink-0">
+      <div className="shrink-0 min-w-[150px] md:min-w-[180px] xl:min-w-[220px]">
         <DateRangePicker value={localDateRange} onChange={handleDateChange} />
       </div>
 
-      <Select value={sucursalParam ?? "all"} onValueChange={handleSucursalChange}>
-        <SelectTrigger className="h-9 min-w-[150px] flex-1 gap-1.5 text-sm sm:min-w-[160px] sm:flex-none">
-          <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-          <SelectValue placeholder="Todas las sucursales" />
-        </SelectTrigger>
-        <SelectContent align="end">
-          <SelectItem value="all">Todas las sucursales</SelectItem>
-          {sucursales.map((s) => (
-            <SelectItem key={s.id_sucursal} value={String(s.id_sucursal)}>
-              {s.nombre_sucursal}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <div className="shrink-0 min-w-[150px] md:min-w-[180px] xl:min-w-[220px]">
+        <Select value={sucursalParam ?? "all"} onValueChange={handleSucursalChange}>
+          <SelectTrigger className="h-9 w-full gap-1.5 text-sm">
+            <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            <SelectValue placeholder="Todas las sucursales" />
+          </SelectTrigger>
+          <SelectContent align="end">
+            <SelectItem value="all">Todas las sucursales</SelectItem>
+            {sucursales.map((s) => (
+              <SelectItem key={s.id_sucursal} value={String(s.id_sucursal)}>
+                {s.nombre_sucursal}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
       {/* ── Dinámicos: solo en /dashboard/inventario, carga lazy ─────────── */}
       {isInventario && marcas.length > 0 && (
-        <Select value={marcaParam ?? "all"} onValueChange={handleMarcaChange}>
-          <SelectTrigger className="h-9 min-w-[130px] flex-1 gap-1.5 text-sm sm:min-w-[140px] sm:flex-none">
-            <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <SelectValue placeholder="Todas las marcas" />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="all">Todas las marcas</SelectItem>
-            {marcas.map((m) => (
-              <SelectItem key={m} value={m}>
-                {m}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="shrink-0 min-w-[130px] md:min-w-[150px] xl:min-w-[180px]">
+          <Select value={marcaParam ?? "all"} onValueChange={handleMarcaChange}>
+            <SelectTrigger className="h-9 w-full gap-1.5 text-sm">
+              <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <SelectValue placeholder="Todas las marcas" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="all">Todas las marcas</SelectItem>
+              {marcas.map((m) => (
+                <SelectItem key={m} value={m}>
+                  {m}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
 
+      {/* ── Dinámicos: solo en /dashboard/inventario, carga lazy ─────────── */}
       {isInventario && grupos.length > 0 && (
-        <Select value={grupoParam ?? "all"} onValueChange={handleGrupoChange}>
-          <SelectTrigger className="h-9 min-w-[130px] flex-1 gap-1.5 text-sm sm:min-w-[140px] sm:flex-none">
-            <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <SelectValue placeholder="Todos los grupos" />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="all">Todos los grupos</SelectItem>
-            {grupos.map((g) => (
-              <SelectItem key={g} value={g}>
-                {g}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="shrink-0 min-w-[130px] md:min-w-[150px] xl:min-w-[180px]">
+          <Select value={grupoParam ?? "all"} onValueChange={handleGrupoChange}>
+            <SelectTrigger className="h-9 w-full gap-1.5 text-sm">
+              <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <SelectValue placeholder="Todos los grupos" />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="all">Todos los grupos</SelectItem>
+              {grupos.map((g) => (
+                <SelectItem key={g} value={g}>
+                  {g}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       )}
     </div>
   );

@@ -97,10 +97,12 @@ export function TipoLenteChart({ data }: Props) {
             type="category"
             tickFormatter={truncateLabel}
             tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
-            tickLine={false}
-            axisLine={false}
             angle={-45}
             textAnchor="end"
+            height={70}
+            interval={0}
+            tickLine={false}
+            axisLine={false}
           />
           <YAxis
             type="number"

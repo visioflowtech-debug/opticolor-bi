@@ -1,4 +1,4 @@
-import { format, subDays, startOfMonth } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -52,7 +52,7 @@ export default async function CarteraPage({
   const { kpis } = data;
 
   return (
-    <div className="flex flex-col gap-6 overflow-hidden pb-10">
+    <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
@@ -61,7 +61,7 @@ export default async function CarteraPage({
       )}
 
       {/* ── Fila 1: KPIs ────────── */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           title="Monto Ordenes"
           value={formatCompactCurrency(kpis.montoPedidos)}
@@ -109,8 +109,8 @@ export default async function CarteraPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-            <GapCobroChart data={data.gapCobro} />
-          </CardContent>
+          <GapCobroChart data={data.gapCobro} />
+        </CardContent>
       </Card>
 
       {/* ── Fila 3: Mix de Ventas y Cartera por Sucursal ────────── */}
