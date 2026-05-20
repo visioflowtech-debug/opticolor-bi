@@ -138,7 +138,7 @@ export function ReportFilters({ sucursales }: Props) {
     <div className="flex w-full items-center gap-2 overflow-x-auto pb-0.5 xl:overflow-visible xl:flex-nowrap md:w-auto">
 
       {/* ── Permanentes: siempre visibles en cualquier ruta de /dashboard ── */}
-      <div className="shrink-0 min-w-[150px] md:min-w-[180px] xl:min-w-[220px]">
+      <div className="shrink-0 w-full sm:w-auto">
         <DateRangePicker value={localDateRange} onChange={handleDateChange} />
       </div>
 
