@@ -29,8 +29,8 @@ const THEME_CYCLE = ["light", "dark", "system"] as const;
 type ThemeMode = (typeof THEME_CYCLE)[number];
 
 const THEME_LABELS: Record<ThemeMode, string> = {
-  light:  "Claro",
-  dark:   "Oscuro",
+  light: "Claro",
+  dark: "Oscuro",
   system: "Sistema",
 };
 
@@ -39,12 +39,12 @@ export function NavUser() {
   const { data: session, status } = useSession();
   const [prefsOpen, setPrefsOpen] = useState(false);
 
-  const themeMode  = usePreferencesStore((s) => s.themeMode);
+  const themeMode = usePreferencesStore((s) => s.themeMode);
   const setThemeMode = usePreferencesStore((s) => s.setThemeMode);
 
-  const user   = session?.user;
-  const name   = user?.name  ?? "";
-  const email  = user?.email ?? "";
+  const user = session?.user;
+  const name = user?.name ?? "";
+  const email = user?.email ?? "";
   const avatar = user?.image ?? "";
 
   // Durante carga inicial no renderizar para evitar flash de "Usuario"
@@ -69,7 +69,7 @@ export function NavUser() {
   }
 
   const cycleTheme = () => {
-    const idx       = THEME_CYCLE.indexOf(themeMode as ThemeMode);
+    const idx = THEME_CYCLE.indexOf(themeMode as ThemeMode);
     const nextTheme = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length];
     setThemeMode(nextTheme);
     void persistPreference("theme_mode", nextTheme);
@@ -77,7 +77,7 @@ export function NavUser() {
 
   const ThemeIcon =
     themeMode === "system" ? Monitor :
-    themeMode === "dark"   ? Sun     : Moon;
+      themeMode === "dark" ? Sun : Moon;
 
   return (
     <>
@@ -133,7 +133,7 @@ export function NavUser() {
                 </DropdownMenuItem>
                 <DropdownMenuItem onSelect={() => setPrefsOpen(true)} className="cursor-pointer">
                   <Settings />
-                  Configuración de Cuenta
+                  Configuración de Tema
                 </DropdownMenuItem>
               </DropdownMenuGroup>
 
