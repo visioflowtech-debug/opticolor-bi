@@ -50,7 +50,7 @@ export type ResumenData = {
 type Params = {
   startDate: string; // "YYYY-MM-DD"
   endDate: string;   // "YYYY-MM-DD"
-  sucursalId: number | null;
+  sucursales: string | null; // IDs separados por coma, null = todas
 };
 
 type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
@@ -71,7 +71,7 @@ type MedioPagoRow       = { medioPago: string; monto: number };
 // startDate, endDate, sucursalId) → cada combinación única tiene su propio slot.
 const fetchResumenData = unstable_cache(
   async (params: FetchParams): Promise<ResumenData> => {
-    const { startDate, endDate, sucursalId, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
 
     const pool = await getConnection();
 
@@ -97,7 +97,7 @@ const fetchResumenData = unstable_cache(
         .input("ytdEnd", ytdEnd)
         .input("startYM", startYM)
         .input("endYM", endYM)
-        .input("sucursalId", sucursalId)
+        .input("sucursales", sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
 

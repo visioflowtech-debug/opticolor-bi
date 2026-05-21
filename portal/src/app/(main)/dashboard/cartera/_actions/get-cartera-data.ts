@@ -54,7 +54,7 @@ export type CarteraData = {
 type Params = {
   startDate: string; // "YYYY-MM-DD"
   endDate: string;   // "YYYY-MM-DD"
-  sucursalId: number | null;
+  sucursales: string | null; // IDs separados por coma, null = todas
 };
 
 type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
@@ -72,7 +72,7 @@ type ClienteDeudorRow = { nombre_sucursal: string; nombre_completo: string; mont
 
 const fetchCarteraData = unstable_cache(
   async (params: FetchParams): Promise<CarteraData> => {
-    const { startDate, endDate, sucursalId, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
 
     const pool = await getConnection();
 
@@ -87,7 +87,7 @@ const fetchCarteraData = unstable_cache(
         .input("endDate",      endDate)
         .input("startYM",      startYM)
         .input("endYM",        endYM)
-        .input("sucursalId",   sucursalId)
+        .input("sucursales",   sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
 
@@ -276,11 +276,7 @@ export async function getCarteraData(
 
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
 
-    const data = await fetchCarteraData({
-      ...params,
-      allowedSucursales,
-      isSupervisor: auth.isSupervisor,
-    });
+    const data = await fetchCarteraData({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getCarteraData]", err);

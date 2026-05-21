@@ -88,7 +88,7 @@ export function MediosPagoChart({ data }: Props) {
     <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
       {/* Donut — anillo más grueso y prominente */}
       <SafeChartContainer height="h-52" className="w-52 shrink-0">
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="100%" minHeight={180}>
           <PieChart>
             <Pie
               data={data}

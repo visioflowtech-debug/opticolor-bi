@@ -1,11 +1,11 @@
-import { Int } from "@/lib/db";
+import { VarChar } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import { getConnection } from "@/lib/db";
 
-async function fetchUserAllowedSucursales(userId: number): Promise<string> {
+async function fetchUserAllowedSucursales(userId: number | string): Promise<string> {
   const pool = await getConnection();
   const result = await pool.request()
-    .input("userId", Int, userId)
+    .input("userId", VarChar, String(userId))
     .query(`
       SELECT id_sucursal
       FROM dbo.Seguridad_Usuarios_Sucursales
@@ -20,7 +20,7 @@ async function fetchUserAllowedSucursales(userId: number): Promise<string> {
 }
 
 export const getUserAllowedSucursales = unstable_cache(
-  async (userId: number) => {
+  async (userId: number | string) => {
     return fetchUserAllowedSucursales(userId);
   },
   ["user-permissions"],

@@ -7,15 +7,9 @@ import type { DateRange } from "react-day-picker";
 import { Layers, MapPin, Tag } from "lucide-react";
 
 import { DateRangePicker } from "@/components/date-range-picker";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { MiSucursal } from "../../_actions/get-mis-sucursales";
 import { getMarcasGrupos } from "../../inventario/_actions/get-inventario-filters";
+import { MultiSelectFilter } from "./multi-select-filter";
 
 interface Props {
   sucursales: MiSucursal[];
@@ -34,6 +28,11 @@ export function ReportFilters({ sucursales }: Props) {
 
   const isInventario = pathname.startsWith("/dashboard/inventario");
 
+  // Arrays de selección derivados de los params de la URL
+  const sucursalesSelected = sucursalParam ? sucursalParam.split(",").filter(Boolean) : [];
+  const marcasSelected = marcaParam ? marcaParam.split(",").filter(Boolean) : [];
+  const gruposSelected = grupoParam ? grupoParam.split(",").filter(Boolean) : [];
+
   // Opciones de Marca y Grupo — se cargan solo en la ruta de inventario
   const [marcas, setMarcas] = useState<string[]>([]);
   const [grupos, setGrupos] = useState<string[]>([]);
@@ -47,19 +46,16 @@ export function ReportFilters({ sucursales }: Props) {
           setGrupos(data.grupos);
         }
       })
-      .catch(() => {/* fail silently — los selects simplemente no aparecen */ });
+      .catch(() => {/* fail silently */});
   }, [isInventario]);
 
-  // ── Handlers ──────────────────────────────────────────────────────────────
+  // ── Date Range ────────────────────────────────────────────────────────────
 
   const [localDateRange, setLocalDateRange] = useState<DateRange>({
     from: fromParam ? new Date(fromParam) : startOfMonth(new Date()),
     to: toParam ? new Date(toParam) : new Date(),
   });
 
-  // (El useEffect de sincronización cruzada fue removido para evitar el bucle de "Double-Fetch")
-
-  // 1. Declarar la referencia del temporizador
   const debounceTimer = useRef<NodeJS.Timeout | null>(null);
 
   const handleDateChange = useCallback(
@@ -71,68 +67,64 @@ export function ReportFilters({ sucursales }: Props) {
       const newFromStr = fromDate.toISOString();
       const newToStr = toDate ? toDate.toISOString() : null;
 
-      // Leer la URL actual directo del navegador para evitar cierres (closures) obsoletos
       const currentParams = new URLSearchParams(window.location.search);
       const currentFrom = currentParams.get("from");
       const currentTo = currentParams.get("to");
 
-      // Control Estricto: Abortar si las fechas seleccionadas son idénticas a las ya activas en la URL
-      if (currentFrom === newFromStr && currentTo === newToStr) {
-        return;
-      }
+      if (currentFrom === newFromStr && currentTo === newToStr) return;
 
-      // Actualizar el estado visual local inmediatamente (UX reactivo)
       setLocalDateRange(range);
 
-      // Regla de Oro: Cancelar inmediatamente el temporizador de la petición anterior si existía
-      if (debounceTimer.current) {
-        clearTimeout(debounceTimer.current);
-      }
+      if (debounceTimer.current) clearTimeout(debounceTimer.current);
 
-      // Crear el temporizador de 500ms antes de disparar la navegación/fetch a SQL
       debounceTimer.current = setTimeout(() => {
-        // Volvemos a leer params frescos justo antes de navegar para evitar colisiones
         const freshParams = new URLSearchParams(window.location.search);
         freshParams.set("from", newFromStr);
         if (newToStr) freshParams.set("to", newToStr);
         else freshParams.delete("to");
-
         router.replace(`${pathname}?${freshParams.toString()}`, { scroll: false });
       }, 500);
     },
-    // Limpiamos dependencias volátiles (como searchParams) para estabilizar el timer
     [pathname, router],
   );
 
   const handleSucursalChange = useCallback(
-    (val: string) => {
+    (vals: string[]) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (val === "all") params.delete("sucursal");
-      else params.set("sucursal", val);
+      if (vals.length === 0) params.delete("sucursal");
+      else params.set("sucursal", vals.join(","));
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [pathname, router, searchParams],
   );
 
   const handleMarcaChange = useCallback(
-    (val: string) => {
+    (vals: string[]) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (val === "all") params.delete("marca");
-      else params.set("marca", val);
+      if (vals.length === 0) params.delete("marca");
+      else params.set("marca", vals.join(","));
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [pathname, router, searchParams],
   );
 
   const handleGrupoChange = useCallback(
-    (val: string) => {
+    (vals: string[]) => {
       const params = new URLSearchParams(searchParams.toString());
-      if (val === "all") params.delete("grupo");
-      else params.set("grupo", val);
+      if (vals.length === 0) params.delete("grupo");
+      else params.set("grupo", vals.join(","));
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
     [pathname, router, searchParams],
   );
+
+  const sucursalOptions = sucursales.map((s) => ({
+    value: String(s.id_sucursal),
+    label: s.nombre_sucursal,
+  }));
+
+  const marcaOptions = marcas.map((m) => ({ value: m, label: m }));
+  const grupoOptions = grupos.map((g) => ({ value: g, label: g }));
 
   return (
     <div className="flex w-full items-center gap-2 overflow-x-auto pb-0.5 xl:overflow-visible xl:flex-nowrap md:w-auto">
@@ -143,59 +135,37 @@ export function ReportFilters({ sucursales }: Props) {
       </div>
 
       <div className="shrink-0 min-w-[150px] md:min-w-[180px] xl:min-w-[220px]">
-        <Select value={sucursalParam ?? "all"} onValueChange={handleSucursalChange}>
-          <SelectTrigger className="h-9 w-full gap-1.5 text-sm">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <SelectValue placeholder="Todas las sucursales" />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="all">Todas las sucursales</SelectItem>
-            {sucursales.map((s) => (
-              <SelectItem key={s.id_sucursal} value={String(s.id_sucursal)}>
-                {s.nombre_sucursal}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <MultiSelectFilter
+          options={sucursalOptions}
+          selected={sucursalesSelected}
+          onChange={handleSucursalChange}
+          placeholder="Todas las sucursales"
+          icon={<MapPin className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+        />
       </div>
 
       {/* ── Dinámicos: solo en /dashboard/inventario, carga lazy ─────────── */}
       {isInventario && marcas.length > 0 && (
         <div className="shrink-0 min-w-[130px] md:min-w-[150px] xl:min-w-[180px]">
-          <Select value={marcaParam ?? "all"} onValueChange={handleMarcaChange}>
-            <SelectTrigger className="h-9 w-full gap-1.5 text-sm">
-              <Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <SelectValue placeholder="Todas las marcas" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="all">Todas las marcas</SelectItem>
-              {marcas.map((m) => (
-                <SelectItem key={m} value={m}>
-                  {m}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            options={marcaOptions}
+            selected={marcasSelected}
+            onChange={handleMarcaChange}
+            placeholder="Todas las marcas"
+            icon={<Tag className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          />
         </div>
       )}
 
-      {/* ── Dinámicos: solo en /dashboard/inventario, carga lazy ─────────── */}
       {isInventario && grupos.length > 0 && (
         <div className="shrink-0 min-w-[130px] md:min-w-[150px] xl:min-w-[180px]">
-          <Select value={grupoParam ?? "all"} onValueChange={handleGrupoChange}>
-            <SelectTrigger className="h-9 w-full gap-1.5 text-sm">
-              <Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <SelectValue placeholder="Todos los grupos" />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="all">Todos los grupos</SelectItem>
-              {grupos.map((g) => (
-                <SelectItem key={g} value={g}>
-                  {g}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <MultiSelectFilter
+            options={grupoOptions}
+            selected={gruposSelected}
+            onChange={handleGrupoChange}
+            placeholder="Todos los grupos"
+            icon={<Layers className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          />
         </div>
       )}
     </div>

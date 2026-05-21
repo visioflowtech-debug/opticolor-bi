@@ -39,9 +39,9 @@ export type InventarioData = {
 type Params = {
   startDate: string;
   endDate: string;
-  sucursalId: number | null;
-  marcaFilter: string | null;
-  grupoFilter: string | null;
+  sucursales: string | null;   // IDs separados por coma, null = todas
+  marcaFilter: string | null;  // nombres separados por coma, null = todas
+  grupoFilter: string | null;  // nombres separados por coma, null = todos
 };
 
 type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
@@ -78,26 +78,30 @@ const EXCLUSION = `AND dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS')`;
 // tiene su propio slot; userId/isSupervisor aseguran aislamiento entre usuarios.
 const fetchInventarioData = unstable_cache(
   async (params: FetchParams): Promise<InventarioData> => {
-    const { startDate, endDate, sucursalId, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
 
     const pool = await getConnection();
 
     // Blindaje de Filtros Vacíos/Globales ("TODOS", "%")
     const isAll = (val: string | null) => !val || val.toUpperCase() === 'TODOS' || val === '%';
 
-    // Filtros opcionales para la tabla de inventario (columnas nativas: marca, grupo)
-    const marcaSqlAgg = !isAll(marcaFilter) ? "AND fi.Marca = @marcaFilter" : "";
-    const grupoSqlAgg = !isAll(grupoFilter) ? "AND fi.Segmento_Comercial = @grupoFilter" : "";
-
-    // Filtro opcional para Dash_Ventas_Resumen (columna via JOIN Dim_Productos)
-    const marcaSql = !isAll(marcaFilter) ? "AND dp.Marca = @marcaFilter" : "";
+    // Filtros opcionales — usan STRING_SPLIT para soportar selección múltiple
+    const marcaSqlAgg = !isAll(marcaFilter)
+      ? "AND fi.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
+      : "";
+    const grupoSqlAgg = !isAll(grupoFilter)
+      ? "AND fi.Segmento_Comercial IN (SELECT value FROM STRING_SPLIT(@grupoFilter, ','))"
+      : "";
+    const marcaSql = !isAll(marcaFilter)
+      ? "AND dp.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
+      : "";
 
     const req = () => {
       let r = pool
         .request()
         .input("startDate",    startDate)
         .input("endDate",      endDate)
-        .input("sucursalId",   sucursalId)
+        .input("sucursales",   sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
       if (marcaFilter) r = r.input("marcaFilter", marcaFilter);

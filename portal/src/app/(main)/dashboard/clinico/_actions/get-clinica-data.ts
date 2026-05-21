@@ -58,7 +58,7 @@ export type ClinicaData = {
 type Params = {
   startDate: string; // "YYYY-MM-DD"
   endDate: string;   // "YYYY-MM-DD"
-  sucursalId: number | null;
+  sucursales: string | null; // IDs separados por coma, null = todas
 };
 
 type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
@@ -91,7 +91,7 @@ const MESES = [
 
 const fetchClinicaData = unstable_cache(
   async (params: FetchParams): Promise<ClinicaData> => {
-    const { startDate, endDate, sucursalId, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
 
     const pool = await getConnection();
 
@@ -100,7 +100,7 @@ const fetchClinicaData = unstable_cache(
         .request()
         .input("startDate",    startDate)
         .input("endDate",      endDate)
-        .input("sucursalId",   sucursalId)
+        .input("sucursales",   sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
 

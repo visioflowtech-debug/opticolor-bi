@@ -44,10 +44,9 @@ export default async function CarteraPage({
   const endDate = to
     ? format(new Date(to), "yyyy-MM-dd")
     : format(new Date(), "yyyy-MM-dd");
-  const sucursalId =
-    sucursal && sucursal !== "all" ? parseInt(sucursal, 10) : null;
+  const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
 
-  const result = await getCarteraData({ startDate, endDate, sucursalId });
+  const result = await getCarteraData({ startDate, endDate, sucursales });
   const data = result.data ?? EMPTY_DATA;
   const { kpis } = data;
 

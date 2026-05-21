@@ -47,15 +47,14 @@ export default async function InventarioPage({
   const endDate = to
     ? format(new Date(to), "yyyy-MM-dd")
     : format(new Date(), "yyyy-MM-dd");
-  const sucursalId =
-    sucursal && sucursal !== "all" ? parseInt(sucursal, 10) : null;
+  const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
   const marcaFilter = marca && marca !== "all" ? marca : null;
   const grupoFilter = grupo && grupo !== "all" ? grupo : null;
 
   const result = await getInventarioData({
     startDate,
     endDate,
-    sucursalId,
+    sucursales,
     marcaFilter,
     grupoFilter,
   });
