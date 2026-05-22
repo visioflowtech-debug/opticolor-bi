@@ -1,34 +1,29 @@
 import { format, startOfMonth } from "date-fns";
+import { Suspense } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   formatCompactCurrency,
   formatCompactNumber,
   formatCurrency,
 } from "@/lib/utils";
 
-import { getCarteraData } from "./_actions/get-cartera-data";
+import { getCarteraKPIs } from "./_actions/get-cartera-data";
 import { KpiCard } from "../resumen-comercial/_components/kpi-card";
-import { GapCobroChart } from "./_components/gap-cobro-chart";
-import { MixVentasChart } from "./_components/mix-ventas-chart";
-import { CarteraSucursalChart } from "./_components/cartera-sucursal-chart";
-import { ClientesDeudoresTable } from "./_components/clientes-deudores-table";
+import { GapCobroChartWrapper } from "./_components/gap-cobro-chart-wrapper";
+import { MixVentasChartWrapper } from "./_components/mix-ventas-chart-wrapper";
+import { CarteraSucursalChartWrapper } from "./_components/cartera-sucursal-chart-wrapper";
+import { ClientesDeudoresTableWrapper } from "./_components/clientes-deudores-table-wrapper";
+import { ChartSkeleton, TableSkeleton } from "../_components/skeletons";
 
 type SearchParams = Promise<{ from?: string; to?: string; sucursal?: string }>;
 
-const EMPTY_DATA = {
-  kpis: {
-    montoPedidos: 0,
-    recaudado: 0,
-    saldoPendiente: 0,
-    pedidosLiquidar: 0,
-    pctCobroInmediato: 0,
-    pctNivelAbono: 0,
-  },
-  gapCobro: [],
-  mixVentas: [],
-  carteraSucursal: [],
-  clientesDeudores: [],
+const EMPTY_KPIS = {
+  montoPedidos: 0,
+  recaudado: 0,
+  saldoPendiente: 0,
+  pedidosLiquidar: 0,
+  pctCobroInmediato: 0,
+  pctNivelAbono: 0,
 };
 
 export default async function CarteraPage({
@@ -46,16 +41,15 @@ export default async function CarteraPage({
     : format(new Date(), "yyyy-MM-dd");
   const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
 
-  const result = await getCarteraData({ startDate, endDate, sucursales });
-  const data = result.data ?? EMPTY_DATA;
-  const { kpis } = data;
+  const result = await getCarteraKPIs({ startDate, endDate, sucursales });
+  const kpis = result.data ?? EMPTY_KPIS;
 
   return (
     <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
-          {result.error ?? "No se pudieron cargar los datos. Intenta de nuevo."}
+          {result.error ?? "No se pudieron cargar los datos de KPI. Intenta de nuevo."}
         </div>
       )}
 
@@ -101,53 +95,25 @@ export default async function CarteraPage({
       </div>
 
       {/* ── Fila 2: GAP de Cobro ────────── */}
-      <Card className="overflow-hidden rounded-2xl shadow-md">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Tendencia de la Cartera · GAP de Cobro
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <GapCobroChart data={data.gapCobro} />
-        </CardContent>
-      </Card>
+      <Suspense fallback={<ChartSkeleton title="Tendencia de la Cartera · GAP de Cobro" height="h-72" />}>
+        <GapCobroChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+      </Suspense>
 
       {/* ── Fila 3: Mix de Ventas y Cartera por Sucursal ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Mix de Ventas · Participación y Monto Neto
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MixVentasChart data={data.mixVentas} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Mix de Ventas · Participación y Monto Neto" height="h-64" />}>
+          <MixVentasChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
 
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Cartera Pendiente por Sucursal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CarteraSucursalChart data={data.carteraSucursal} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Cartera Pendiente por Sucursal" height="h-64" />}>
+          <CarteraSucursalChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
       </div>
 
       {/* ── Fila 4: Top Clientes Deudores ────────── */}
-      <Card className="overflow-hidden rounded-2xl shadow-md">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Top 10 de Clientes Deudores
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ClientesDeudoresTable data={data.clientesDeudores} />
-        </CardContent>
-      </Card>
+      <Suspense fallback={<TableSkeleton title="Top 10 de Clientes Deudores" rows={10} />}>
+        <ClientesDeudoresTableWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+      </Suspense>
     </div>
   );
 }

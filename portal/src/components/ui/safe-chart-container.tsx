@@ -14,8 +14,19 @@ interface SafeChartContainerProps {
 
 /** Parses "h-[350px]" → "350px". Returns undefined for non-pixel patterns. */
 function toInlineHeight(cls: string): string | undefined {
-  const m = cls.match(/h-\[(\d+(?:\.\d+)?(?:px|rem|vh))\]/);
-  return m ? m[1] : undefined;
+  const m = cls.match(/h-\[(\d+(?:\.\d+)?(?:px|rem|vh|%))\]/);
+  if (m) return m[1];
+
+  const stdMap: Record<string, string> = {
+    "h-40": "10rem",
+    "h-48": "12rem",
+    "h-52": "13rem",
+    "h-64": "16rem",
+    "h-72": "18rem",
+    "h-80": "20rem",
+    "h-96": "24rem",
+  };
+  return stdMap[cls];
 }
 
 export function SafeChartContainer({

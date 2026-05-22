@@ -1,31 +1,27 @@
 import { format, startOfMonth } from "date-fns";
+import { Suspense } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   formatCompactCurrency,
   formatCompactNumber,
   formatCurrency,
 } from "@/lib/utils";
 
-import { getEficienciaData } from "./_actions/get-eficiencia-data";
+import { getEficienciaKPIs } from "./_actions/get-eficiencia-data";
 import { KpiCard } from "../resumen-comercial/_components/kpi-card";
-import { TendenciaOrdenesChart } from "./_components/tendencia-ordenes-chart";
-import { TipoLenteChart } from "./_components/tipo-lente-chart";
-import { OrdenesSucursalChart } from "./_components/ordenes-sucursal-chart";
-import { DetalleCristalesTable } from "./_components/detalle-cristales-table";
+import { TendenciaOrdenesChartWrapper } from "./_components/tendencia-ordenes-chart-wrapper";
+import { TipoLenteChartWrapper } from "./_components/tipo-lente-chart-wrapper";
+import { OrdenesSucursalChartWrapper } from "./_components/ordenes-sucursal-chart-wrapper";
+import { DetalleCristalesTableWrapper } from "./_components/detalle-cristales-table-wrapper";
+import { ChartSkeleton, TableSkeleton } from "../_components/skeletons";
 
 type SearchParams = Promise<{ from?: string; to?: string; sucursal?: string }>;
 
-const EMPTY_DATA = {
-  kpis: {
-    ordenesHoy: 0,
-    volumenOrdenes: 0,
-    promedioDiario: 0,
-    montoTotal: 0,
-  },
-  tendencia: [],
-  tipoLente: [],
-  ordenesSucursal: [],
+const EMPTY_KPIS = {
+  ordenesHoy: 0,
+  volumenOrdenes: 0,
+  promedioDiario: 0,
+  montoTotal: 0,
 };
 
 export default async function EficienciaPage({
@@ -43,16 +39,15 @@ export default async function EficienciaPage({
     : format(new Date(), "yyyy-MM-dd");
   const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
 
-  const result = await getEficienciaData({ startDate, endDate, sucursales });
-  const data = result.data ?? EMPTY_DATA;
-  const { kpis } = data;
+  const result = await getEficienciaKPIs({ startDate, endDate, sucursales });
+  const kpis = result.data ?? EMPTY_KPIS;
 
   return (
     <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
-          {result.error ?? "No se pudieron cargar los datos. Intenta de nuevo."}
+          {result.error ?? "No se pudieron cargar los datos de KPI. Intenta de nuevo."}
         </div>
       )}
 
@@ -86,53 +81,25 @@ export default async function EficienciaPage({
       </div>
 
       {/* ── Fila 2: Tendencia de Órdenes ────────── */}
-      <Card className="overflow-hidden rounded-2xl shadow-md">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Tendencia de Órdenes · Últimos 12 Meses
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TendenciaOrdenesChart data={data.tendencia} />
-        </CardContent>
-      </Card>
+      <Suspense fallback={<ChartSkeleton title="Tendencia de Órdenes · Últimos 12 Meses" height="h-72" />}>
+        <TendenciaOrdenesChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+      </Suspense>
 
       {/* ── Fila 3: Detalle por Tipo y Órdenes por Sucursal ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Detalle de Órdenes por Tipo de Lente
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TipoLenteChart data={data.tipoLente} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Detalle de Órdenes por Tipo de Lente" height="h-[500px]" />}>
+          <TipoLenteChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
 
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Órdenes Ejecutadas por Sucursal
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <OrdenesSucursalChart data={data.ordenesSucursal} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Órdenes Ejecutadas por Sucursal" height="h-[500px]" />}>
+          <OrdenesSucursalChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
       </div>
 
       {/* ── Fila 4: Detalle de Cristales ────────── */}
-      <Card className="overflow-hidden rounded-2xl shadow-md">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Detalle de Órdenes de Cristales por Tipo
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DetalleCristalesTable data={data.tipoLente} />
-        </CardContent>
-      </Card>
+      <Suspense fallback={<TableSkeleton title="Detalle de Órdenes de Cristales por Tipo" rows={5} />}>
+        <DetalleCristalesTableWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+      </Suspense>
     </div>
   );
 }

@@ -1,34 +1,30 @@
 import { format, startOfMonth } from "date-fns";
+import { Suspense } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   formatCompactCurrency,
   formatCompactNumber,
   formatCurrency,
 } from "@/lib/utils";
 
-import { getResumenData } from "./_actions/get-resumen-data";
+import { getResumenKPIs } from "./_actions/get-resumen-data";
 import { KpiCard } from "./_components/kpi-card";
-import { MediosPagoChart } from "./_components/medios-pago-chart";
-import { SucursalesChart } from "./_components/sucursales-chart";
-import { VentasChart } from "./_components/ventas-chart";
+import { MediosPagoChartWrapper } from "./_components/medios-pago-chart-wrapper";
+import { SucursalesChartWrapper } from "./_components/sucursales-chart-wrapper";
+import { VentasChartWrapper } from "./_components/ventas-chart-wrapper";
+import { ChartSkeleton } from "../_components/skeletons";
 
 type SearchParams = Promise<{ from?: string; to?: string; sucursal?: string }>;
 
-const EMPTY_DATA = {
-  kpis: {
-    ventaNetaYTD: 0,
-    ventaNeta: 0,
-    proyeccion: 0,
-    totalCobrado: 0,
-    ticketPromedio: 0,
-    cantidadPedidos: 0,
-    totalExamenes: 0,
-    clientesNuevos: 0,
-  },
-  ventasDiarias: [],
-  topSucursales: [],
-  mediosPago: [],
+const EMPTY_KPIS = {
+  ventaNetaYTD: 0,
+  ventaNeta: 0,
+  proyeccion: 0,
+  totalCobrado: 0,
+  ticketPromedio: 0,
+  cantidadPedidos: 0,
+  totalExamenes: 0,
+  clientesNuevos: 0,
 };
 
 export default async function ResumenComercialPage({
@@ -46,9 +42,8 @@ export default async function ResumenComercialPage({
     : format(new Date(), "yyyy-MM-dd");
   const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
 
-  const result = await getResumenData({ startDate, endDate, sucursales });
-  const data = result.data ?? EMPTY_DATA;
-  const { kpis } = data;
+  const result = await getResumenKPIs({ startDate, endDate, sucursales });
+  const kpis = result.data ?? EMPTY_KPIS;
 
   // proyeccionPct: compara venta real del período filtrado vs su proyección al cierre
   const proyeccionPct =
@@ -61,7 +56,7 @@ export default async function ResumenComercialPage({
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
-          {result.error ?? "No se pudieron cargar los datos. Intenta de nuevo."}
+          {result.error ?? "No se pudieron cargar los datos de KPI. Intenta de nuevo."}
         </div>
       )}
 
@@ -126,40 +121,19 @@ export default async function ResumenComercialPage({
 
       {/* ── Fila 3: Distribución — Top Sucursales | Medios de Pago ──────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Top 10 Sucursales · Venta Neta
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <SucursalesChart data={data.topSucursales} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Top 10 Sucursales · Venta Neta" height="h-64" />}>
+          <SucursalesChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
 
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Distribución · Medios de Pago
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <MediosPagoChart data={data.mediosPago} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Distribución · Medios de Pago" height="h-52" />}>
+          <MediosPagoChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
       </div>
 
       {/* ── Fila 4: Tendencia anual YTD — ancho completo ────────────────────── */}
-      <Card className="overflow-hidden rounded-2xl shadow-md">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Tendencia Anual · Ventas y Tráfico
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <VentasChart data={data.ventasDiarias} />
-        </CardContent>
-      </Card>
+      <Suspense fallback={<ChartSkeleton title="Tendencia Anual · Ventas y Tráfico" height="h-[350px]" />}>
+        <VentasChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+      </Suspense>
     </div>
   );
 }

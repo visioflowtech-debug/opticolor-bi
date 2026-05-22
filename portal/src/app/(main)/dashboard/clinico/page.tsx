@@ -1,32 +1,26 @@
 import { format, startOfMonth } from "date-fns";
+import { Suspense } from "react";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCompactNumber } from "@/lib/utils";
 
-import { getClinicaData } from "./_actions/get-clinica-data";
+import { getClinicaKPIs } from "./_actions/get-clinica-data";
 import { KpiCard } from "../resumen-comercial/_components/kpi-card";
-import { TendenciaExamenesChart } from "./_components/tendencia-examenes-chart";
-import { VolumenConversionChart } from "./_components/volumen-conversion-chart";
-import { GeneroChart } from "./_components/genero-chart";
-import { EdadChart } from "./_components/edad-chart";
-import { TopSucursalesClinicaChart } from "./_components/top-sucursales-clinica-chart";
+import { TendenciaExamenesChartWrapper } from "./_components/tendencia-examenes-chart-wrapper";
+import { VolumenConversionChartWrapper } from "./_components/volumen-conversion-chart-wrapper";
+import { GeneroChartWrapper } from "./_components/genero-chart-wrapper";
+import { EdadChartWrapper } from "./_components/edad-chart-wrapper";
+import { TopSucursalesClinicaChartWrapper } from "./_components/top-sucursales-clinica-chart-wrapper";
+import { ChartSkeleton } from "../_components/skeletons";
 
 type SearchParams = Promise<{ from?: string; to?: string; sucursal?: string }>;
 
-const EMPTY_DATA = {
-  kpis: {
-    totalExamenes: 0,
-    pctConversion: 0,
-    examenesHoy: 0,
-    promedioDiario: 0,
-    convertidos: 0,
-    noConvertidos: 0,
-  },
-  tendencia: [],
-  volumenConversion: [],
-  genero: [],
-  edad: [],
-  topSucursales: [],
+const EMPTY_KPIS = {
+  totalExamenes: 0,
+  pctConversion: 0,
+  examenesHoy: 0,
+  promedioDiario: 0,
+  convertidos: 0,
+  noConvertidos: 0,
 };
 
 export default async function ClinicaPage({
@@ -44,16 +38,15 @@ export default async function ClinicaPage({
     : format(new Date(), "yyyy-MM-dd");
   const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
 
-  const result = await getClinicaData({ startDate, endDate, sucursales });
-  const data = result.data ?? EMPTY_DATA;
-  const { kpis } = data;
+  const result = await getClinicaKPIs({ startDate, endDate, sucursales });
+  const kpis = result.data ?? EMPTY_KPIS;
 
   return (
     <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
       {!result.success && (
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
-          {result.error ?? "No se pudieron cargar los datos. Intenta de nuevo."}
+          {result.error ?? "No se pudieron cargar los datos de KPI. Intenta de nuevo."}
         </div>
       )}
 
@@ -98,67 +91,30 @@ export default async function ClinicaPage({
       </div>
 
       {/* ── Fila 4: Tendencia Full Width ────────── */}
-      <Card className="overflow-hidden rounded-2xl shadow-md">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Tendencia de Exámenes · Últimos 12 Meses
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TendenciaExamenesChart data={data.tendencia} />
-        </CardContent>
-      </Card>
+      <Suspense fallback={<ChartSkeleton title="Tendencia de Exámenes · Últimos 12 Meses" height="h-72" />}>
+        <TendenciaExamenesChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+      </Suspense>
 
       {/* ── Fila 3: Género y Edad ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Distribución por Género
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <GeneroChart data={data.genero} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Distribución por Género" height="h-52" />}>
+          <GeneroChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
 
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Pacientes por Rango de Edad
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EdadChart data={data.edad} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Pacientes por Rango de Edad" height="h-[350px]" />}>
+          <EdadChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
       </div>
-
-
 
       {/* ── Fila 2: Sucursales + Volumen vs Conversión ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Top Sucursales por Volumen de Exámenes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TopSucursalesClinicaChart data={data.topSucursales} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Top Sucursales por Volumen de Exámenes" height="h-[500px]" />}>
+          <TopSucursalesClinicaChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
 
-        <Card className="overflow-hidden rounded-2xl shadow-md">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-semibold text-muted-foreground">
-              Volumen vs Conversión
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <VolumenConversionChart data={data.volumenConversion} />
-          </CardContent>
-        </Card>
+        <Suspense fallback={<ChartSkeleton title="Volumen vs Conversión" height="h-[350px]" />}>
+          <VolumenConversionChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        </Suspense>
       </div>
     </div>
   );

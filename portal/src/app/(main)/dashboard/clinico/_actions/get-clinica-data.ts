@@ -46,16 +46,7 @@ export type SucursalExamen = {
   total_examenes: number;
 };
 
-export type ClinicaData = {
-  kpis: ClinicaKpis;
-  tendencia: TendenciaExamen[];
-  volumenConversion: VolumenConversion[];
-  genero: GeneroExamen[];
-  edad: EdadExamen[];
-  topSucursales: SucursalExamen[];
-};
-
-type Params = {
+export type Params = {
   startDate: string; // "YYYY-MM-DD"
   endDate: string;   // "YYYY-MM-DD"
   sucursales: string | null; // IDs separados por coma, null = todas
@@ -67,7 +58,6 @@ type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean }
 
 type ValorRow        = { valor: number };
 type PeriodoStatsRow = { total_examenes: number; convertidos: number; no_convertidos: number; promedio_diario: number };
-// Fila fusionada tendencia + volumen/conversión — misma query, distintas proyecciones en TS
 type TendenciaVolRow = { periodo: string; total_examenes: number; convertidos: number; no_convertidos: number };
 type GeneroRow       = { genero_label: string; total_examenes: number };
 type EdadRow         = { rango_edad_descripcion: string; total_examenes: number };
@@ -80,19 +70,16 @@ function extractMinAge(rango: string): number {
   return match ? parseInt(match[0], 10) : 0;
 }
 
-// Nombres de mes en español derivados del campo periodo ('YYYY-MM') — sin depender del locale de SQL Server.
 const MESES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 
-// ─── Cache interno ────────────────────────────────────────────────────────────
-// La guarda de auth vive fuera: unstable_cache no puede capturar APIs dinámicas.
+// ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
-const fetchClinicaData = unstable_cache(
-  async (params: FetchParams): Promise<ClinicaData> => {
+const fetchClinicaKPIs = unstable_cache(
+  async (params: FetchParams): Promise<ClinicaKpis> => {
     const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
-
     const pool = await getConnection();
 
     const req = () =>
@@ -104,27 +91,8 @@ const fetchClinicaData = unstable_cache(
         .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
 
-    // ── 6 queries en paralelo (reducido desde 7) ─────────────────────────────
-    //
-    //  [1] Exámenes Hoy       — Dash_Clinico_Agregado (fecha_examen = hoy GMT-4)
-    //  [2] KPIs período       — Dash_Clinico_Agregado (aggregación condicional)
-    //  [3] Tendencia + Volumen FUSIONADOS — Dash_Clinico_Agregado GROUP BY periodo
-    //      Una sola pasada alimenta dos visualizaciones; mes_examen_nombre se
-    //      deriva en TypeScript desde el campo periodo ('YYYY-MM').
-    //  [4] Género  — Fact_Examenes (genero_label no disponible en tabla agregada)
-    //  [5] Edad    — Fact_Examenes (rango_edad_descripcion no disponible en tabla agregada)
-    //  [6] Top Sucursales — Dash_Clinico_Agregado (nombre_sucursal pre-unido, sin JOIN)
-
-    const [
-      examenesHoyRes,
-      periodoStatsRes,
-      tendenciaVolumenRes,
-      generoRes,
-      edadRes,
-      topSucursalesRes,
-    ] = await Promise.all([
-
-      // [1] Exámenes Hoy — snapshot del día actual (zona GMT-4)
+    const [examenesHoyRes, periodoStatsRes] = await Promise.all([
+      // Exámenes Hoy
       req().query(`
         SELECT ISNULL(SUM(dca.total_examenes), 0) AS valor
         FROM dbo.Dash_Clinico_Agregado dca
@@ -132,8 +100,7 @@ const fetchClinicaData = unstable_cache(
           ${buildSucursalFilter("dca")}
       `),
 
-      // [2] KPIs período — aggregación condicional por estado_conversion.
-      // Una sola fila devuelve total, convertidos, no_convertidos y promedio_diario.
+      // KPIs período
       req().query(`
         SELECT
           ISNULL(SUM(dca.total_examenes), 0)                                                                    AS total_examenes,
@@ -147,63 +114,7 @@ const fetchClinicaData = unstable_cache(
         WHERE dca.fecha_examen BETWEEN @startDate AND @endDate
           ${buildSucursalFilter("dca")}
       `),
-
-      // [3] Tendencia + Volumen/Conversión FUSIONADOS — últimos 12 meses.
-      // GROUP BY periodo ('YYYY-MM') → cada fila alimenta ambas visualizaciones.
-      // mes_examen_nombre se convierte en TypeScript para evitar dependencias de locale SQL.
-      req().query(`
-        SELECT
-          dca.periodo                                                                                            AS periodo,
-          ISNULL(SUM(dca.total_examenes), 0)                                                                    AS total_examenes,
-          ISNULL(SUM(CASE WHEN dca.estado_conversion = 'CONVERTIDO'    THEN dca.total_examenes ELSE 0 END), 0)  AS convertidos,
-          ISNULL(SUM(CASE WHEN dca.estado_conversion = 'NO CONVERTIDO' THEN dca.total_examenes ELSE 0 END), 0)  AS no_convertidos
-        FROM dbo.Dash_Clinico_Agregado dca
-        WHERE dca.fecha_examen >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
-          AND dca.fecha_examen <= CAST(@endDate AS DATE)
-          ${buildSucursalFilter("dca")}
-        GROUP BY dca.periodo
-        ORDER BY dca.periodo ASC
-      `),
-
-      // [4] Género — Fact_Examenes + Dim_Clientes (genero_label no está en la tabla agregada)
-      req().query(`
-        SELECT
-          ISNULL(dc.genero_label, 'Sin Definir') AS genero_label,
-          ISNULL(COUNT(DISTINCT fe.id_examen), 0) AS total_examenes
-        FROM dbo.Fact_Examenes fe
-        LEFT JOIN dbo.Dim_Clientes dc ON fe.id_cliente = dc.id_cliente
-        WHERE CAST(fe.fecha_examen_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("fe")}
-        GROUP BY dc.genero_label
-        ORDER BY total_examenes DESC
-      `),
-
-      // [5] Rango de Edad — Fact_Examenes + Dim_Clientes (rango_edad_descripcion no está en la tabla agregada)
-      req().query(`
-        SELECT
-          ISNULL(dc.rango_edad_descripcion, 'Sin Definir') AS rango_edad_descripcion,
-          ISNULL(COUNT(DISTINCT fe.id_examen), 0) AS total_examenes
-        FROM dbo.Fact_Examenes fe
-        LEFT JOIN dbo.Dim_Clientes dc ON fe.id_cliente = dc.id_cliente
-        WHERE CAST(fe.fecha_examen_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("fe")}
-        GROUP BY dc.rango_edad_descripcion
-      `),
-
-      // [6] Top Sucursales — Dash_Clinico_Agregado (nombre_sucursal pre-unido, sin JOIN a Dim_Sucursales)
-      req().query(`
-        SELECT
-          dca.nombre_sucursal,
-          ISNULL(SUM(dca.total_examenes), 0) AS total_examenes
-        FROM dbo.Dash_Clinico_Agregado dca
-        WHERE dca.fecha_examen BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("dca")}
-        GROUP BY dca.nombre_sucursal
-        ORDER BY total_examenes DESC
-      `),
     ]);
-
-    // ── Procesamiento TypeScript — costo O(n), cero round-trips adicionales ───
 
     const stats = (periodoStatsRes.recordset as PeriodoStatsRow[])[0]
       ?? { total_examenes: 0, convertidos: 0, no_convertidos: 0, promedio_diario: 0 };
@@ -211,15 +122,115 @@ const fetchClinicaData = unstable_cache(
     const convertidos   = Number(stats.convertidos ?? 0);
     const pctConversion = totalExamenes > 0 ? Math.round((convertidos / totalExamenes) * 10000) / 100 : 0;
 
-    // Fila fusionada → tendencia y volumenConversion derivados de las mismas filas O(n)
-    const tvRows = tendenciaVolumenRes.recordset as TendenciaVolRow[];
+    return {
+      examenesHoy:    Number((examenesHoyRes.recordset as ValorRow[])[0]?.valor ?? 0),
+      totalExamenes,
+      pctConversion,
+      promedioDiario: Math.round(Number(stats.promedio_diario ?? 0) * 100) / 100,
+      convertidos,
+      noConvertidos:  Number(stats.no_convertidos ?? 0),
+    };
+  },
+  ["dash-clinico-kpis"],
+  { revalidate: 3600, tags: ["dash-clinico-kpis"] }
+);
 
-    const tendencia: TendenciaExamen[] = tvRows.map((r) => ({
+export async function getClinicaKPIs(
+  params: Params,
+): Promise<{ success: boolean; data?: ClinicaKpis; error?: string }> {
+  try {
+    const auth = await getAuthContext();
+    if (!auth) return { success: false, error: "No autorizado" };
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+    const data = await fetchClinicaKPIs({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    return { success: true, data };
+  } catch (err) {
+    console.error("[ERROR][getClinicaKPIs]", err);
+    return { success: false, error: "Error al obtener KPIs de clínica." };
+  }
+}
+
+// ─── 2. Tendencia ────────────────────────────────────────────────────────────
+
+const fetchTendenciaExamen = unstable_cache(
+  async (params: FetchParams): Promise<TendenciaExamen[]> => {
+    const { endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const pool = await getConnection();
+
+    const req = () =>
+      pool
+        .request()
+        .input("endDate",      endDate)
+        .input("sucursales",   sucursales)
+        .input("allowedSucursales", allowedSucursales)
+        .input("isSupervisor", isSupervisor ? 1 : 0);
+
+    const res = await req().query(`
+      SELECT
+        dca.periodo                                                                                            AS periodo,
+        ISNULL(SUM(dca.total_examenes), 0)                                                                    AS total_examenes
+      FROM dbo.Dash_Clinico_Agregado dca
+      WHERE dca.fecha_examen >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
+        AND dca.fecha_examen <= CAST(@endDate AS DATE)
+        ${buildSucursalFilter("dca")}
+      GROUP BY dca.periodo
+      ORDER BY dca.periodo ASC
+    `);
+
+    return (res.recordset as { periodo: string; total_examenes: number }[]).map((r) => ({
       mes_examen_nombre: MESES[parseInt(r.periodo.slice(5, 7), 10) - 1] ?? r.periodo,
       total_examenes:    Number(r.total_examenes ?? 0),
     }));
+  },
+  ["dash-clinico-tendencia"],
+  { revalidate: 3600, tags: ["dash-clinico-tendencia"] }
+);
 
-    const volumenConversion: VolumenConversion[] = tvRows.map((r) => {
+export async function getTendenciaExamen(
+  params: Params,
+): Promise<{ success: boolean; data?: TendenciaExamen[]; error?: string }> {
+  try {
+    const auth = await getAuthContext();
+    if (!auth) return { success: false, error: "No autorizado" };
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+    const data = await fetchTendenciaExamen({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    return { success: true, data };
+  } catch (err) {
+    console.error("[ERROR][getTendenciaExamen]", err);
+    return { success: false, error: "Error al obtener tendencia de exámenes." };
+  }
+}
+
+// ─── 3. Volumen vs Conversión ─────────────────────────────────────────────────
+
+const fetchVolumenConversion = unstable_cache(
+  async (params: FetchParams): Promise<VolumenConversion[]> => {
+    const { endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const pool = await getConnection();
+
+    const req = () =>
+      pool
+        .request()
+        .input("endDate",      endDate)
+        .input("sucursales",   sucursales)
+        .input("allowedSucursales", allowedSucursales)
+        .input("isSupervisor", isSupervisor ? 1 : 0);
+
+    const res = await req().query(`
+      SELECT
+        dca.periodo                                                                                            AS periodo,
+        ISNULL(SUM(dca.total_examenes), 0)                                                                    AS total_examenes,
+        ISNULL(SUM(CASE WHEN dca.estado_conversion = 'CONVERTIDO'    THEN dca.total_examenes ELSE 0 END), 0)  AS convertidos,
+        ISNULL(SUM(CASE WHEN dca.estado_conversion = 'NO CONVERTIDO' THEN dca.total_examenes ELSE 0 END), 0)  AS no_convertidos
+      FROM dbo.Dash_Clinico_Agregado dca
+      WHERE dca.fecha_examen >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
+        AND dca.fecha_examen <= CAST(@endDate AS DATE)
+        ${buildSucursalFilter("dca")}
+      GROUP BY dca.periodo
+      ORDER BY dca.periodo ASC
+    `);
+
+    return (res.recordset as TendenciaVolRow[]).map((r) => {
       const total = Number(r.total_examenes ?? 0);
       const conv  = Number(r.convertidos ?? 0);
       return {
@@ -229,9 +240,106 @@ const fetchClinicaData = unstable_cache(
         pct_conversion:    total > 0 ? Math.round((conv / total) * 10000) / 100 : 0,
       };
     });
+  },
+  ["dash-clinico-volumen-conversion"],
+  { revalidate: 3600, tags: ["dash-clinico-volumen-conversion"] }
+);
 
-    // Edades ordenadas lógicamente por el primer número del rango descriptivo
-    const rawEdades = (edadRes.recordset as EdadRow[]).map((r) => {
+export async function getVolumenConversion(
+  params: Params,
+): Promise<{ success: boolean; data?: VolumenConversion[]; error?: string }> {
+  try {
+    const auth = await getAuthContext();
+    if (!auth) return { success: false, error: "No autorizado" };
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+    const data = await fetchVolumenConversion({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    return { success: true, data };
+  } catch (err) {
+    console.error("[ERROR][getVolumenConversion]", err);
+    return { success: false, error: "Error al obtener volumen de conversión." };
+  }
+}
+
+// ─── 4. Género ───────────────────────────────────────────────────────────────
+
+const fetchGeneroExamen = unstable_cache(
+  async (params: FetchParams): Promise<GeneroExamen[]> => {
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const pool = await getConnection();
+
+    const req = () =>
+      pool
+        .request()
+        .input("startDate",    startDate)
+        .input("endDate",      endDate)
+        .input("sucursales",   sucursales)
+        .input("allowedSucursales", allowedSucursales)
+        .input("isSupervisor", isSupervisor ? 1 : 0);
+
+    const res = await req().query(`
+      SELECT
+        ISNULL(dc.genero_label, 'Sin Definir') AS genero_label,
+        ISNULL(COUNT(DISTINCT fe.id_examen), 0) AS total_examenes
+      FROM dbo.Fact_Examenes fe
+      LEFT JOIN dbo.Dim_Clientes dc ON fe.id_cliente = dc.id_cliente
+      WHERE CAST(fe.fecha_examen_completa AS DATE) BETWEEN @startDate AND @endDate
+        ${buildSucursalFilter("fe")}
+      GROUP BY dc.genero_label
+      ORDER BY total_examenes DESC
+    `);
+
+    return (res.recordset as GeneroRow[]).map((r) => ({
+      genero_label:   String(r.genero_label ?? ""),
+      total_examenes: Number(r.total_examenes ?? 0),
+    }));
+  },
+  ["dash-clinico-genero"],
+  { revalidate: 3600, tags: ["dash-clinico-genero"] }
+);
+
+export async function getGeneroExamen(
+  params: Params,
+): Promise<{ success: boolean; data?: GeneroExamen[]; error?: string }> {
+  try {
+    const auth = await getAuthContext();
+    if (!auth) return { success: false, error: "No autorizado" };
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+    const data = await fetchGeneroExamen({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    return { success: true, data };
+  } catch (err) {
+    console.error("[ERROR][getGeneroExamen]", err);
+    return { success: false, error: "Error al obtener datos por género." };
+  }
+}
+
+// ─── 5. Edad ─────────────────────────────────────────────────────────────────
+
+const fetchEdadExamen = unstable_cache(
+  async (params: FetchParams): Promise<EdadExamen[]> => {
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const pool = await getConnection();
+
+    const req = () =>
+      pool
+        .request()
+        .input("startDate",    startDate)
+        .input("endDate",      endDate)
+        .input("sucursales",   sucursales)
+        .input("allowedSucursales", allowedSucursales)
+        .input("isSupervisor", isSupervisor ? 1 : 0);
+
+    const res = await req().query(`
+      SELECT
+        ISNULL(dc.rango_edad_descripcion, 'Sin Definir') AS rango_edad_descripcion,
+        ISNULL(COUNT(DISTINCT fe.id_examen), 0) AS total_examenes
+      FROM dbo.Fact_Examenes fe
+      LEFT JOIN dbo.Dim_Clientes dc ON fe.id_cliente = dc.id_cliente
+      WHERE CAST(fe.fecha_examen_completa AS DATE) BETWEEN @startDate AND @endDate
+        ${buildSucursalFilter("fe")}
+      GROUP BY dc.rango_edad_descripcion
+    `);
+
+    const rawEdades = (res.recordset as EdadRow[]).map((r) => {
       const desc = String(r.rango_edad_descripcion ?? "Sin Definir");
       return {
         rango_edad_descripcion: desc,
@@ -240,53 +348,74 @@ const fetchClinicaData = unstable_cache(
       };
     });
 
-    return {
-      kpis: {
-        examenesHoy:    Number((examenesHoyRes.recordset as ValorRow[])[0]?.valor ?? 0),
-        totalExamenes,
-        pctConversion,
-        promedioDiario: Math.round(Number(stats.promedio_diario ?? 0) * 100) / 100,
-        convertidos,
-        noConvertidos:  Number(stats.no_convertidos ?? 0),
-      },
-      tendencia,
-      volumenConversion,
-      genero: (generoRes.recordset as GeneroRow[]).map((r) => ({
-        genero_label:   String(r.genero_label ?? ""),
-        total_examenes: Number(r.total_examenes ?? 0),
-      })),
-      edad: rawEdades.sort((a, b) => a.min_edad - b.min_edad),
-      topSucursales: (topSucursalesRes.recordset as SucursalRow[]).map((r) => ({
-        nombre_sucursal: String(r.nombre_sucursal ?? ""),
-        total_examenes:  Number(r.total_examenes ?? 0),
-      })),
-    };
+    return rawEdades.sort((a, b) => a.min_edad - b.min_edad);
   },
-  ["dash-clinico"],
-  { revalidate: 3600, tags: ["dash-clinico"] },
+  ["dash-clinico-edad"],
+  { revalidate: 3600, tags: ["dash-clinico-edad"] }
 );
 
-// ─── Acción principal ─────────────────────────────────────────────────────────
-// La guarda de auth vive fuera del cache: unstable_cache no puede capturar
-// APIs dinámicas (headers/cookies) como getAuthContext().
-
-export async function getClinicaData(
+export async function getEdadExamen(
   params: Params,
-): Promise<{ success: boolean; data?: ClinicaData; error?: string }> {
+): Promise<{ success: boolean; data?: EdadExamen[]; error?: string }> {
   try {
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
-
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-
-    const data = await fetchClinicaData({
-      ...params,
-      allowedSucursales,
-      isSupervisor: auth.isSupervisor,
-    });
+    const data = await fetchEdadExamen({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
     return { success: true, data };
   } catch (err) {
-    console.error("[ERROR][getClinicaData]", err);
-    return { success: false, error: "Error al obtener los datos de clínica." };
+    console.error("[ERROR][getEdadExamen]", err);
+    return { success: false, error: "Error al obtener datos por edad." };
+  }
+}
+
+// ─── 6. Top Sucursales ────────────────────────────────────────────────────────
+
+const fetchTopSucursalesExamen = unstable_cache(
+  async (params: FetchParams): Promise<SucursalExamen[]> => {
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const pool = await getConnection();
+
+    const req = () =>
+      pool
+        .request()
+        .input("startDate",    startDate)
+        .input("endDate",      endDate)
+        .input("sucursales",   sucursales)
+        .input("allowedSucursales", allowedSucursales)
+        .input("isSupervisor", isSupervisor ? 1 : 0);
+
+    const res = await req().query(`
+      SELECT
+        dca.nombre_sucursal,
+        ISNULL(SUM(dca.total_examenes), 0) AS total_examenes
+      FROM dbo.Dash_Clinico_Agregado dca
+      WHERE dca.fecha_examen BETWEEN @startDate AND @endDate
+        ${buildSucursalFilter("dca")}
+      GROUP BY dca.nombre_sucursal
+      ORDER BY total_examenes DESC
+    `);
+
+    return (res.recordset as SucursalRow[]).map((r) => ({
+      nombre_sucursal: String(r.nombre_sucursal ?? ""),
+      total_examenes:  Number(r.total_examenes ?? 0),
+    }));
+  },
+  ["dash-clinico-top-sucursales"],
+  { revalidate: 3600, tags: ["dash-clinico-top-sucursales"] }
+);
+
+export async function getTopSucursalesExamen(
+  params: Params,
+): Promise<{ success: boolean; data?: SucursalExamen[]; error?: string }> {
+  try {
+    const auth = await getAuthContext();
+    if (!auth) return { success: false, error: "No autorizado" };
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+    const data = await fetchTopSucursalesExamen({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    return { success: true, data };
+  } catch (err) {
+    console.error("[ERROR][getTopSucursalesExamen]", err);
+    return { success: false, error: "Error al obtener top sucursales de clínica." };
   }
 }
