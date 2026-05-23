@@ -12,10 +12,10 @@ import {
 } from "recharts";
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import type { VentaDiaria } from "../_actions/get-resumen-data";
+import type { MonthlyTrendData } from "../_actions/get-resumen-data";
 
 interface Props {
-  data: VentaDiaria[];
+  data: MonthlyTrendData[];
 }
 
 const fmtMoney = (v: number) =>
@@ -50,7 +50,7 @@ function ChartTooltip({
         <div key={p.name} className="flex items-center gap-2.5 text-xs">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
           <span className="text-muted-foreground">
-            {p.name === "ventaNeta" ? "Venta Neta" : "Tráfico"}
+            {p.name === "ventaNeta" ? "Venta Neta" : "Cantidad de Facturas"}
           </span>
           <span className="ml-auto font-semibold tabular-nums">
             {p.name === "ventaNeta"
@@ -133,12 +133,12 @@ export function VentasChart({ data }: Props) {
           opacity={0.9}
         />
 
-        {/* Línea suave con puntos: Tráfico — gris medio */}
+        {/* Línea suave con puntos: Facturas — gris medio */}
         <Line
           yAxisId="right"
           type="monotone"
-          dataKey="trafico"
-          name="trafico"
+          dataKey="cantidadFacturas"
+          name="cantidadFacturas"
           stroke="var(--chart-2)"
           strokeWidth={2.5}
           dot={{ r: 4, fill: "var(--chart-2)", strokeWidth: 0 }}

@@ -4,6 +4,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 export type AuthContext = {
   userId: number;
   isSupervisor: boolean;
+  isMaster: boolean;
 };
 
 export async function getAuthContext(): Promise<AuthContext | null> {
@@ -12,5 +13,9 @@ export async function getAuthContext(): Promise<AuthContext | null> {
   return {
     userId: parseInt(session.user.id, 10),
     isSupervisor: session.user.nivel === 4 || session.user.rol === "SUPERVISOR",
+    isMaster:
+      session.user.nivel === 1 ||
+      session.user.rol === "SUPER_ADMIN" ||
+      session.user.rol === "MASTER",
   };
 }

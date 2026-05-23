@@ -31,7 +31,7 @@ export async function getDatosEdicion(idUsuario: number): Promise<{
       .request()
       .input("id_usuario", idUsuario)
       .query(`
-        SELECT id_sucursal
+        SELECT DISTINCT id_sucursal
         FROM dbo.Seguridad_Usuarios_Sucursales
         WHERE id_usuario = @id_usuario AND esta_vigente = 1
       `);

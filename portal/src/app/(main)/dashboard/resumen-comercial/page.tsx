@@ -132,7 +132,7 @@ export default async function ResumenComercialPage({
 
       {/* ── Fila 4: Tendencia anual YTD — ancho completo ────────────────────── */}
       <Suspense fallback={<ChartSkeleton title="Tendencia Anual · Ventas y Tráfico" height="h-[350px]" />}>
-        <VentasChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        <VentasChartWrapper sucursales={sucursales} />
       </Suspense>
     </div>
   );

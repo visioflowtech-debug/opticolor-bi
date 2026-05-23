@@ -20,11 +20,11 @@ export type KpiData = {
   clientesNuevos: number;
 };
 
-export type VentaDiaria = {
-  fecha: string;  // "YYYY-MM"
-  label: string;  // "Ene", "Feb", …
+export type MonthlyTrendData = {
+  periodo: string;  // "YYYY-MM"
+  label: string;    // "Ene", "Feb", ...
   ventaNeta: number;
-  trafico: number;
+  cantidadFacturas: number;
 };
 
 export type VentaSucursal = {
@@ -46,12 +46,25 @@ type Params = {
   sucursales: string | null; // IDs separados por coma, null = todas
 };
 
-type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
+type FetchParams = Params & {
+  allowedSucursales: string;
+  isSupervisor: boolean;
+  isMaster: boolean;
+};
+
+export type TrendParams = {
+  sucursales: string | null; // IDs separados por coma, null = todas
+};
+
+type FetchTrendParams = TrendParams & {
+  allowedSucursales: string;
+  isSupervisor: boolean;
+  isMaster: boolean;
+};
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
-type VentasKpiRow       = { anio: number; mes_nro: number; ventaMensual: number; trafico: number };
-type ProyeccionRow      = { kpi: string; valor: number };
+type VentasKpiRow       = { anio: number; mes_nro: number; periodo: string; ventaMensual: number; trafico: number };
 type ValorRow           = { valor: number };
 type PedidosClientesRow = { cantidadPedidos: number; clientesNuevos: number };
 type TopSucursalRow     = { idSucursal: number; nombreSucursal: string; ventaNeta: number; estimadoCierre: number };
@@ -61,117 +74,139 @@ type MedioPagoRow       = { medioPago: string; monto: number };
 
 const fetchResumenKPIs = unstable_cache(
   async (params: FetchParams): Promise<KpiData> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor, isMaster } = params;
     const pool = await getConnection();
 
-    const startYM = parseInt(startDate.slice(0, 4) + startDate.slice(5, 7), 10);
-    const endYM   = parseInt(endDate.slice(0, 4)   + endDate.slice(5, 7),   10);
-
-    const nowDate  = new Date();
-    const ytdStart = `${nowDate.getFullYear()}-01-01`;
+    // Fecha Venezuela GMT-4 — new Date() es UTC, restar 4 h para obtener la fecha local real
+    const nowGMT4  = new Date(Date.now() - 4 * 60 * 60 * 1000);
+    const ytdStart = `${nowGMT4.getUTCFullYear()}-01-01`;
     const ytdEnd   = [
-      nowDate.getFullYear(),
-      String(nowDate.getMonth() + 1).padStart(2, "0"),
-      String(nowDate.getDate()).padStart(2, "0"),
+      nowGMT4.getUTCFullYear(),
+      String(nowGMT4.getUTCMonth() + 1).padStart(2, "0"),
+      String(nowGMT4.getUTCDate()).padStart(2, "0"),
     ].join("-");
 
     const req = () =>
       pool
         .request()
-        .input("startDate", startDate)
-        .input("endDate", endDate)
-        .input("ytdStart", ytdStart)
-        .input("ytdEnd", ytdEnd)
-        .input("startYM", startYM)
-        .input("endYM", endYM)
-        .input("sucursales", sucursales)
+        .input("startDate",         startDate)
+        .input("endDate",           endDate)
+        .input("ytdStart",          ytdStart)
+        .input("ytdEnd",            ytdEnd)
+        .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("isSupervisor",      isSupervisor ? 1 : 0);
 
     const [
-      ventasKpisRes,
-      proyeccionCobradoRes,
-      ticketRes,
+      ventaNetaRes,
+      ventaNetaYtdRes,
+      proyeccionRes,
+      cobradoRes,
       pedidosClientesRes,
       examenesRes,
     ] = await Promise.all([
+
+      // C-1.1 — Venta Neta: período filtrado exacto, con ROUND para paridad DAX
       req().query(`
-        SELECT
-          ISNULL(SUM(CASE WHEN fecha_factura BETWEEN @startDate AND @endDate THEN monto_neto ELSE 0 END), 0) AS ventaNeta,
-          ISNULL(SUM(monto_neto), 0) AS ventaNetaYTD
+        SELECT ISNULL(ROUND(SUM(monto_neto), 2), 0) AS valor
         FROM dbo.KPI_Inf1_Venta_Neta
-        WHERE (fecha_factura BETWEEN @startDate AND @endDate
-            OR fecha_factura BETWEEN @ytdStart AND @ytdEnd)
-          ${buildSucursalFilter()}
+        WHERE fecha_factura BETWEEN @startDate AND @endDate
+          ${buildSucursalFilter("", isMaster)}
       `),
+
+      // C-1.6 — Venta Neta YTD: query independiente — año en curso GMT-4, sin OR contaminante
       req().query(`
-        SELECT 'proyeccion' AS kpi, ISNULL(SUM(
-          CAST(monto_neto AS DECIMAL(18,4))
-          / NULLIF(CAST(dia_hoy_gmt4 AS DECIMAL(18,4)), 0)
-          * CAST(dias_del_mes AS DECIMAL(18,4))
-        ), 0) AS valor
+        SELECT ISNULL(ROUND(SUM(monto_neto), 2), 0) AS valor
+        FROM dbo.KPI_Inf1_Venta_Neta
+        WHERE fecha_factura BETWEEN @ytdStart AND @ytdEnd
+          ${buildSucursalFilter("", isMaster)}
+      `),
+
+      // C-1.2 — Proyección: condicional mes histórico (→ venta real) vs mes en curso (→ extrapolación)
+      // Los días transcurridos y el último día del mes se calculan en tiempo real con GMT-4
+      req().query(`
+        DECLARE @DiaHoyGMT4  INT = DAY(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+        DECLARE @MesHoyGMT4  INT = MONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+        DECLARE @AnioHoyGMT4 INT = YEAR(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+        DECLARE @DiasTranscurridos INT = CASE WHEN @DiaHoyGMT4 = 1 THEN 1 ELSE @DiaHoyGMT4 - 1 END;
+        DECLARE @UltimoDiaMes      INT = DAY(EOMONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE)));
+        DECLARE @MesStart  INT = MONTH(CAST(@startDate AS DATE));
+        DECLARE @AnioStart INT = YEAR(CAST(@startDate AS DATE));
+        SELECT CASE
+          WHEN @AnioStart < @AnioHoyGMT4
+            OR (@AnioStart = @AnioHoyGMT4 AND @MesStart < @MesHoyGMT4)
+            THEN ISNULL(ROUND(SUM(monto_neto), 2), 0)
+          ELSE ISNULL(ROUND(
+            SUM(CAST(monto_neto AS DECIMAL(18,4)))
+            / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0)
+            * CAST(@UltimoDiaMes AS DECIMAL(18,4))
+          , 2), 0)
+        END AS valor
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter()}
-        UNION ALL
-        SELECT 'cobrado', ISNULL(SUM(importe_neto), 0)
-        FROM dbo.KPI_Inf1_Total_Cobrado
-        WHERE fecha_completa BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter()}
+          ${buildSucursalFilter("", isMaster)}
       `),
+
+      // C-1.3 — Total Cobrado: Dash_Recaudo_Agregado (pre-calculado por el ETL)
       req().query(`
-        SELECT ISNULL(
-          CAST(SUM(venta_neta) AS DECIMAL(18,4)) / NULLIF(SUM(cantidad_pedidos), 0),
-          0
-        ) AS valor
-        FROM dbo.KPI_Inf1_Ticket_Promedio
-        WHERE anio * 100 + mes_nro BETWEEN @startYM AND @endYM
-        ${buildSucursalFilter()}
+        SELECT ISNULL(ROUND(SUM(monto_total), 2), 0) AS valor
+        FROM dbo.Dash_Recaudo_Agregado
+        WHERE fecha_recaudo BETWEEN @startDate AND @endDate
+          ${buildSucursalFilter("", isMaster)}
       `),
+
+      // C-1.5 + C-1.8 — Órdenes (DISTINCT id_pedido) y Clientes Nuevos
       req().query(`
         WITH pedidos_periodo AS (
-          SELECT
+          SELECT DISTINCT
+            fp.id_pedido,
             fp.id_cliente,
-            CASE
-              WHEN NOT EXISTS (
-                SELECT 1 FROM dbo.Fact_Pedidos fp2
-                WHERE fp2.id_cliente = fp.id_cliente
-                  AND CAST(fp2.fecha_pedido_completa AS DATE) < @startDate
-              ) THEN 1 ELSE 0
-            END AS es_nuevo
+            CASE WHEN NOT EXISTS (
+              SELECT 1 FROM dbo.Fact_Pedidos fp2
+              WHERE fp2.id_cliente = fp.id_cliente
+                AND CAST(fp2.fecha_pedido_completa AS DATE) < @startDate
+            ) THEN 1 ELSE 0 END AS es_nuevo
           FROM dbo.Fact_Pedidos fp
           WHERE CAST(fp.fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("fp")}
+          ${buildSucursalFilter("fp", isMaster)}
         )
         SELECT
-          COUNT(*)                                                    AS cantidadPedidos,
+          COUNT(DISTINCT id_pedido)                                   AS cantidadPedidos,
           COUNT(DISTINCT CASE WHEN es_nuevo = 1 THEN id_cliente END)  AS clientesNuevos
         FROM pedidos_periodo
       `),
+
+      // C-1.7 — Total Exámenes: Fact_Examenes usando COUNT(DISTINCT id_examen)
       req().query(`
-        SELECT COUNT(*) AS valor
+        SELECT COUNT(DISTINCT id_examen) AS valor
         FROM dbo.Fact_Examenes
-        WHERE CAST(fecha_examen_completa AS DATE) BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter()}
+        WHERE fecha_examen_completa BETWEEN @startDate AND @endDate
+          ${buildSucursalFilter("", isMaster)}
       `),
     ]);
 
-    const salesStats = (ventasKpisRes.recordset as { ventaNeta: number; ventaNetaYTD: number }[])[0]
-      ?? { ventaNeta: 0, ventaNetaYTD: 0 };
-    const pcRows     = proyeccionCobradoRes.recordset as ProyeccionRow[];
-    const proyRow    = pcRows.find((r) => r.kpi === "proyeccion");
-    const cobRow     = pcRows.find((r) => r.kpi === "cobrado");
-    const pedidosRow = pedidosClientesRes.recordset[0] as PedidosClientesRow;
+    const ventaNeta       = Number((ventaNetaRes.recordset    as ValorRow[])[0]?.valor ?? 0);
+    const ventaNetaYTD    = Number((ventaNetaYtdRes.recordset as ValorRow[])[0]?.valor ?? 0);
+    const proyeccion      = Number((proyeccionRes.recordset   as ValorRow[])[0]?.valor ?? 0);
+    const totalCobrado    = Number((cobradoRes.recordset      as ValorRow[])[0]?.valor ?? 0);
+    const pedidosRow      = pedidosClientesRes.recordset[0]   as PedidosClientesRow;
+    const cantidadPedidos = Number(pedidosRow?.cantidadPedidos ?? 0);
+
+    // C-1.4 — Ticket Promedio: derivado de ventaNeta y cantidadPedidos ya corregidos
+    // Equivalente exacto al DAX: DIVIDE([Venta Neta], [Cantidad Pedidos], 0)
+    const ticketPromedio = cantidadPedidos > 0
+      ? Math.round((ventaNeta / cantidadPedidos) * 100) / 100
+      : 0;
 
     return {
-      ventaNetaYTD:    Number(salesStats.ventaNetaYTD   ?? 0),
-      ventaNeta:       Number(salesStats.ventaNeta       ?? 0),
-      proyeccion:      Number(proyRow?.valor             ?? 0),
-      totalCobrado:    Number(cobRow?.valor              ?? 0),
-      ticketPromedio:  Math.round(Number((ticketRes.recordset as ValorRow[])[0]?.valor ?? 0) * 100) / 100,
-      cantidadPedidos: Number(pedidosRow?.cantidadPedidos ?? 0),
-      totalExamenes:   Number((examenesRes.recordset as ValorRow[])[0]?.valor ?? 0),
-      clientesNuevos:  Number(pedidosRow?.clientesNuevos  ?? 0),
+      ventaNetaYTD,
+      ventaNeta,
+      proyeccion,
+      totalCobrado,
+      ticketPromedio,
+      cantidadPedidos,
+      totalExamenes:  Number((examenesRes.recordset as ValorRow[])[0]?.valor ?? 0),
+      clientesNuevos: Number(pedidosRow?.clientesNuevos ?? 0),
     };
   },
   ["dash-ventas-kpis"],
@@ -185,7 +220,12 @@ export async function getResumenKPIs(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchResumenKPIs({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchResumenKPIs({
+      ...params,
+      allowedSucursales,
+      isSupervisor: auth.isSupervisor,
+      isMaster: auth.isMaster,
+    });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getResumenKPIs]", err);
@@ -196,15 +236,13 @@ export async function getResumenKPIs(
 // ─── 2. Ventas Diarias ────────────────────────────────────────────────────────
 
 const fetchVentasDiarias = unstable_cache(
-  async (params: FetchParams): Promise<VentaDiaria[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+  async (params: FetchTrendParams): Promise<MonthlyTrendData[]> => {
+    const { sucursales, allowedSucursales, isSupervisor, isMaster } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("startDate", startDate)
-        .input("endDate", endDate)
         .input("sucursales", sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("isSupervisor", isSupervisor ? 1 : 0);
@@ -213,12 +251,13 @@ const fetchVentasDiarias = unstable_cache(
       SELECT
         anio_factura                                                                  AS anio,
         mes_factura_nro                                                               AS mes_nro,
+        periodo_factura                                                               AS periodo,
         ISNULL(SUM(monto_neto), 0)                                                   AS ventaMensual,
-        COUNT(*)                                                                       AS trafico
+        COUNT(DISTINCT id_factura)                                                    AS trafico
       FROM dbo.KPI_Inf1_Venta_Neta
-      WHERE fecha_factura BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter()}
-      GROUP BY anio_factura, mes_factura_nro
+      WHERE anio_factura = 2026
+        ${buildSucursalFilter("", isMaster)}
+      GROUP BY anio_factura, mes_factura_nro, periodo_factura
       ORDER BY anio_factura, mes_factura_nro ASC
     `);
 
@@ -226,10 +265,10 @@ const fetchVentasDiarias = unstable_cache(
     return (res.recordset as VentasKpiRow[]).map((r) => {
       const mesNum = Number(r.mes_nro ?? 1);
       return {
-        fecha:     `${r.anio}-${String(mesNum).padStart(2, "0")}`,
-        label:     MESES_SHORT[mesNum - 1] ?? String(mesNum),
-        ventaNeta: Number(r.ventaMensual ?? 0),
-        trafico:   Number(r.trafico ?? 0),
+        periodo:          String(r.periodo ?? `${r.anio}-${String(mesNum).padStart(2, "0")}`),
+        label:            MESES_SHORT[mesNum - 1] ?? String(mesNum),
+        ventaNeta:        Number(r.ventaMensual ?? 0),
+        cantidadFacturas: Number(r.trafico ?? 0),
       };
     });
   },
@@ -238,13 +277,18 @@ const fetchVentasDiarias = unstable_cache(
 );
 
 export async function getVentasDiarias(
-  params: Params,
-): Promise<{ success: boolean; data?: VentaDiaria[]; error?: string }> {
+  params: TrendParams,
+): Promise<{ success: boolean; data?: MonthlyTrendData[]; error?: string }> {
   try {
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchVentasDiarias({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchVentasDiarias({
+      ...params,
+      allowedSucursales,
+      isSupervisor: auth.isSupervisor,
+      isMaster: auth.isMaster,
+    });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getVentasDiarias]", err);
@@ -256,7 +300,7 @@ export async function getVentasDiarias(
 
 const fetchTopSucursales = unstable_cache(
   async (params: FetchParams): Promise<VentaSucursal[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor, isMaster } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -269,6 +313,14 @@ const fetchTopSucursales = unstable_cache(
         .input("isSupervisor", isSupervisor ? 1 : 0);
 
     const res = await req().query(`
+      DECLARE @DiaHoyGMT4  INT = DAY(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+      DECLARE @MesHoyGMT4  INT = MONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+      DECLARE @AnioHoyGMT4 INT = YEAR(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+      DECLARE @DiasTranscurridos INT = CASE WHEN @DiaHoyGMT4 = 1 THEN 1 ELSE @DiaHoyGMT4 - 1 END;
+      DECLARE @UltimoDiaMes      INT = DAY(EOMONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE)));
+      DECLARE @MesStart  INT = MONTH(CAST(@startDate AS DATE));
+      DECLARE @AnioStart INT = YEAR(CAST(@startDate AS DATE));
+
       SELECT TOP 10
         vn.idSucursal,
         ds.nombre_sucursal              AS nombreSucursal,
@@ -277,24 +329,24 @@ const fetchTopSucursales = unstable_cache(
       FROM (
         SELECT
           id_sucursal                  AS idSucursal,
-          ISNULL(SUM(monto_neto), 0)  AS ventaNeta
+          ISNULL(ROUND(SUM(monto_neto), 2), 0)  AS ventaNeta
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter()}
+          ${buildSucursalFilter("", isMaster)}
         GROUP BY id_sucursal
       ) vn
       INNER JOIN dbo.Dim_Sucursales ds ON ds.id_sucursal = vn.idSucursal
       LEFT JOIN (
         SELECT
           id_sucursal,
-          ISNULL(SUM(
-            CAST(monto_neto AS DECIMAL(18,4))
-            / NULLIF(CAST(dia_hoy_gmt4 AS DECIMAL(18,4)), 0)
-            * CAST(dias_del_mes AS DECIMAL(18,4))
-          ), 0) AS estimado
+          ISNULL(ROUND(CASE
+            WHEN @AnioStart < @AnioHoyGMT4 OR (@AnioStart = @AnioHoyGMT4 AND @MesStart < @MesHoyGMT4)
+              THEN SUM(monto_neto)
+            ELSE SUM(CAST(monto_neto AS DECIMAL(18,4))) / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0) * CAST(@UltimoDiaMes AS DECIMAL(18,4))
+          END, 2), 0) AS estimado
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter()}
+          ${buildSucursalFilter("", isMaster)}
         GROUP BY id_sucursal
       ) pv ON pv.id_sucursal = vn.idSucursal
       ORDER BY vn.ventaNeta DESC
@@ -318,7 +370,12 @@ export async function getTopSucursales(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchTopSucursales({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchTopSucursales({
+      ...params,
+      allowedSucursales,
+      isSupervisor: auth.isSupervisor,
+      isMaster: auth.isMaster,
+    });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getTopSucursales]", err);
@@ -330,7 +387,7 @@ export async function getTopSucursales(
 
 const fetchMediosPago = unstable_cache(
   async (params: FetchParams): Promise<MedioPago[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor, isMaster } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -345,10 +402,10 @@ const fetchMediosPago = unstable_cache(
     const res = await req().query(`
       SELECT
         metodo_pago                       AS medioPago,
-        ISNULL(SUM(importe_neto), 0)     AS monto
-      FROM dbo.KPI_Inf1_Mix_Medios_Pago
-      WHERE fecha_completa BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter()}
+        ISNULL(SUM(monto_total), 0)       AS monto
+      FROM dbo.Dash_Recaudo_Agregado
+      WHERE fecha_recaudo BETWEEN @startDate AND @endDate
+        ${buildSucursalFilter("", isMaster)}
       GROUP BY metodo_pago
       ORDER BY monto DESC
     `);
@@ -375,7 +432,12 @@ export async function getMediosPago(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchMediosPago({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchMediosPago({
+      ...params,
+      allowedSucursales,
+      isSupervisor: auth.isSupervisor,
+      isMaster: auth.isMaster,
+    });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getMediosPago]", err);

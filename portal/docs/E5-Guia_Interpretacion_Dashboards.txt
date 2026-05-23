@@ -1,0 +1,1320 @@
+
+VISIOFLOW
+Inteligencia de Datos para Ópticas
+E5 — GUÍA DE INTERPRETACIÓN
+DE DASHBOARDS
+Ecosistema de Inteligencia de Datos
+OPTI-COLOR #2, C.A.
+Venezuela
+Versión: 1.0
+Fecha de emisión: 10 de mayo de 2026
+Preparado por: VisioFlow
+Contacto: visioflow.tech@gmail.com
+
+
+Control de Versiones
+VersiónFechaAutorDescripción1.010/05/2026Gerardo Argueta — VisioFlowGuía técnica y ejecutiva inicial. Documenta los 5 informes con todos sus slicers, cards, gráficos y tablas, sus medidas DAX y propósito de negocio.
+Distribución
+NombreCargoOrganizaciónReinaldo José Rangel EstevaDirector GeneralOPTI-COLOR #2, C.A.Eduardo MartínezInterlocutor TécnicoOPTI-COLOR #2, C.A.Gerardo ArguetaConsultor BI / Líder TécnicoVisioFlow
+
+Contenido
+Control de Versiones	2
+Distribución	2
+1. Introducción	5
+1.1 Propósito del Documento	5
+1.2 Alcance	5
+1.3 Audiencia	5
+1.4 Convenciones del Documento	5
+1.5 Modelo de Tiempo y Zonas Horarias	6
+2. Estructura Común de los Dashboards	7
+2.1 Marca Visual	7
+2.2 Slicers Comunes a Todos los Informes	7
+Slicer Fecha	7
+Slicer Sucursal	7
+2.3 Lógica de Filtrado Cruzado	7
+2.4 Sincronización de Datos	7
+3. Informe 1 — Resumen Comercial	8
+3.1 Propósito del Informe	8
+3.2 Vista General del Dashboard	8
+3.3 Slicers del Informe	8
+3.4 Cards Principales del Informe	11
+3.5 Gráficos y Tablas del Informe	20
+4. Informe 2 — Control de Cartera y Saldos	24
+4.1 Propósito del Informe	24
+4.2 Vista General del Dashboard	24
+4.3 Slicers del Informe	24
+4.4 Cards Principales del Informe	25
+4.5 Gráficos y Tablas del Informe	31
+5. Informe 3 — Eficiencia de Órdenes	36
+5.1 Propósito del Informe	36
+5.2 Vista General del Dashboard	36
+5.3 Slicers del Informe	37
+5.4 Cards Principales del Informe	38
+5.5 Gráficos y Tablas del Informe	42
+6. Informe 4 — Desempeño Clínico	46
+6.1 Propósito del Informe	46
+6.2 Vista General del Dashboard	46
+6.3 Slicers del Informe	46
+6.4 Cards Principales del Informe	47
+6.5 Gráficos y Tablas del Informe	53
+7. Informe 5 — Inventario y Desplazamiento	58
+7.1 Propósito del Informe	58
+7.2 Vista General del Dashboard	58
+7.3 Slicers del Informe	59
+7.4 Cards Principales del Informe	61
+7.5 Gráficos y Tablas del Informe	67
+8. Anexos	71
+8.1 Glosario de Términos Analíticos	71
+8.2 Inventario de Medidas DAX Críticas	72
+8.3 Recomendaciones de Uso	73
+Para Dirección General	73
+Para Gerencia Nacional y Supervisores	73
+Para Marketing y Comercial	73
+Para Finanzas y Tesorería	73
+8.4 Contactos y Soporte	73
+8.5 Conclusión	74
+
+
+
+
+1. Introducción
+1.1 Propósito del Documento
+El presente documento constituye el entregable técnico-ejecutivo oficial (Entregable E5) correspondiente a la Guía de Interpretación de Dashboards del Ecosistema de Inteligencia de Datos desarrollado por VisioFlow para OPTI-COLOR #2, C.A. Su finalidad es servir como fuente única de verdad para la lectura, interpretación y aprovechamiento analítico de cada uno de los cinco informes ejecutivos del proyecto.
+El documento describe de manera exhaustiva cada elemento visual presente en los cinco dashboards: filtros (slicers), tarjetas de indicadores (cards), gráficos y tablas. Para cada elemento se detalla su nombre, tipo, vista o tabla fuente de la base de datos, la medida DAX que lo genera, el propósito de negocio, las preguntas que responde, la audiencia objetivo y la forma correcta de interpretarlo.
+1.2 Alcance
+La guía cubre los cinco informes ejecutivos contratados del Ecosistema de Inteligencia de Datos:
+• Informe 1: Resumen Comercial — visión consolidada de venta, cobro y tráfico.
+• Informe 2: Control de Cartera y Saldos — gestión de cuentas por cobrar y eficiencia de recaudo.
+• Informe 3: Eficiencia de Órdenes — análisis operativo de órdenes de cristales.
+• Informe 4: Desempeño Clínico — métricas de exámenes optométricos y conversión a venta.
+• Informe 5: Inventario y Desplazamiento — análisis de stock, rotación y rentabilidad por producto.
+1.3 Audiencia
+Este documento está dirigido a tres perfiles de usuario del ecosistema analítico:
+• Gerencia General y Dirección: Para comprender el alcance integral de la información disponible y maximizar el uso estratégico de los reportes en la toma de decisiones.
+• Mandos medios y Supervisores de tienda: Para interpretar correctamente cada indicador de su área de responsabilidad y traducirlo en planes de acción operativos.
+• Equipo técnico y de soporte: Para mantener, evolucionar y dar soporte a las medidas DAX y a la lógica analítica del modelo Power BI.
+1.4 Convenciones del Documento
+Cada visual del documento sigue una estructura uniforme con los siguientes campos:
+• Imagen de referencia: Captura del elemento tal como aparece en el dashboard.
+• Tipo de visual: Slicer, Card, Gráfica de barras, Gráfica de líneas, Gráfica circular, Tabla, etc.
+• Vista o tabla fuente: Objeto del Data Warehouse que alimenta el visual.
+• Audiencia objetivo: Perfil principal al que está orientado el indicador.
+• Medida DAX: Código fuente de la medida que calcula el indicador.
+• Para qué sirve: Propósito analítico del visual.
+• Preguntas de negocio que responde: Listado de cuestiones gerenciales que el visual permite contestar.
+• Cómo interpretarlo: Explicación de la lectura correcta del visual.
+• Insights típicos: Patrones, alertas o tendencias relevantes detectables en el visual.
+1.5 Modelo de Tiempo y Zonas Horarias
+Todo el modelo analítico de Opticolor opera bajo zona horaria de Venezuela (GMT-4). La dimensión de tiempo Dim_Tiempo está construida como tabla calculada dentro de Power BI con corrección dinámica de la hora UTC mediante la expresión UTCNOW() menos cuatro veinticuatroavos. Esta consideración es fundamental para todos los cálculos de fechas, proyecciones y filtros temporales del modelo.
+
+
+2. Estructura Común de los Dashboards
+2.1 Marca Visual
+Los cinco dashboards comparten una identidad visual unificada con los siguientes elementos:
+• Logotipo de Opticolor en la esquina superior izquierda.
+• Título del informe destacado en color rojo institucional.
+• Barra de navegación superior con accesos directos a los cinco informes y un botón Limpiar para restablecer filtros.
+• Indicador de Sincronización en el pie del dashboard que muestra la última actualización del Data Warehouse.
+2.2 Slicers Comunes a Todos los Informes
+Los siguientes filtros aparecen en todos los informes del ecosistema y permiten al usuario acotar el análisis a un período y una geografía específicos:
+Slicer Fecha
+Filtro temporal basado en la dimensión Dim_Tiempo. Por defecto está configurado en Mes Actual, permitiendo al usuario seleccionar otros meses, trimestres, años o rangos personalizados. La lógica del slicer está implementada en la columna calculada Slicer Mes Actual de Dim_Tiempo.
+Slicer Sucursal
+Filtro geográfico basado en el campo nombre_comercial de la tabla Dim_Sucursales. Por defecto muestra todas las sucursales (All). El usuario con rol SUPERVISOR ve únicamente las sucursales asignadas a su perfil por la vista de Row-Level Security Vw_RLS_Sucursales del Data Warehouse.
+2.3 Lógica de Filtrado Cruzado
+Todos los visuales dentro de un informe responden de manera dinámica a los filtros aplicados en los slicers y a las selecciones realizadas sobre cualquier otro visual del dashboard (filtrado cruzado). Esto permite navegar entre niveles de detalle y aislar segmentos específicos sin necesidad de cambiar de pantalla.
+2.4 Sincronización de Datos
+La etiqueta Sincronización presente al pie de cada dashboard refleja la última carga exitosa del proceso ETL en el Data Warehouse. Los datos se actualizan cada dos horas según los ocho ciclos diarios programados (12:00, 14:00, 16:00, 18:00, 20:00, 22:00, 00:00 y 02:00 UTC). Para detalles operativos del ETL, consultar el Documento E4.
+
+
+3. Informe 1 — Resumen Comercial
+3.1 Propósito del Informe
+El informe Resumen Comercial proporciona una vista consolidada de la operación comercial de Opticolor. Es el panel ejecutivo principal para la Dirección General y los Gerentes Nacionales, mostrando en una sola pantalla los indicadores clave de venta, cobranza y tráfico de clientes.
+Permite responder en menos de treinta segundos preguntas como: ¿cómo vamos este mes?, ¿cuánto hemos cobrado?, ¿cuál es el ticket promedio?, ¿qué sucursales están liderando?, ¿qué medios de pago prefieren los clientes?
+3.2 Vista General del Dashboard
+
+3.3 Slicers del Informe
+? SL-1.1 — Slicer Fecha
+
+Tipo de visualFiltro desplegable (dropdown)Vista / Tabla fuenteDim_Tiempo (tabla calculada en Power BI)Audiencia objetivoTodos los usuarios del informe
+Medida DAX:
+Dim_Tiempo =
+-- 1. Ajustamos la hora UTC a GMT-4 (Venezuela)
+VAR FechaHoyGMT4 = UTCNOW() - (4 / 24)
+VAR AnioInicio = 2026
+VAR AnioActual = YEAR(FechaHoyGMT4)
+VAR AnioAnterior = AnioActual - 1
+RETURN
+ADDCOLUMNS (
+    CALENDAR(DATE(AnioInicio, 1, 1), FechaHoyGMT4),
+    "Año", YEAR([Date]),
+    "Mes Nro", MONTH([Date]),
+    "Día", DAY([Date]),
+    "Mes", FORMAT([Date], "mmmm", "es-VE"),
+    "Mes Corto", FORMAT([Date], "mmm", "es-VE"),
+    "Trimestre", "Q" & FORMAT([Date], "q"),
+    "Año-Mes", FORMAT([Date], "YYYY-MM"),
+    "Dia Semana", WEEKDAY([Date], 2),
+    "Nombre Dia", FORMAT([Date], "dddd", "es-VE"),
+    "Es Fin de Semana", IF(WEEKDAY([Date], 2) > 5, "Si", "No"),
+    "Fecha_Relativa", IF([Date] = DATEVALUE(FORMAT(FechaHoyGMT4, "YYYY-MM-DD")), "Hoy", IF([Date] < FechaHoyGMT4, "Pasado", "Futuro")),
+    "Slicer Mes Actual", IF(MONTH([Date]) = MONTH(FechaHoyGMT4) && YEAR([Date]) = YEAR(FechaHoyGMT4), "Mes Actual", FORMAT([Date], "mmmm yyyy", "es-VE")),
+    "Filtro Comparativo Dinamico", IF(YEAR([Date]) = AnioActual || YEAR([Date]) = AnioAnterior, 1, 0)
+)
+Para qué sirve:
+Permite filtrar todos los visuales del dashboard por período de tiempo. El valor por defecto Mes Actual aplica al mes calendario en curso según la hora de Venezuela. El usuario puede cambiar a cualquier otro mes histórico o navegar por años, trimestres y rangos personalizados.
+Preguntas de negocio que responde:
+• ¿Qué resultados obtuvimos este mes?
+• ¿Cómo se compara el mes actual con meses anteriores?
+• ¿Qué pasó en un trimestre o mes específico?
+• ¿Cuál es la evolución histórica de los indicadores?
+Cómo interpretarlo:
+El slicer arranca preseleccionado en Mes Actual. Para cambiar el período, hacer clic en el dropdown y seleccionar otro mes. Para análisis comparativos, se puede seleccionar múltiples meses con la tecla Ctrl presionada.
+
+Insights típicos:
+El campo Slicer Mes Actual fue diseñado para que la opción por defecto sea siempre el mes vigente, sin necesidad de mantener el modelo manualmente.
+
+? SL-1.2 — Slicer Sucursal
+
+Tipo de visualFiltro desplegable (dropdown)Vista / Tabla fuenteDim_Sucursales — campo nombre_comercialAudiencia objetivoGerencia Nacional y Supervisores de tienda (filtrado por RLS)
+Para qué sirve:
+Permite acotar el análisis a una sucursal específica o a un conjunto de sucursales. Los usuarios con rol MASTER ven todas las sucursales; los SUPERVISOR ven únicamente las suyas asignadas mediante la vista Vw_RLS_Sucursales del Data Warehouse.
+Preguntas de negocio que responde:
+• ¿Cómo se desempeña una sucursal específica?
+• ¿Cómo compara mi sucursal con el resto de la red?
+• ¿Qué sucursales están en el top y cuáles requieren atención?
+Cómo interpretarlo:
+Al seleccionar una sucursal, todos los KPIs, cards y gráficas se recalculan para mostrar únicamente los datos correspondientes. Para volver a la vista nacional, seleccionar All.
+Insights típicos:
+Los usuarios SUPERVISOR no podrán ver datos de sucursales no asignadas, garantizando la confidencialidad de información comercial cruzada.
+
+
+
+
+
+
+3.4 Cards Principales del Informe
+? C-1.1 — Venta Neta (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Ventas (vía Venta Bruta y Devoluciones)Audiencia objetivoDirección General, Gerencia Nacional, Supervisores
+Medida DAX:
+Venta Neta =
+COALESCE(
+    ROUND([Venta Bruta] - [Devoluciones], 2),
+    0
+)
+Para qué sirve:
+Representa el indicador comercial principal del informe. Es la venta facturada del período menos las devoluciones aplicadas, expresada en bolívares. Constituye la línea superior de los estados de resultados operativos.
+Preguntas de negocio que responde:
+• ¿Cuánto vendimos netamente en el período?
+• ¿Estamos cumpliendo la meta de venta del mes?
+• ¿Cuál es el impacto real de las devoluciones sobre la venta bruta?
+Cómo interpretarlo:
+El valor mostrado está en bolívares con formato abreviado (M para millones, K para miles). Para ver el detalle exacto, hover sobre la card. Esta cifra responde dinámicamente a los slicers de Fecha y Sucursal aplicados.
+Insights típicos:
+El uso de COALESCE garantiza que ante ausencia de datos se muestre cero en lugar de un valor en blanco, mejorando la experiencia visual del dashboard.
+
+
+? C-1.2 — Proyección este mes (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Ventas + Dim_Tiempo (cálculo dinámico)Audiencia objetivoDirección General, Gerencia Nacional
+Medida DAX:
+Proyección Venta Neta =
+VAR FechaHoraGMT4 = UTCNOW() - (4/24)
+VAR FechaHoyGMT4 = DATE(YEAR(FechaHoraGMT4), MONTH(FechaHoraGMT4), DAY(FechaHoraGMT4))
+VAR MesHoy = MONTH(FechaHoyGMT4)
+VAR AnioHoy = YEAR(FechaHoyGMT4)
+VAR DiaHoy = DAY(FechaHoyGMT4)
+VAR DiasTranscurridos = IF(DiaHoy = 1, 1, DiaHoy - 1)
+VAR UltimoDiaMes = DAY(EOMONTH(FechaHoyGMT4, 0))
+VAR MesSeleccionado = SELECTEDVALUE('Dim_Tiempo'[Mes Nro])
+VAR AnioSeleccionado = SELECTEDVALUE('Dim_Tiempo'[Año])
+VAR VentaActual = [Venta Neta]
+VAR CalculoProyeccion = ROUND(DIVIDE(VentaActual, DiasTranscurridos, 0) * UltimoDiaMes, 2)
+RETURN
+IF(
+    ISFILTERED('Dim_Tiempo'[Mes]) || ISFILTERED('Dim_Tiempo'[Date]),
+    IF(
+        AnioSeleccionado < AnioHoy || (AnioSeleccionado = AnioHoy && MesSeleccionado < MesHoy),
+        [Venta Neta],
+        CalculoProyeccion
+    ),
+    ROUND(
+        CALCULATE(
+            DIVIDE([Venta Neta], DiasTranscurridos, 0) * UltimoDiaMes,
+            'Dim_Tiempo'[Mes Nro] = MesHoy,
+            'Dim_Tiempo'[Año] = AnioHoy
+        ), 2
+    )
+)
+Para qué sirve:
+Estima la venta neta al cierre del mes en curso extrapolando el ritmo diario observado al total de días del mes. Es un indicador prospectivo que permite anticipar resultados y tomar acciones correctivas antes del cierre del período.
+Preguntas de negocio que responde:
+• ¿Vamos a cumplir la meta del mes al ritmo actual?
+• ¿Cuánto vamos a cerrar el mes si mantenemos el comportamiento?
+• ¿Necesitamos acelerar acciones comerciales antes del cierre?
+Cómo interpretarlo:
+Si el período seleccionado es el mes actual, la card muestra la proyección extrapolada. Si el período seleccionado es un mes histórico (ya cerrado), muestra el valor real de venta neta del período. La lógica detecta automáticamente si se está mirando el mes en curso o un mes pasado.
+Insights típicos:
+Esta medida es particularmente útil en los primeros quince días del mes para anticipar tendencias. A medida que avanza el mes, la proyección se vuelve más precisa porque tiene más días de información acumulada.
+
+
+? C-1.3 — Total Cobrado (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_RecaudoAudiencia objetivoDirección General, Gerencia Nacional, Finanzas
+Medida DAX:
+Total Cobrado =
+COALESCE(
+    ROUND(SUM(Fact_Recaudo[importe_neto]), 2),
+    0
+)
+Para qué sirve:
+Suma de todos los cobros aplicados en el período sobre facturas y pedidos comerciales. Representa el ingreso efectivo de caja, complementario a la venta neta facturada.
+Preguntas de negocio que responde:
+• ¿Cuánto efectivo hemos recaudado en el período?
+• ¿Está el cobro alineado con la venta facturada?
+• ¿Existe gap entre venta y cobro que indique problemas de cartera?
+Cómo interpretarlo:
+El valor refleja el flujo de caja real del período independientemente de la fecha de facturación. Una venta de marzo cobrada en abril aparece en el Total Cobrado de abril. Para análisis de gap entre venta y cobro, comparar contra la card Venta Neta.
+Insights típicos:
+Si el Total Cobrado es significativamente menor a la Venta Neta del mismo período, puede indicar acumulación de cartera. Si es mayor, se está recuperando cartera vieja.
+
+
+? C-1.4 — Ticket Promedio (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Ventas + Fact_Pedidos (medidas calculadas)Audiencia objetivoDirección General, Gerencia Comercial
+Medida DAX:
+Ticket Promedio =
+COALESCE(
+    ROUND(DIVIDE([Venta Neta], [Cantidad Pedidos], 0), 2),
+    0
+)
+Para qué sirve:
+Calcula el valor promedio de cada transacción comercial. Es un indicador clave para evaluar la calidad del mix de venta: tickets más altos sugieren venta de productos premium o cross-selling efectivo.
+Preguntas de negocio que responde:
+• ¿Cuál es el valor promedio de cada venta?
+• ¿Está aumentando o disminuyendo el ticket promedio?
+• ¿El equipo comercial está logrando vender productos de mayor valor?
+Cómo interpretarlo:
+Se calcula como Venta Neta dividida entre Cantidad de Pedidos. Un aumento sostenido indica mejor mix comercial. Una caída puede indicar promociones agresivas o cambio en el perfil del cliente.
+Insights típicos:
+Comparar el ticket promedio entre sucursales puede revelar diferencias significativas en el perfil de cliente o en la habilidad comercial de cada punto de venta.
+
+
+? C-1.5 — Órdenes Facturadas
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_PedidosAudiencia objetivoDirección General, Gerencia Comercial, Supervisores
+Medida DAX:
+Cantidad Pedidos = DISTINCTCOUNT(Fact_Pedidos[id_pedido])
+Para qué sirve:
+Cuenta los pedidos comerciales únicos generados en el período. Indica volumen transaccional y frecuencia de actividad de cada sucursal.
+Preguntas de negocio que responde:
+• ¿Cuántas transacciones generamos en el período?
+• ¿Cuál es el ritmo de pedidos diarios?
+• ¿El volumen acompaña a la venta o estamos vendiendo más por menos transacciones?
+Cómo interpretarlo:
+Es un indicador de volumen puro. Debe analizarse junto con Ticket Promedio para comprender si el crecimiento de venta proviene de mayor volumen o de mayor valor por transacción.
+Insights típicos:
+El uso de DISTINCTCOUNT garantiza que no se cuenten duplicados aunque el mismo pedido tenga múltiples líneas o eventos asociados.
+
+
+? C-1.6 — Venta Neta YTD (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Ventas + Dim_TiempoAudiencia objetivoDirección General, Gerencia Nacional
+Medida DAX:
+Venta Neta YTD =
+VAR AnioActual = YEAR(TODAY())
+RETURN
+CALCULATE(
+    [Venta Neta],
+    'Dim_Tiempo'[Año] = AnioActual,
+    'Dim_Tiempo'[Date] <= TODAY()
+)
+Para qué sirve:
+Acumula la venta neta desde el primero de enero del año en curso hasta la fecha actual (Year-To-Date). Permite evaluar el desempeño anual acumulado independientemente del mes seleccionado en el slicer.
+Preguntas de negocio que responde:
+• ¿Cómo vamos en el acumulado del año?
+• ¿Vamos por buen camino para cumplir la meta anual?
+• ¿Cuánto representa el mes actual sobre el acumulado anual?
+Cómo interpretarlo:
+Este valor no responde al slicer de Fecha; siempre muestra el acumulado desde inicio de año hasta hoy. Es un complemento contextual a las cards de período corto.
+Insights típicos:
+Comparar esta cifra con la suma de las ventas mensuales del año permite validar la consistencia del Data Warehouse y detectar posibles vacíos en datos históricos.
+
+
+
+? C-1.7 — Total Exámenes
+
+Tipo de visualCard (tarjeta de indicador, secundaria)Vista / Tabla fuenteFact_ExamenesAudiencia objetivoDirección General, Gerencia Clínica
+Medida DAX:
+Total Exámenes =
+COALESCE(DISTINCTCOUNT(Fact_Examenes[id_examen]), 0)
+Para qué sirve:
+Cuenta los exámenes optométricos únicos realizados en el período. Es el indicador clínico fundamental que mide el volumen de atención profesional brindada en las sucursales.
+Preguntas de negocio que responde:
+• ¿Cuántos exámenes optométricos realizamos en el período?
+• ¿El volumen de exámenes acompaña al crecimiento comercial?
+• ¿Estamos aprovechando el flujo clínico para generar ventas?
+Cómo interpretarlo:
+El examen es el evento clínico previo a la venta. La relación entre Total Exámenes y Cantidad Pedidos permite calcular implícitamente la tasa de conversión examen-venta. El detalle de conversión se profundiza en el Informe 4.
+Insights típicos:
+Sucursales con muchos exámenes pero pocos pedidos pueden estar perdiendo oportunidades de cierre comercial.
+
+
+? C-1.8 — Clientes Nuevos
+
+Tipo de visualCard (tarjeta de indicador, secundaria)Vista / Tabla fuenteFact_Pedidos + Dim_Tiempo + Dim_SucursalesAudiencia objetivoDirección General, Marketing, Gerencia Comercial
+Medida DAX:
+Clientes Nuevos =
+VAR ClientesEnContexto = VALUES(Fact_Pedidos[id_cliente])
+RETURN
+COUNTROWS(
+    FILTER(
+        ClientesEnContexto,
+        VAR FechaMinimaHistorica =
+        CALCULATE(
+            MIN(Fact_Pedidos[fecha_pedido_completa]),
+            ALL(Dim_Tiempo),
+            ALL(Dim_Sucursales)
+        )
+        RETURN
+        FechaMinimaHistorica IN VALUES(Dim_Tiempo[Date])
+    )
+) + 0
+Para qué sirve:
+Identifica clientes cuyo primer pedido histórico ocurre dentro del período seleccionado. Es el indicador clave de adquisición de clientes nuevos versus retención de clientes existentes.
+Preguntas de negocio que responde:
+• ¿Cuántos clientes nuevos captamos en el período?
+• ¿Estamos creciendo en base de clientes o solo vendiendo a los existentes?
+• ¿Qué sucursales son más efectivas captando clientes nuevos?
+Cómo interpretarlo:
+Un cliente solo se cuenta como nuevo en el período donde realizó su primer pedido histórico, sin importar cuántas veces vuelva a comprar después. La lógica usa ALL sobre Dim_Tiempo y Dim_Sucursales para encontrar la fecha mínima del cliente en todo el histórico.
+Insights típicos:
+Una caída sostenida en Clientes Nuevos puede indicar debilidad en la captación o saturación del mercado local.
+
+3.5 Gráficos y Tablas del Informe
+? G-1.1 — Relación de Ventas Neta y Tráfico de Ventas
+
+Tipo de visualGráfico combinado (barras + línea)Vista / Tabla fuenteFact_Ventas + Fact_Pedidos + Dim_TiempoAudiencia objetivoDirección General, Gerencia Comercial
+Para qué sirve:
+Visualiza simultáneamente dos métricas correlacionadas: el ingreso neto mensual (barras) y el volumen transaccional (línea). Permite identificar si el crecimiento comercial proviene de mayor volumen o de mejor mix.
+Preguntas de negocio que responde:
+• ¿Cómo evoluciona la venta neta y el número de transacciones mes a mes?
+• ¿Existe correlación entre el volumen y el valor de ventas?
+• ¿Hay meses donde aumenta el volumen pero cae la venta o viceversa?
+Cómo interpretarlo:
+El eje horizontal muestra los meses en formato AAAA-MM. Las barras representan la Venta Neta y la línea representa la Cantidad de Pedidos. Cuando ambas crecen juntas, el crecimiento es saludable. Cuando divergen, debe analizarse el ticket promedio y el mix.
+Insights típicos:
+Un mes con barra alta y línea baja indica tickets más grandes (productos premium). Un mes con línea alta y barra baja indica mayor volumen, pero a precios menores (posiblemente promociones).
+
+
+? G-1.2 — Top Sucursales: Venta Real vs Estimado de Cierre
+
+Tipo de visualGráfico de barras horizontales con dos seriesVista / Tabla fuenteFact_Ventas + Dim_Sucursales + Proyección Venta NetaAudiencia objetivoDirección General, Gerencia Nacional, Supervisores
+Para qué sirve:
+Ranking de sucursales por venta acumulada en el período, con una segunda barra que muestra la proyección al cierre del mes basada en el ritmo diario. Permite identificar líderes y rezagados y tomar acciones específicas.
+Preguntas de negocio que responde:
+• ¿Qué sucursales lideran las ventas?
+• ¿Cuáles van a cerrar el mes con mejor desempeño?
+• ¿Qué sucursales necesitan apoyo para alcanzar su meta?
+Cómo interpretarlo:
+Cada sucursal se muestra con dos barras: una barra principal que indica la Venta Neta real acumulada, y una barra de proyección que estima el cierre del mes al ritmo actual. La diferencia entre ambas indica el potencial de cierre.
+Insights típicos:
+Sucursales cuya proyección esté muy por encima de su realidad histórica pueden estar teniendo un mes excepcional. Sucursales rezagadas requieren intervención inmediata del Supervisor.
+
+
+? G-1.3 — Distribución por Medio de Pago
+
+Tipo de visualGráfico circular (donut)Vista / Tabla fuenteFact_RecaudoAudiencia objetivoDirección General, Finanzas, Tesorería
+Medida DAX:
+% Mix Medios Pago =
+VAR CobroPorCategoria = [Total Cobrado]
+VAR CobroTotal = CALCULATE([Total Cobrado], ALL(Fact_Recaudo[metodo_pago]))
+RETURN
+IF(
+    CobroPorCategoria < 0,
+    0,
+    DIVIDE(CobroPorCategoria, CobroTotal)
+)
+Para qué sirve:
+Muestra la participación porcentual de cada medio de pago en el total recaudado del período. Es información crítica para gestión de tesorería, negociación con procesadores de pago y diseño de promociones específicas por canal.
+Preguntas de negocio que responde:
+• ¿Qué medios de pago prefieren nuestros clientes?
+• ¿Cuánto representa cada canal sobre el total recaudado?
+• ¿Está creciendo el pago digital sobre el efectivo?
+Cómo interpretarlo:
+Cada sector del donut representa un medio de pago. El porcentaje indica la participación sobre el total. Los medios típicos en la operación venezolana incluyen Tarjeta Débito, Cashea, Pago Móvil, Divisa, Lysto, entre otros.
+Insights típicos:
+Una alta participación de un solo medio de pago puede representar riesgo de concentración. La participación de divisa es indicador relevante del comportamiento del mercado venezolano.
+
+
+
+4. Informe 2 — Control de Cartera y Saldos
+4.1 Propósito del Informe
+El informe de Control de Cartera y Saldos es la herramienta de gestión de cuentas por cobrar de Opticolor. Permite a la Gerencia Comercial y a Finanzas monitorear el comportamiento del cobro, identificar saldos pendientes, priorizar gestiones de cobranza y evaluar la eficiencia del cierre transaccional por sucursal.
+Es el panel de control financiero operativo: ¿cuánto dinero hay pactado en pedidos? ¿cuánto se ha cobrado efectivamente? ¿cuánto está pendiente? ¿qué clientes deben más? ¿qué sucursales tienen mejor disciplina de cobro?
+4.2 Vista General del Dashboard
+
+
+4.3 Slicers del Informe
+Este informe reutiliza los mismos dos slicers comunes a todos los dashboards descritos en la Sección 2.2: Slicer Fecha basado en Dim_Tiempo y Slicer Sucursal basado en Dim_Sucursales.
+
+
+4.4 Cards Principales del Informe
+? C-2.1 — Monto Ordenes (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_PedidosAudiencia objetivoDirección General, Gerencia Comercial, Finanzas
+Medida DAX:
+Monto Pedidos = COALESCE(ROUND(SUM(Fact_Pedidos[monto_total]), 2), 0)
+Para qué sirve:
+Suma el valor total pactado de todos los pedidos generados en el período, independientemente de si fueron cobrados o no. Representa el compromiso comercial generado.
+Preguntas de negocio que responde:
+• ¿Cuánto valor comercial generamos en pedidos en el período?
+• ¿Cuál es el potencial de ingresos que comprometimos?
+• ¿Está creciendo el monto pactado mes a mes?
+Cómo interpretarlo:
+Difiere de la Venta Neta porque incluye pedidos en cualquier estado: pagados, parcialmente pagados o pendientes. Es la métrica del lado comercial; la Venta Neta es la métrica facturada.
+Insights típicos:
+Un gap creciente entre Monto Ordenes y Total Cobrado indica deterioro de la cartera.
+
+
+? C-2.2 — Recaudado en Ordenes (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_PedidosAudiencia objetivoDirección General, Finanzas, Tesorería
+Medida DAX:
+Recaudado en Pedidos = COALESCE(ROUND(SUM(Fact_Pedidos[monto_pagado]), 2), 0)
+Para qué sirve:
+Suma de los montos efectivamente cobrados sobre los pedidos del período. Mide la efectividad del proceso de cobro inmediato y de la gestión posterior.
+Preguntas de negocio que responde:
+• ¿Cuánto hemos cobrado efectivamente sobre los pedidos del período?
+• ¿Qué porcentaje del monto pactado se ha hecho efectivo?
+• ¿Es saludable nuestro flujo de caja respecto al volumen vendido?
+Cómo interpretarlo:
+Comparar contra el Monto Ordenes para evaluar la tasa de cobro. La diferencia entre ambos es el Monto Saldo Pendiente.
+Insights típicos:
+Una ratio Recaudado/Pactado por encima del 90% indica disciplina de cobro saludable. Por debajo del 80% requiere atención.
+
+
+? C-2.3 — Monto Saldo Pendiente (Bs)
+
+Tipo de visualCard (tarjeta de indicador, alerta)Vista / Tabla fuenteFact_PedidosAudiencia objetivoDirección General, Finanzas, Supervisores
+Medida DAX:
+Monto Saldo Pendiente = COALESCE(ROUND(SUM(Fact_Pedidos[saldo_pendiente]), 2), 0)
+Para qué sirve:
+Suma del saldo por cobrar de todos los pedidos del período. Es el indicador directo de la cartera vencida o por vencer.
+Preguntas de negocio que responde:
+• ¿Cuánto dinero está pendiente de cobro?
+• ¿Cuál es la exposición financiera de Opticolor en cuentas por cobrar?
+• ¿Está creciendo o disminuyendo la cartera pendiente?
+Cómo interpretarlo:
+Este monto debe contrastarse con el Monto Ordenes para entender su peso relativo. Un saldo pendiente del 5% sobre pactado es operativo normal; del 20% o más es señal de alerta crítica.
+Insights típicos:
+Sucursales con saldos pendientes desproporcionados respecto a su volumen suelen requerir capacitación o cambios en la política de crédito.
+
+
+? C-2.4 — Ordenes por Liquidar
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_PedidosAudiencia objetivoGerencia Comercial, Supervisores, Cobranzas
+Medida DAX:
+Pedidos por Liquidar =
+COALESCE(
+    CALCULATE(
+        DISTINCTCOUNT('Fact_Pedidos'[id_pedido]),
+        FILTER('Fact_Pedidos', 'Fact_Pedidos'[saldo_pendiente] > 0)
+    ),
+    0
+)
+Para qué sirve:
+Cuenta los pedidos únicos del período que aún tienen saldo pendiente de cobro mayor a cero. Es la base de trabajo del área de cobranzas y supervisores de tienda.
+Preguntas de negocio que responde:
+• ¿Cuántos pedidos tenemos activos en cobranza?
+• ¿Cuál es el volumen de la gestión de cobro pendiente?
+• ¿Está creciendo el número de pedidos sin liquidar?
+Cómo interpretarlo:
+Es el contador de tickets activos en cobranza. Cada uno representa un cliente con saldo pendiente. Combinar con Monto Saldo Pendiente para conocer el ticket promedio de la cartera pendiente.
+Insights típicos:
+Muchos pedidos por liquidar con bajo saldo promedio sugiere multitud de cobros pequeños. Pocos pedidos con saldos altos sugiere concentración en clientes grandes.
+
+
+? C-2.5 — % Primer Abono
+
+Tipo de visualCard (tarjeta de indicador porcentual)Vista / Tabla fuenteFact_PedidosAudiencia objetivoGerencia Comercial, Supervisores
+Medida DAX:
+% Primer Abono =
+VAR TotalPedidos = DISTINCTCOUNT('Fact_Pedidos'[id_pedido])
+VAR PedidosConPago =
+CALCULATE(
+    DISTINCTCOUNT('Fact_Pedidos'[id_pedido]),
+    FILTER('Fact_Pedidos', 'Fact_Pedidos'[monto_pagado] > 0)
+)
+RETURN COALESCE(DIVIDE(PedidosConPago, TotalPedidos, 0), 0)
+Para qué sirve:
+Mide el porcentaje de pedidos del período sobre los cuales se aplicó al menos un cobro parcial. Es indicador de salud del cobro inmediato.
+Preguntas de negocio que responde:
+• ¿Qué porcentaje de pedidos tienen al menos un abono?
+• ¿Estamos logrando cobrar en el momento de la venta?
+• ¿Hay pedidos completamente sin pago que requieren atención?
+Cómo interpretarlo:
+Valores cercanos al 100% indican que prácticamente todos los pedidos arrancan con algún pago. Valores por debajo del 90% indican que existen muchos pedidos a crédito puro sin abono inicial.
+Insights típicos:
+Este indicador suele ser muy alto en operación retail (>95%); valores menores requieren revisión de la política de crédito.
+
+
+? C-2.6 — % Pago Total
+
+Tipo de visualCard (tarjeta de indicador porcentual)Vista / Tabla fuenteFact_PedidosAudiencia objetivoDirección General, Finanzas, Supervisores
+Medida DAX:
+% Cobro Inmediato =
+VAR TotalPedidos = DISTINCTCOUNT('Fact_Pedidos'[id_pedido])
+VAR PedidosPagadosFull =
+CALCULATE(
+    DISTINCTCOUNT('Fact_Pedidos'[id_pedido]),
+    FILTER('Fact_Pedidos', 'Fact_Pedidos'[saldo_pendiente] <= 0)
+)
+RETURN
+COALESCE(
+    DIVIDE(PedidosPagadosFull, TotalPedidos, 0),
+    0
+)
+Para qué sirve:
+Mide el porcentaje de pedidos del período que están completamente liquidados (saldo pendiente igual o menor a cero). Es el indicador maestro de eficiencia de cierre transaccional.
+Preguntas de negocio que responde:
+• ¿Qué porcentaje de pedidos están totalmente cobrados?
+• ¿Cuál es la efectividad del cierre transaccional?
+• ¿Cómo compara la eficiencia entre sucursales?
+Cómo interpretarlo:
+Valores cercanos al 100% indican operación muy eficiente con cobro total al momento. Valores entre 75% y 90% son típicos en operación con crédito habilitado. Por debajo del 70% indica acumulación significativa de cartera.
+Insights típicos:
+Esta es la métrica de salud financiera más importante del informe. Su evolución mes a mes refleja la disciplina comercial de la cadena.
+
+4.5 Gráficos y Tablas del Informe
+? G-2.1 — Tendencia de la Cartera (Gap de Cobro)
+
+Tipo de visualGráfico de áreas con dos seriesVista / Tabla fuenteFact_Pedidos + Dim_TiempoAudiencia objetivoDirección General, Finanzas
+Para qué sirve:
+Visualiza la evolución histórica mensual del gap entre los montos pactados en pedidos y los saldos pendientes. Permite identificar tendencias en la acumulación o reducción de cartera.
+Preguntas de negocio que responde:
+• ¿Cómo ha evolucionado la cartera pendiente en el tiempo?
+• ¿Está creciendo el gap entre ventas y cobros?
+• ¿En qué meses tuvimos peores indicadores de cartera?
+Cómo interpretarlo:
+El eje X muestra los meses. Las dos series superpuestas son el Monto Ordenes (mayor) y el Monto Saldo Pendiente (menor). La distancia entre ambas es el monto efectivamente cobrado.
+Insights típicos:
+Un gap estable indica disciplina sostenida. Un gap creciente alerta sobre acumulación progresiva de cartera difícil.
+
+
+? G-2.2 — Cartera Pendiente por Sucursal
+
+Tipo de visualGráfico de barras verticales con scroll horizontalVista / Tabla fuenteFact_Pedidos + Dim_SucursalesAudiencia objetivoGerencia Nacional, Supervisores, Cobranzas
+Para qué sirve:
+Identifica qué sucursales tienen mayor cartera pendiente. Permite priorizar acciones de cobranza por punto de venta y detectar problemas locales de gestión.
+Preguntas de negocio que responde:
+• ¿Qué sucursales acumulan mayor saldo pendiente?
+• ¿Dónde necesitamos reforzar las acciones de cobranza?
+• ¿Existe correlación entre tamaño de sucursal y cartera pendiente?
+Cómo interpretarlo:
+Las barras se ordenan de mayor a menor saldo pendiente. La primera barra siempre representa la sucursal con mayor exposición. Para análisis completo, considerar el saldo pendiente como porcentaje del Monto Ordenes de cada sucursal.
+Insights típicos:
+Una sucursal con saldo pendiente alto en absolutos puede estar bien si su venta también lo es. Lo crítico es la relación saldo/venta de cada punto.
+
+
+? G-2.3 — Mix de Ventas: Participación y Monto Neto
+
+Tipo de visualGráfico de barras horizontalesVista / Tabla fuenteFact_Ventas_por_CategoriaAudiencia objetivoDirección General, Gerencia Comercial
+Medida DAX:
+Venta Neta Mix =
+COALESCE(
+    ROUND(SUM('Fact_Ventas_por_Categoria'[venta_neta]), 2),
+    0
+)
+
+% Participación Mix =
+COALESCE(
+    DIVIDE(
+        [Venta Neta Mix],
+        CALCULATE(
+            [Venta Neta Mix],
+            ALL('Fact_Ventas_por_Categoria'[categoria_agrupada])
+        ),
+        0
+    ),
+    0
+)
+Para qué sirve:
+Descompone la venta neta del período por categoría de producto. Muestra el mix comercial real de Opticolor: monturas correctivas, progresivos, visión sencilla, bifocales, lentes de sol, lentes de contacto, entre otros.
+Preguntas de negocio que responde:
+• ¿Qué categorías de producto generan más venta?
+• ¿Cómo está cambiando el mix comercial en el tiempo?
+• ¿Cuál es el peso de cada línea de negocio?
+Cómo interpretarlo:
+Las barras se ordenan de mayor a menor monto neto. Cada barra representa una categoría comercial específica. La barra más larga indica la categoría líder del período seleccionado.
+Insights típicos:
+Monturas correctivas suele ser la categoría líder en una óptica. Cambios significativos en el mix pueden indicar tendencias de mercado o efectividad de campañas.
+
+
+? T-2.1 — Top de Clientes Deudores
+
+Tipo de visualTabla detalladaVista / Tabla fuenteFact_Pedidos + Dim_Clientes + Dim_SucursalesAudiencia objetivoCobranzas, Supervisores, Finanzas
+Para qué sirve:
+Lista los clientes con mayor monto pendiente de cobro. Es el insumo directo del equipo de cobranzas para priorizar gestión por importe del saldo.
+Preguntas de negocio que responde:
+• ¿Quiénes son los clientes con mayor deuda?
+• ¿En qué sucursales se concentra la cartera difícil?
+• ¿A qué clientes debemos contactar primero?
+Cómo interpretarlo:
+La tabla muestra columnas Sucursal, Cliente, Monto Ordenes, Recaudado en Ordenes y Monto Saldo Pendiente. El total en pie de tabla es la suma agregada para el período y sucursal filtrados.
+Insights típicos:
+Cuentas con saldo pendiente igual al monto de ordenes (sin recaudo) son las más críticas: requieren contacto inmediato. Cuentas con abonos parciales sugieren clientes en proceso de pago.
+
+
+5. Informe 3 — Eficiencia de Órdenes
+5.1 Propósito del Informe
+El informe de Eficiencia de Órdenes está enfocado en la operación de fabricación de cristales ópticos. Permite a la Gerencia Operativa y a los Supervisores de tienda monitorear el volumen de órdenes generadas, el ritmo diario de procesamiento y la distribución por tipo de lente.
+Es el panel clave de la producción óptica: ¿cuántas órdenes tenemos hoy? ¿qué tipo de lente domina nuestra venta? ¿qué sucursales generan más volumen? ¿cuál es nuestra capacidad operativa diaria promedio?
+5.2 Vista General del Dashboard
+
+
+
+5.3 Slicers del Informe
+Este informe utiliza los slicers comunes Fecha y Sucursal, y adiciona un slicer específico:
+? SL-3.1 — Slicer Tipo de Lente
+
+Tipo de visualFiltro desplegable (dropdown)Vista / Tabla fuenteFact_Eficiencia_Ordenes — campo tipo_lente_descripcionAudiencia objetivoGerencia Operativa, Supervisores
+Para qué sirve:
+Permite filtrar el análisis por tipo de lente específico: Lejos (monofocales), Progresivos, Bifocales o Cerca. Útil para análisis detallado por categoría operativa.
+Preguntas de negocio que responde:
+• ¿Cómo se distribuye nuestra producción por tipo de lente?
+• ¿Cuál es el desempeño en cada segmento operativo?
+• ¿Qué tipo de lente domina en cada sucursal?
+Cómo interpretarlo:
+Al seleccionar un tipo específico, todos los visuales se recalculan para mostrar únicamente las órdenes de ese tipo. Para volver al análisis consolidado, seleccionar All.
+Insights típicos:
+Progresivos típicamente tienen mayor ticket promedio pero menor volumen. Lejos suele ser el de mayor volumen pero menor ticket.
+
+
+5.4 Cards Principales del Informe
+? C-3.1 — Ordenes Hoy
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Eficiencia_OrdenesAudiencia objetivoGerencia Operativa, Supervisores
+Medida DAX:
+Ordenes Hoy =
+VAR FechaHoyVE = TODAY()
+RETURN
+CALCULATE(
+    [Volumen de Ordenes],
+    FILTER(ALL(Fact_Eficiencia_Ordenes), Fact_Eficiencia_Ordenes[fecha_pedido] = FechaHoyVE)
+)+0
+Para qué sirve:
+Cuenta las órdenes generadas en el día actual, independientemente del slicer de Fecha seleccionado. Es el termómetro operativo del día en curso.
+Preguntas de negocio que responde:
+• ¿Cuántas órdenes llevamos hoy?
+• ¿El ritmo del día es bueno comparado con el promedio?
+• ¿Necesitamos acelerar la operación antes del cierre del día?
+Cómo interpretarlo:
+El valor se actualiza con cada sincronización del ETL (cada dos horas). Es independiente del slicer de Fecha porque usa ALL para ignorar el filtro y aplicar siempre el día hoy.
+Insights típicos:
+Si la cifra muestra 0, significa que aún no hay órdenes registradas hoy o el ETL aún no ha procesado las cargas del día.
+
+
+? C-3.2 — Volumen de Órdenes
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Eficiencia_OrdenesAudiencia objetivoGerencia Operativa, Supervisores
+Medida DAX:
+Volumen de Ordenes =
+COUNTA(Fact_Eficiencia_Ordenes[id_pedido])
+Para qué sirve:
+Cuenta el total de órdenes únicas del período seleccionado en el slicer de Fecha. Es el indicador maestro del informe.
+Preguntas de negocio que responde:
+• ¿Cuántas órdenes generamos en el período?
+• ¿Cómo compara el volumen contra meses anteriores?
+• ¿Está creciendo nuestra capacidad operativa?
+Cómo interpretarlo:
+Este indicador responde al slicer de Fecha aplicado. Para análisis de tendencia, modificar el slicer y observar cómo varía la cifra.
+Insights típicos:
+El uso de COUNTA garantiza el conteo robusto incluso si hay valores nulos parciales.
+
+
+? C-3.3 — Promedio Ordenes Diarias
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Eficiencia_OrdenesAudiencia objetivoGerencia Operativa, Supervisores
+Medida DAX:
+Promedio Ordenes Diarias =
+DIVIDE(
+    [Volumen de Ordenes],
+    DISTINCTCOUNT(Fact_Eficiencia_Ordenes[fecha_pedido]),
+    0
+)
+Para qué sirve:
+Calcula la cantidad promedio de órdenes generadas por día con actividad en el período. Es la capacidad operativa media diaria de la cadena.
+Preguntas de negocio que responde:
+• ¿Cuántas órdenes promediamos por día?
+• ¿Estamos por encima o por debajo de nuestra capacidad histórica?
+• ¿La operación es estable o variable día a día?
+Cómo interpretarlo:
+Solo considera días con actividad, evitando distorsiones por feriados o domingos sin operación. Para análisis de variabilidad, usar este valor como línea base contra Ordenes Hoy.
+Insights típicos:
+Una caída sostenida en el promedio puede indicar problemas operativos. Un aumento sostenido indica crecimiento real.
+
+
+? C-3.4 — Monto Total Ordenes (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Eficiencia_OrdenesAudiencia objetivoGerencia Operativa, Gerencia Comercial
+Medida DAX:
+Monto Total Ordenes =
+SUM(Fact_Eficiencia_Ordenes[monto_total])
+Para qué sirve:
+Suma el valor comercial total de las órdenes del período. Complementa el volumen con la dimensión económica.
+Preguntas de negocio que responde:
+• ¿Cuánto valor comercial generaron las órdenes del período?
+• ¿Cuál es el monto promedio por orden?
+• ¿Está mejorando el valor por orden con el tiempo?
+Cómo interpretarlo:
+Dividir esta cifra entre el Volumen de Ordenes da el ticket promedio operativo. Comparar con la card de Ventas para cuantificar el peso de cristales en la venta total.
+Insights típicos:
+Crecimiento sostenido sin aumento de volumen indica mejor mix (más progresivos, materiales premium).
+
+
+5.5 Gráficos y Tablas del Informe
+? G-3.1 — Detalle Órdenes por Tipo
+
+Tipo de visualGráfico de barras verticalesVista / Tabla fuenteFact_Eficiencia_OrdenesAudiencia objetivoGerencia Operativa, Marketing
+Para qué sirve:
+Distribución del volumen de órdenes por clasificación de lente: Lejos, Progresivo, Bifocal, Cerca. Permite identificar el peso comercial de cada categoría óptica.
+Preguntas de negocio que responde:
+• ¿Qué tipo de lente vendemos más en volumen?
+• ¿Cómo está distribuida la producción operativa?
+• ¿Estamos creciendo en progresivos (mayor margen) o en visión sencilla?
+Cómo interpretarlo:
+El eje horizontal muestra los tipos de lente; el vertical el volumen de órdenes. La barra más alta indica el tipo dominante en el período seleccionado.
+Insights típicos:
+La distribución típica muestra Lejos como categoría dominante, seguida de Progresivo. Un crecimiento en progresivos suele acompañarse de aumento en ticket promedio.
+
+
+? G-3.2 — Órdenes Ejecutadas por Sucursal
+
+Tipo de visualGráfico de barras horizontales con línea de referenciaVista / Tabla fuenteFact_Eficiencia_Ordenes + Dim_SucursalesAudiencia objetivoGerencia Nacional, Supervisores
+Para qué sirve:
+Ranking de sucursales por volumen de órdenes procesadas en el período. La línea roja vertical marca la mediana, permitiendo identificar sucursales por encima o por debajo del estándar.
+Preguntas de negocio que responde:
+• ¿Qué sucursales lideran en volumen operativo?
+• ¿Cuáles están por debajo de la mediana de la cadena?
+• ¿Dónde se concentra la operación de cristales?
+Cómo interpretarlo:
+Las barras se ordenan de mayor a menor volumen. La línea roja punteada representa la mediana de la distribución. Sucursales a la izquierda de la línea están por debajo del estándar.
+Insights típicos:
+Sucursales con volumen muy bajo pueden estar perdiendo oportunidades de cierre clínico-comercial.
+
+
+? G-3.3 — Tendencia de Órdenes
+
+Tipo de visualGráfico de líneasVista / Tabla fuenteFact_Eficiencia_Ordenes + Dim_TiempoAudiencia objetivoGerencia Operativa, Dirección General
+Para qué sirve:
+Evolución temporal mensual del volumen de órdenes. Permite identificar patrones estacionales, tendencias de crecimiento o caídas operativas.
+Preguntas de negocio que responde:
+• ¿Cómo evoluciona la producción mes a mes?
+• ¿Existe estacionalidad en la demanda?
+• ¿Hay tendencia clara de crecimiento o decrecimiento?
+Cómo interpretarlo:
+El eje X muestra los meses en formato AAAA-MM. La línea representa el Volumen de Ordenes en cada mes. Picos en meses específicos sugieren temporadas comerciales (regreso a clases, fin de año).
+Insights típicos:
+Comparar la pendiente reciente contra el año anterior permite anticipar cierres de año y planificar capacidad operativa.
+
+
+? T-3.1 — Detalle de Órdenes de Cristales por Tipo
+
+Tipo de visualTabla detallada con totalesVista / Tabla fuenteFact_Eficiencia_OrdenesAudiencia objetivoGerencia Operativa, Análisis Comercial
+Para qué sirve:
+Tabla cruzada que muestra simultáneamente el volumen de órdenes y el monto total facturado por cada tipo de lente. Permite calcular implícitamente el ticket por categoría.
+Preguntas de negocio que responde:
+• ¿Cuántas órdenes y cuánto valor por cada tipo de lente?
+• ¿Cuál es el ticket promedio por categoría?
+• ¿Qué categoría aporta más al monto total?
+Cómo interpretarlo:
+Columnas tipo_lente_descripcion, Volumen de Ordenes y Monto Total Ordenes. El total al pie representa la suma agregada. Dividir Monto entre Volumen por fila da el ticket promedio de cada tipo.
+Insights típicos:
+Los progresivos típicamente muestran ticket promedio significativamente mayor a los monofocales. Esta tabla cuantifica la diferencia.
+
+
+
+6. Informe 4 — Desempeño Clínico
+6.1 Propósito del Informe
+El informe de Desempeño Clínico mide la actividad optométrica de Opticolor y la conversión de exámenes clínicos en ventas comerciales. Es el panel donde convergen el área profesional y la comercial, permitiendo medir tanto el volumen de atención clínica como la efectividad de cierre comercial posterior.
+Es la herramienta clave para optometristas, supervisores clínicos y Gerencia: ¿cuántos pacientes atendimos? ¿qué porcentaje convirtió en venta? ¿cómo es el perfil demográfico de nuestros pacientes? ¿qué sucursales son más efectivas convirtiendo exámenes?
+6.2 Vista General del Dashboard
+
+6.3 Slicers del Informe
+Este informe utiliza los mismos dos slicers comunes a todos los dashboards: Fecha y Sucursal.
+
+
+6.4 Cards Principales del Informe
+? C-4.1 — Total Exámenes
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_ExamenesAudiencia objetivoDirección Clínica, Gerencia Nacional, Supervisores
+Medida DAX:
+Total Exámenes =
+COALESCE(DISTINCTCOUNT(Fact_Examenes[id_examen]), 0)
+Para qué sirve:
+Cuenta los exámenes optométricos únicos realizados en el período. Es el indicador clínico fundamental y aparece también como card secundaria en el Informe 1.
+Preguntas de negocio que responde:
+• ¿Cuántos exámenes clínicos realizamos en el período?
+• ¿El volumen clínico justifica nuestra capacidad instalada?
+• ¿Está creciendo la demanda de servicios clínicos?
+Cómo interpretarlo:
+El indicador responde al slicer de Fecha y Sucursal. El examen es la puerta de entrada al ciclo comercial; sin examen no hay diagnóstico y, por tanto, hay menor probabilidad de venta de lentes correctivos.
+Insights típicos:
+Comparar con la card Total Pedidos del Informe 1 permite calcular la tasa de conversión clínica-comercial.
+
+
+? C-4.2 — % Conversión Exámenes
+
+Tipo de visualCard (tarjeta de indicador porcentual)Vista / Tabla fuenteFact_ExamenesAudiencia objetivoDirección General, Dirección Clínica, Supervisores
+Medida DAX:
+% Conversión exámenes =
+DIVIDE(
+    CALCULATE([Total Exámenes], Fact_Examenes[estado_conversion] = "CONVERTIDO"),
+    [Total Exámenes],
+    0
+)
+Para qué sirve:
+Mide el porcentaje de exámenes que resultaron en una venta comercial (pedido de cristales). Es el indicador crítico de efectividad del ciclo clínico-comercial y, posiblemente, la métrica más importante del informe.
+Preguntas de negocio que responde:
+• ¿Qué porcentaje de exámenes se convierte en venta?
+• ¿Cuán efectivo es nuestro proceso clínico-comercial?
+• ¿Qué sucursales tienen mejor conversión?
+Cómo interpretarlo:
+Un porcentaje de conversión alto (>70%) indica que el examen es altamente predictivo de venta. Valores bajos (<50%) indican fugas en el ciclo: clientes que examinan pero no compran. La causa puede ser precio, oferta inadecuada, falta de seguimiento o competencia.
+Insights típicos:
+Es probablemente el indicador con mayor potencial de mejora operativa. Una mejora del 5 puntos puede traducirse en aumentos significativos de venta sin incremento en el volumen clínico.
+
+
+? C-4.3 — Exámenes Hoy
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_ExamenesAudiencia objetivoSupervisores Clínicos, Optometristas
+Medida DAX:
+Exámenes Hoy =
+CALCULATE(
+    [Total Exámenes],
+    Fact_Examenes[fecha_examen_completa] = TODAY()
+)
+Para qué sirve:
+Cuenta los exámenes realizados en el día actual. Es el termómetro de la operación clínica del día en curso.
+Preguntas de negocio que responde:
+• ¿Cuántos exámenes llevamos hoy?
+• ¿La actividad clínica del día es normal?
+• ¿Hemos cumplido la meta diaria de atención?
+Cómo interpretarlo:
+Independiente del slicer de Fecha. Si muestra cero al inicio del día, es normal. Si muestra cero a media jornada, requiere revisión operativa.
+Insights típicos:
+Es ideal para visualización en pantallas de operación en sucursal y para apertura de reuniones de seguimiento diarias.
+
+
+? C-4.4 — Promedio Diario Exámenes
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_ExamenesAudiencia objetivoGerencia Clínica, Supervisores
+Medida DAX:
+Promedio Diario Exámenes =
+DIVIDE(
+    [Total Exámenes],
+    DISTINCTCOUNT(Fact_Examenes[fecha_examen_completa]),
+    0
+)
+Para qué sirve:
+Calcula la cantidad promedio de exámenes realizados por día con actividad en el período. Es la capacidad operativa media diaria del área clínica.
+Preguntas de negocio que responde:
+• ¿Cuántos exámenes promediamos por día?
+• ¿Estamos por encima o por debajo de la capacidad histórica?
+• ¿Cómo varía la actividad entre días laborables?
+Cómo interpretarlo:
+Solo considera días con actividad. Útil para dimensionar capacidad de optometristas y horarios de atención.
+Insights típicos:
+Variaciones grandes entre sucursales pueden indicar diferencias de demanda local o de disponibilidad clínica.
+
+
+? C-4.5 — Exámenes Convertidos
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_ExamenesAudiencia objetivoDirección Comercial, Gerencia Clínica
+Medida DAX:
+Exámenes Convertidos =
+CALCULATE(
+    [Total Exámenes],
+    Fact_Examenes[estado_conversion] = "CONVERTIDO"
+)
+Para qué sirve:
+Cuenta los exámenes del período que generaron una venta posterior. Es el numerador del % Conversión Exámenes y representa el éxito del ciclo clínico-comercial.
+Preguntas de negocio que responde:
+• ¿Cuántos exámenes terminaron en venta?
+• ¿Cómo evoluciona el volumen absoluto de conversiones?
+• ¿Estamos creciendo en el flujo total convertido?
+Cómo interpretarlo:
+Esta cifra es siempre menor o igual al Total Exámenes. La diferencia entre ambos es el volumen de Exámenes No Convertidos.
+Insights típicos:
+Un aumento sostenido en exámenes convertidos sin aumento proporcional en exámenes totales indica mejora real de la eficiencia comercial.
+
+
+? C-4.6 — Exámenes No Convertidos
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_ExamenesAudiencia objetivoDirección Comercial, Marketing, Supervisores
+Medida DAX:
+Exámenes No Convertidos =
+CALCULATE(
+    [Total Exámenes],
+    Fact_Examenes[estado_conversion] = "NO CONVERTIDO"
+)
+Para qué sirve:
+Cuenta los exámenes del período que no generaron venta. Representa la oportunidad comercial perdida y el universo natural para campañas de seguimiento.
+Preguntas de negocio que responde:
+• ¿Cuántos pacientes examinamos pero no compraron?
+• ¿Cuál es el universo para campañas de recuperación?
+• ¿En qué sucursales hay más pacientes no convertidos?
+Cómo interpretarlo:
+Cifra crítica para campañas de email marketing, llamadas de seguimiento o promociones específicas dirigidas a pacientes que ya están en la base de datos.
+Insights típicos:
+Cada uno de estos pacientes ya pasó por consultorio, está pre-calificado y conoce la marca. Convertir incluso un 20% representa potencial significativo.
+
+
+     6.5 Gráficos y Tablas del Informe
+? G-4.1 — Distribución de Pacientes por Género
+
+Tipo de visualGráfico circular (donut)Vista / Tabla fuenteFact_Examenes + Dim_ClientesAudiencia objetivoMarketing, Dirección Comercial
+Para qué sirve:
+Distribución demográfica por género de los pacientes atendidos en exámenes clínicos. Información clave para diseñar campañas y comunicación segmentada.
+Preguntas de negocio que responde:
+• ¿Cuál es el perfil de género de nuestros pacientes?
+• ¿Hay sesgo en la base de atención clínica?
+• ¿Cómo segmentar campañas según género dominante?
+Cómo interpretarlo:
+Cada sector del donut representa un género con su porcentaje. La categoría No Definido agrupa registros sin información demográfica completa.
+Insights típicos:
+Una alta proporción de No Definido sugiere oportunidad de mejorar la captura de datos demográficos en el momento del examen.
+
+
+? G-4.2 — Distribución de Pacientes por Rango de Edad
+
+Tipo de visualGráfico de barras verticalesVista / Tabla fuenteFact_Examenes + Dim_ClientesAudiencia objetivoMarketing, Dirección Comercial
+Para qué sirve:
+Distribución demográfica por rangos de edad de los pacientes: 01 a 18, 19 a 30, 31 a 40, 41 a 50, 51 a 100, Mayor de 100, No Indica. Muestra el segmento etario predominante.
+Preguntas de negocio que responde:
+• ¿Qué edades predominan en nuestra base de pacientes?
+• ¿Estamos atendiendo más adultos o más jóvenes?
+• ¿Cómo adaptar el mix de productos al perfil etario?
+Cómo interpretarlo:
+El rango 51 a 100 suele ser dominante porque la presbicia comienza alrededor de los 45 años y genera necesidad recurrente de progresivos. Rangos juveniles pueden indicar miopía o consulta preventiva.
+Insights típicos:
+Un alto volumen en 01 a 18 puede asociarse a temporadas escolares. Adultos 41-50 son típicamente el segmento con mejor ticket por necesidad de progresivos.
+
+
+? G-4.3 — Exámenes: Volumen Total vs Conversión
+
+Tipo de visualGráfico combinado (barras + línea)Vista / Tabla fuenteFact_Examenes + Dim_TiempoAudiencia objetivoDirección General, Dirección Clínica
+Para qué sirve:
+Visualiza simultáneamente el volumen total de exámenes (barras) y la cantidad de exámenes convertidos (línea) por mes. Permite ver gráficamente la efectividad de conversión en el tiempo.
+Preguntas de negocio que responde:
+• ¿Cómo evolucionan exámenes totales versus convertidos?
+• ¿Mantiene Opticolor su tasa de conversión a lo largo del tiempo?
+• ¿Hay meses con bajón en conversión a pesar de alto volumen?
+Cómo interpretarlo:
+El eje X muestra los meses. Las barras representan el Total de Exámenes; la línea representa los Exámenes Convertidos. La distancia entre la cima de la barra y la línea es el volumen no convertido en cada mes.
+Insights típicos:
+Si la línea sigue de cerca a las barras, la conversión es alta y estable. Si la brecha es amplia y creciente, hay oportunidad de mejora.
+
+
+? G-4.4 — Tendencia de Exámenes por Mes
+
+Tipo de visualGráfico de líneasVista / Tabla fuenteFact_Examenes + Dim_TiempoAudiencia objetivoDirección Clínica, Marketing
+Para qué sirve:
+Evolución temporal del volumen de exámenes mes a mes. Permite identificar tendencias de crecimiento, estacionalidad o caídas.
+Preguntas de negocio que responde:
+• ¿Cómo crece la actividad clínica en el tiempo?
+• ¿Hay estacionalidad en la demanda de exámenes?
+• ¿Coincide la tendencia con campañas de marketing?
+Cómo interpretarlo:
+Cada punto en la línea es un mes. Picos sugieren temporadas o campañas exitosas; caídas indican desaceleración. Comparar con calendario de promociones para evaluar impacto.
+Insights típicos:
+Crecimiento sostenido del flujo clínico es indicador de salud comercial de largo plazo: garantiza pipeline futuro de venta de lentes.
+
+
+? G-4.5 — Top Sucursales por Volumen de Exámenes
+
+Tipo de visualGráfico de barras horizontales con medianaVista / Tabla fuenteFact_Examenes + Dim_SucursalesAudiencia objetivoGerencia Nacional, Supervisores
+Para qué sirve:
+Ranking de sucursales por volumen de exámenes clínicos. La línea roja vertical marca la mediana, identificando sucursales por encima o por debajo del estándar.
+Preguntas de negocio que responde:
+• ¿Qué sucursales realizan más exámenes?
+• ¿Cuáles están por debajo de la mediana?
+• ¿Dónde hay capacidad clínica subutilizada?
+Cómo interpretarlo:
+Sucursales con bajo volumen de exámenes pueden tener problemas de afluencia, falta de optometristas o problemas operativos. Sucursales líderes pueden replicar buenas prácticas.
+Insights típicos:
+Cruzar con la tasa de conversión por sucursal permite identificar sucursales eficientes (alta conversión) versus de alto flujo (alto volumen) pero baja efectividad.
+
+
+
+7. Informe 5 — Inventario y Desplazamiento
+7.1 Propósito del Informe
+El informe de Inventario y Desplazamiento es la herramienta de gestión de stock y análisis de rotación de productos de Opticolor. Permite a la Gerencia Comercial, Compras y Operaciones monitorear el nivel de inventario, identificar productos de alto y bajo desplazamiento, optimizar capital invertido y planificar reposición.
+Es el panel de inteligencia de producto: ¿cuántas unidades tenemos en stock? ¿cuánto capital tenemos inmovilizado? ¿cuántas unidades vendemos? ¿cuáles son nuestras marcas y productos top? ¿cómo se relaciona el stock con las ventas reales?
+7.2 Vista General del Dashboard
+
+
+
+7.3 Slicers del Informe
+Además de los slicers comunes Fecha y Sucursal, este informe incorpora dos slicers exclusivos para análisis de inventario:
+? SL-5.1 — Slicer Marca
+
+Tipo de visualFiltro desplegable (dropdown)Vista / Tabla fuenteDim_Productos — campo marcaAudiencia objetivoGerencia Comercial, Compras, Marketing
+Para qué sirve:
+Permite filtrar el análisis a una marca específica o conjunto de marcas. Útil para análisis comparativo entre marcas Luxury (Herrera, Montblanc, Gucci, Versace, Cartier), Intermedias y BE DIFERENT (marca propia).
+Preguntas de negocio que responde:
+• ¿Cómo se desempeña una marca específica?
+• ¿Cuál es el stock y rotación de BE DIFERENT vs marcas Luxury?
+• ¿Qué marca tiene mejor desplazamiento?
+Cómo interpretarlo:
+Al seleccionar una marca, todos los visuales se recalculan para mostrar únicamente productos de esa marca. Combinable con el slicer de Grupo para análisis multidimensional.
+Insights típicos:
+BE DIFERENT, al ser marca propia, suele tener mejor margen unitario; las marcas Luxury suelen tener mayor ticket pero menor volumen.
+
+
+? SL-5.2 — Slicer Grupo
+
+Tipo de visualFiltro desplegable (dropdown)Vista / Tabla fuenteDim_Productos — campo segmento_comercialAudiencia objetivoGerencia Comercial, Compras, Marketing
+Para qué sirve:
+Permite filtrar por grupo de producto: Monturas, Lentes de Sol, Lentes de Contacto, Accesorios, entre otros. Es la dimensión maestra de categorización comercial.
+Preguntas de negocio que responde:
+• ¿Cómo se distribuye el stock entre grupos de producto?
+• ¿Cuál es el grupo de mayor rotación?
+• ¿Dónde está nuestro capital invertido por grupo?
+Cómo interpretarlo:
+Los segmentos LENTES y TRATAMIENTOS están excluidos de las métricas de Stock Físico y Capital Invertido porque son productos de fabricación bajo pedido, no de inventario en stock.
+Insights típicos:
+Monturas suele ser el grupo de mayor stock y rotación. Lentes de Sol presenta mayor estacionalidad y ticket alto.
+
+
+7.4 Cards Principales del Informe
+? C-5.1 — Stock Físico (Unds)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Inventario + Dim_ProductosAudiencia objetivoGerencia Comercial, Compras, Operaciones
+Medida DAX:
+Stock Fisico (Unds) =
+SUMX(
+    GENERATE(
+        VALUES('Dim_Productos'[SK_Producto]),
+        CALCULATETABLE(
+            Fact_Inventario,
+            Dim_Productos[Segmento_Comercial] <> "LENTES",
+            Dim_Productos[Segmento_Comercial] <> "TRATAMIENTOS"
+        )
+    ),
+    Fact_Inventario[cantidad_disponible]
+)
+Para qué sirve:
+Cuenta el total de unidades físicas disponibles en stock de productos inventariables. Excluye lentes y tratamientos que son productos de fabricación bajo pedido. Es el indicador maestro del informe.
+Preguntas de negocio que responde:
+• ¿Cuántas unidades tenemos en stock disponibles?
+• ¿Tenemos suficiente inventario para sostener la operación?
+• ¿Cómo varía el stock entre sucursales?
+Cómo interpretarlo:
+El cálculo usa SUMX con GENERATE para iterar el producto cartesiano entre productos y su inventario, filtrando los segmentos no inventariables. El valor responde al slicer de Sucursal aplicado.
+Insights típicos:
+Niveles muy altos de stock pueden indicar capital inmovilizado innecesario. Niveles muy bajos pueden indicar riesgo de quiebre y pérdida de venta.
+? C-5.2 — Capital Invertido (Bs)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Inventario + Dim_ProductosAudiencia objetivoDirección General, Finanzas, Compras
+Medida DAX:
+Capital Invertido =
+COALESCE(
+    ROUND(
+        CALCULATE(
+            SUM(Fact_Inventario[valor_total_inventario]),
+            Dim_Productos[Segmento_Comercial] <> "LENTES",
+            Dim_Productos[Segmento_Comercial] <> "TRATAMIENTOS"
+        ), 2
+    ), 0
+)
+Para qué sirve:
+Valor monetario total del inventario disponible al costo (cantidad multiplicada por costo unitario). Es la métrica de capital inmovilizado en stock, indicador crítico para Finanzas.
+Preguntas de negocio que responde:
+• ¿Cuánto dinero tenemos inmovilizado en stock?
+• ¿Cómo dimensionamos nuestra inversión en inventario?
+• ¿Estamos optimizando el capital de trabajo?
+Cómo interpretarlo:
+El cálculo aplica los mismos filtros de exclusión que Stock Físico (no incluye LENTES ni TRATAMIENTOS). El campo valor_total_inventario es producto de cantidad disponible por costo promedio.
+Insights típicos:
+Un Capital Invertido creciente sin crecimiento proporcional de venta indica saturación de stock. Cruzar con rotación para evaluar salud.
+
+
+? C-5.3 — Unidades Vendidas
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Ventas_DetalleAudiencia objetivoGerencia Comercial, Compras
+Medida DAX:
+Unidades Vendidas =
+COALESCE(
+    SUM(Fact_Ventas_Detalle[cantidad]),
+    0
+)
+Para qué sirve:
+Suma de unidades físicas vendidas en el período según el detalle de facturas. Es el indicador de salida real de inventario.
+Preguntas de negocio que responde:
+• ¿Cuántas unidades hemos vendido en el período?
+• ¿Cómo varía la salida de unidades entre meses?
+• ¿Mantenemos un ritmo de venta saludable?
+Cómo interpretarlo:
+Es el volumen físico de salida, no monetario. Combinar con Stock Físico para calcular rotación: Stock dividido entre Unidades Vendidas indica meses de cobertura.
+Insights típicos:
+Un crecimiento sostenido en unidades vendidas indica salud comercial real, más allá de variaciones de precio.
+
+
+? C-5.4 — Unidades por Ticket (UPT)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Ventas_Detalle + Fact_VentasAudiencia objetivoGerencia Comercial, Supervisores
+Medida DAX:
+Unidades por Ticket (UPT) =
+COALESCE(
+    DIVIDE([Unidades Vendidas], [Cantidad Facturas], 0),
+    0
+)
+
+Cantidad Facturas =
+COALESCE(
+    DISTINCTCOUNT(Fact_Ventas[id_factura]),
+    0
+)
+Para qué sirve:
+Promedio de unidades vendidas por cada factura emitida. Es un indicador clave de cross-selling y de la efectividad del vendedor en agregar productos a la transacción.
+Preguntas de negocio que responde:
+• ¿Cuántos productos vendemos en promedio por ticket?
+• ¿Estamos haciendo cross-selling efectivo?
+• ¿Cómo está mejorando la canasta de venta?
+Cómo interpretarlo:
+Un UPT cercano a 1 indica transacciones de un solo producto (compras puntuales). UPT entre 2 y 4 indica cross-selling moderado (montura más cristales más accesorios). Valores superiores indican venta efectiva de combinaciones.
+Insights típicos:
+Capacitación en venta sugestiva y disponibilidad de accesorios cerca del checkout pueden incrementar significativamente el UPT.
+
+? C-5.5 — ASP (Precio Promedio)
+
+Tipo de visualCard (tarjeta de indicador)Vista / Tabla fuenteFact_Ventas_DetalleAudiencia objetivoDirección Comercial, Marketing
+Medida DAX:
+ASP (Precio Promedio) =
+COALESCE(
+    DIVIDE([Venta Neta (Producto)], [Unidades Vendidas], 0),
+    0
+)
+
+Venta Neta (Producto) = ROUND(SUM('Fact_Ventas_Detalle'[monto_final_transaccional]), 2)
+Para qué sirve:
+Average Selling Price. Precio promedio de venta por unidad física. Indicador de calidad del mix: ASP creciente sugiere venta de productos premium o reducción de descuentos.
+Preguntas de negocio que responde:
+• ¿Cuál es el precio promedio por unidad vendida?
+• ¿Estamos vendiendo productos de mayor valor?
+• ¿Cómo evoluciona el ASP en el tiempo?
+Cómo interpretarlo:
+Calculado como Venta Neta de productos dividida entre Unidades Vendidas. Diferente al Ticket Promedio: el ASP es por unidad; el ticket promedio es por factura completa (incluye varias unidades).
+Insights típicos:
+Crecimiento de ASP sin aumento de unidades indica mejor mix. Aumento de unidades con ASP estable indica más volumen del mismo mix.
+
+
+? C-5.6 — Volumen Unidades
+
+Tipo de visualCard (tarjeta de indicador, secundaria)Vista / Tabla fuenteFact_Ventas_AnaliticoAudiencia objetivoAnálisis Comercial
+Medida DAX:
+Volumen Unidades = SUM(Fact_Ventas_Analitico[cantidad])
+Para qué sirve:
+Suma alternativa de unidades vendidas calculada desde la vista analítica Fact_Ventas_Analitico. Complementa el indicador Unidades Vendidas calculado desde Fact_Ventas_Detalle.
+Preguntas de negocio que responde:
+• ¿Cuál es el volumen total de unidades movidas en la operación?
+• ¿Coinciden las dos fuentes de cálculo (Detalle y Analítico)?
+Cómo interpretarlo:
+Esta métrica es una validación cruzada del cálculo principal de Unidades Vendidas. En operación normal ambas deben coincidir; diferencias significativas indican problemas de consistencia en el modelo.
+Insights típicos:
+Es una métrica técnica útil para auditoría del modelo; los usuarios de negocio típicamente trabajan con Unidades Vendidas.
+
+
+7.5 Gráficos y Tablas del Informe
+? T-5.1 — Detalle Operativo de Cobertura de Inventario
+
+Tipo de visualTabla detallada con totalesVista / Tabla fuenteFact_Inventario + Fact_Ventas_Detalle + Dim_ProductosAudiencia objetivoGerencia Comercial, Compras
+Para qué sirve:
+Tabla cruzada por marca que muestra simultáneamente las unidades vendidas, el stock físico disponible y el valor de venta neta del producto. Es la herramienta principal para análisis de cobertura y rotación.
+Preguntas de negocio que responde:
+• ¿Cuánto stock tengo y cuánto vendo por marca?
+• ¿Qué marcas tienen exceso o defecto de inventario?
+• ¿Cuál es la cobertura en meses por marca?
+Cómo interpretarlo:
+Columnas: Marca, Unidades Vendidas, Stock Físico (Unds), Venta Neta (Producto). El total al pie es la suma agregada. La división Stock entre Unidades Vendidas mensuales indica meses de cobertura.
+Insights típicos:
+Marcas con cobertura mayor a 12 meses pueden estar sobre-stockeadas. Marcas con cobertura menor a 2 meses tienen riesgo de quiebre.
+
+
+? G-5.1 — Eficiencia de Inventario: Venta vs Stock
+
+Tipo de visualGráfico de dispersión (scatter)Vista / Tabla fuenteFact_Inventario + Fact_Ventas_Detalle + Dim_ProductosAudiencia objetivoDirección Comercial, Compras
+Para qué sirve:
+Analiza la correlación entre el desplazamiento comercial (eje horizontal, unidades vendidas) y las existencias físicas (eje vertical, stock disponible) por categoría de producto. Permite identificar visualmente productos sobrestockeados o subabastecidos.
+Preguntas de negocio que responde:
+• ¿Existe correlación entre stock y venta?
+• ¿Qué categorías tienen stock desbalanceado respecto a su venta?
+• ¿Dónde tenemos oportunidades de optimización?
+Cómo interpretarlo:
+Cada punto representa una categoría (Monturas, Lentes de Sol, Lentes de Contacto, Accesorios, entre otros). Puntos arriba a la izquierda indican alto stock con baja venta (problema). Puntos abajo a la derecha indican alta venta con bajo stock (riesgo de quiebre).
+Insights típicos:
+El ideal es una recta diagonal positiva: a mayor venta, mayor stock. Desviaciones de esa línea revelan ineficiencias específicas.
+
+
+? G-5.2 — Ranking de Ventas por Marca
+
+Tipo de visualGráfico de barras horizontalesVista / Tabla fuenteFact_Ventas_Detalle + Dim_ProductosAudiencia objetivoGerencia Comercial, Marketing, Compras
+Para qué sirve:
+Clasificación de marcas comerciales por volumen monetario de ventas. Identifica las marcas líderes y permite priorizar negociaciones, surtido y campañas.
+Preguntas de negocio que responde:
+• ¿Qué marcas lideran nuestras ventas?
+• ¿Dónde concentramos esfuerzos comerciales?
+• ¿Cuál es la curva de Pareto de marcas?
+Cómo interpretarlo:
+Las barras se ordenan de mayor a menor venta. Las primeras barras representan las marcas dominantes. Aplica la regla de Pareto: típicamente 20% de marcas concentran 80% de venta.
+Insights típicos:
+BE DIFERENT (marca propia) suele aparecer en los primeros lugares por margen y disponibilidad. Identificar marcas de baja venta para evaluar discontinuación.
+
+
+? G-5.3 — Mix de Venta por Grupo
+
+Tipo de visualTreemap (gráfico de árbol)Vista / Tabla fuenteFact_Ventas_Detalle + Dim_ProductosAudiencia objetivoDirección Comercial, Marketing
+Para qué sirve:
+Visualización proporcional del aporte de cada grupo de producto al volumen total de ventas. Cada rectángulo representa un grupo y su tamaño es proporcional al monto vendido.
+Preguntas de negocio que responde:
+• ¿Qué grupo de producto domina la venta?
+• ¿Cómo se reparte la venta entre Monturas, Lentes de Sol, Contacto, etc.?
+• ¿Estamos diversificados o concentrados en pocas categorías?
+Cómo interpretarlo:
+El rectángulo más grande es el grupo dominante. Los rectángulos pequeños son grupos minoritarios que pueden representar oportunidad de crecimiento o categorías marginales.
+Insights típicos:
+Monturas suele ser el grupo dominante en una óptica. Crecimiento de lentes de contacto o lentes de sol indica diversificación del portafolio comercial.
+
+
+
+8. Anexos
+8.1 Glosario de Términos Analíticos
+TérminoDefiniciónASPAverage Selling Price. Precio promedio de venta por unidad física. Diferente al ticket promedio porque considera unidades en lugar de transacciones.UPTUnits Per Transaction. Unidades vendidas por cada factura emitida. Indicador clave de cross-selling.YTDYear-To-Date. Acumulado desde el primero de enero del año en curso hasta la fecha actual.Cross-sellingTécnica comercial que consiste en agregar productos complementarios a una transacción ya iniciada.Capital InvertidoValor monetario total del inventario en stock valorado al costo. Indica recursos financieros inmovilizados.Conversión clínica-comercialPorcentaje de exámenes optométricos que resultan en una venta posterior. Indicador de efectividad del ciclo de atención.Cartera pendienteSuma de saldos no cobrados de pedidos abiertos. Equivale a las cuentas por cobrar comerciales.Ticket promedioValor monetario promedio de cada transacción comercial (factura).Mix comercialDistribución porcentual de la venta entre las distintas categorías o líneas de producto.Rotación de inventarioVelocidad con que el stock se convierte en venta. Calculada como Unidades Vendidas dividido entre Stock Físico promedio.Proyección Venta NetaEstimación matemática del cierre mensual basada en el ritmo diario observado hasta la fecha actual.SlicerControl visual de filtrado que permite al usuario seleccionar valores de una dimensión para acotar el análisis.CardTarjeta visual que muestra un único valor numérico (KPI) destacado.DonutGráfico circular con centro vacío que muestra participación proporcional de categorías.TreemapGráfico jerárquico donde rectángulos anidados representan proporcionalmente categorías y subcategorías.ScatterGráfico de dispersión que cruza dos variables continuas, útil para identificar correlaciones.RLSRow-Level Security. Filtrado automático de datos según el usuario que consulta la información.
+
+
+8.2 Inventario de Medidas DAX Críticas
+Las siguientes son las medidas DAX más relevantes del modelo, documentadas en este E5 y reutilizadas en distintos informes:
+MedidaAparece enTabla / Vista fuenteVenta NetaInforme 1Fact_VentasProyección Venta NetaInforme 1Fact_Ventas + Dim_TiempoTotal CobradoInforme 1Fact_RecaudoTicket PromedioInforme 1Fact_Ventas + Fact_PedidosCantidad PedidosInformes 1, 4Fact_PedidosCantidad FacturasInformes 1, 5Fact_VentasVenta Neta YTDInforme 1Fact_Ventas + Dim_TiempoTotal ExámenesInformes 1, 4Fact_ExamenesClientes NuevosInforme 1Fact_Pedidos + Dim_Tiempo + Dim_Sucursales% Mix Medios PagoInforme 1Fact_RecaudoMonto PedidosInforme 2Fact_PedidosRecaudado en PedidosInforme 2Fact_PedidosMonto Saldo PendienteInforme 2Fact_PedidosPedidos por LiquidarInforme 2Fact_Pedidos% Primer AbonoInforme 2Fact_Pedidos% Cobro InmediatoInforme 2Fact_PedidosVenta Neta MixInforme 2Fact_Ventas_por_Categoria% Participación MixInforme 2Fact_Ventas_por_CategoriaOrdenes HoyInforme 3Fact_Eficiencia_OrdenesVolumen de OrdenesInforme 3Fact_Eficiencia_OrdenesPromedio Ordenes DiariasInforme 3Fact_Eficiencia_OrdenesMonto Total OrdenesInforme 3Fact_Eficiencia_Ordenes% Conversión ExámenesInforme 4Fact_ExamenesExámenes HoyInforme 4Fact_ExamenesPromedio Diario ExámenesInforme 4Fact_ExamenesExámenes ConvertidosInforme 4Fact_ExamenesExámenes No ConvertidosInforme 4Fact_ExamenesStock Físico (Unds)Informe 5Fact_Inventario + Dim_ProductosCapital InvertidoInforme 5Fact_Inventario + Dim_ProductosUnidades VendidasInforme 5Fact_Ventas_DetalleUnidades por Ticket (UPT)Informe 5Fact_Ventas_Detalle + Fact_VentasASP (Precio Promedio)Informe 5Fact_Ventas_DetalleVenta Neta (Producto)Informe 5Fact_Ventas_DetalleVolumen UnidadesInforme 5Fact_Ventas_Analitico8.3 Recomendaciones de Uso
+Para Dirección General
+Iniciar la sesión revisando el Informe 1 Resumen Comercial para tener visión consolidada. Profundizar en Informe 2 si la cartera muestra alertas. Revisar Informe 4 si la conversión clínica está por debajo del 60%. Usar el Informe 5 para revisar capital inmovilizado al menos una vez al mes.
+Para Gerencia Nacional y Supervisores
+Comenzar con los slicers de Sucursal aplicados a las propias responsabilidades. El Informe 1 da la foto comercial; el Informe 2 muestra dónde están los riesgos de cobranza; el Informe 3 monitorea operación de cristales; el Informe 4 mide eficiencia clínica del equipo.
+Para Marketing y Comercial
+El Informe 4 (Distribución por Género y Rango de Edad) es la base para segmentación de campañas. El Informe 5 (Ranking de Marcas, Mix de Grupo) permite diseñar promociones específicas. El Informe 1 (Mix Medios de Pago) orienta promociones por canal.
+Para Finanzas y Tesorería
+El Informe 2 es la herramienta principal: cards de Recaudado en Ordenes, Saldo Pendiente, % Pago Total y tabla de Clientes Deudores. El Informe 1 complementa con Total Cobrado y Distribución por Medio de Pago.
+8.4 Contactos y Soporte
+RecursoReferenciaLíder técnico VisioFlowGerardo Argueta — visioflow.tech@gmail.comDirector General OpticolorReinaldo José Rangel EstevaInterlocutor técnico OpticolorEduardo Martínez — Emartinez@grupoopticolor.comDocumentos relacionadosE3 — Documento Técnico Base de Datos. E4 — Documento Técnico ETL.
+
+
+8.5 Conclusión
+El presente documento describe en detalle cada uno de los visuales que componen los cinco informes ejecutivos del Ecosistema de Inteligencia de Datos desarrollado por VisioFlow para OPTI-COLOR #2, C.A. Más de sesenta elementos visuales han sido catalogados con su medida DAX, propósito de negocio, preguntas que responden y forma correcta de interpretación.
+Esta guía debe utilizarse en conjunto con los documentos E3 (Base de Datos) y E4 (ETL) para tener visión completa del ecosistema. Su consulta sistemática por parte de la organización permitirá maximizar el aprovechamiento analítico de la inversión realizada en el proyecto y transformar datos en decisiones de negocio fundamentadas.
+ 
+VisioFlow    |    E5 - Guía Interpretación Dashboards - Opticolor
+
+Confidencial — Uso exclusivo OPTI-COLOR #2, C.A.    Página 1 de 2
+

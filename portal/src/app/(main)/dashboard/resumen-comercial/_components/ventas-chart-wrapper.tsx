@@ -3,13 +3,11 @@ import { VentasChart } from "./ventas-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface WrapperProps {
-  startDate: string;
-  endDate: string;
   sucursales: string | null;
 }
 
-export async function VentasChartWrapper({ startDate, endDate, sucursales }: WrapperProps) {
-  const result = await getVentasDiarias({ startDate, endDate, sucursales });
+export async function VentasChartWrapper({ sucursales }: WrapperProps) {
+  const result = await getVentasDiarias({ sucursales });
   const data = result.data ?? [];
 
   return (
