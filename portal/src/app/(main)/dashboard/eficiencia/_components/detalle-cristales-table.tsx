@@ -4,6 +4,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -24,8 +25,15 @@ export function DetalleCristalesTable({ data }: Props) {
     );
   }
 
-  // Asegurar ordenamiento de mayor a menor por volumen
   const sortedData = [...data].sort((a, b) => b.volumen_ordenes - a.volumen_ordenes);
+
+  const totales = sortedData.reduce(
+    (acc, item) => ({
+      volumen_ordenes: acc.volumen_ordenes + item.volumen_ordenes,
+      monto_total:     acc.monto_total     + item.monto_total,
+    }),
+    { volumen_ordenes: 0, monto_total: 0 }
+  );
 
   return (
     <div className="w-full overflow-x-auto pb-2">
@@ -38,8 +46,8 @@ export function DetalleCristalesTable({ data }: Props) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedData.map((item, index) => (
-            <TableRow key={index} className="group transition-colors">
+          {sortedData.map((item) => (
+            <TableRow key={item.tipo_lente_descripcion} className="group transition-colors">
               <TableCell className="font-medium text-sm text-muted-foreground">
                 {item.tipo_lente_descripcion}
               </TableCell>
@@ -52,6 +60,19 @@ export function DetalleCristalesTable({ data }: Props) {
             </TableRow>
           ))}
         </TableBody>
+        <TableFooter>
+          <TableRow className="bg-muted/30 font-semibold">
+            <TableCell className="text-xs uppercase tracking-wider text-muted-foreground">
+              Total
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-sm">
+              {new Intl.NumberFormat("en-US").format(totales.volumen_ordenes)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-sm">
+              {formatCurrency(totales.monto_total)}
+            </TableCell>
+          </TableRow>
+        </TableFooter>
       </Table>
     </div>
   );

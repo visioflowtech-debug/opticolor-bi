@@ -38,55 +38,55 @@ export type Params = {
   sucursales: string | null; // IDs separados por coma, null = todas
 };
 
-type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
+type FetchParams = Params & { allowedSucursales: string };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
 type ValorRow        = { valor: number };
 type PeriodoStatsRow = { volumen_ordenes: number; monto_total: number; promedio_ordenes_diarias: number };
-type TendenciaRow    = { periodo: string; volumen_ordenes: number };
+type TendenciaRow    = { periodo: string; anio: number; mes_nombre: string; volumen_ordenes: number };
 type TipoLenteRow    = { tipo_lente_descripcion: string; volumen_ordenes: number; monto_total: number };
 type SucursalRow     = { nombre_sucursal: string; volumen_ordenes: number };
 
-const MESES = [
-  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
-  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
-];
+const MES_ABBR: Record<string, string> = {
+  Enero: "Ene", Febrero: "Feb", Marzo: "Mar",  Abril: "Abr",
+  Mayo:  "May", Junio:   "Jun", Julio: "Jul",  Agosto: "Ago",
+  Septiembre: "Sep", Octubre: "Oct", Noviembre: "Nov", Diciembre: "Dic",
+};
 
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
 const fetchEficienciaKPIs = unstable_cache(
   async (params: FetchParams): Promise<EficienciaKpis> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("startDate",    startDate)
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("startDate",         startDate)
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const [ordenesHoyRes, periodoStatsRes] = await Promise.all([
+      // C-3.1 Órdenes Hoy — pedidos únicos con zona horaria Venezuela (GMT-4)
       req().query(`
-        SELECT ISNULL(SUM(dea.total_ordenes), 0) AS valor
-        FROM dbo.Dash_Eficiencia_Agregado dea
-        WHERE dea.fecha_pedido = CAST(GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SA Western Standard Time' AS DATE)
-          ${buildSucursalFilter("dea")}
+        SELECT COUNT(DISTINCT id_pedido) AS valor
+        FROM dbo.Fact_Eficiencia_Ordenes
+        WHERE fecha_pedido = CAST(GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SA Western Standard Time' AS DATE)
+          ${buildSucursalFilter()}
       `),
+
+      // C-3.2 Volumen + C-3.3 Promedio Diario — COUNTA semántico (filas, no pedidos únicos)
       req().query(`
         SELECT
-          ISNULL(SUM(dea.total_ordenes), 0)                                           AS volumen_ordenes,
-          ISNULL(SUM(dea.monto_total),   0)                                           AS monto_total,
-          ISNULL(
-            SUM(dea.total_ordenes) * 1.0 / NULLIF(COUNT(DISTINCT dea.fecha_pedido), 0),
-            0
-          )                                                                            AS promedio_ordenes_diarias
-        FROM dbo.Dash_Eficiencia_Agregado dea
-        WHERE dea.fecha_pedido BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("dea")}
+          COUNT(f.id_pedido)                                                              AS volumen_ordenes,
+          ISNULL(SUM(f.monto_total), 0)                                                  AS monto_total,
+          COUNT(f.id_pedido) * 1.0 / NULLIF(COUNT(DISTINCT f.fecha_pedido), 0)          AS promedio_ordenes_diarias
+        FROM dbo.Fact_Eficiencia_Ordenes f
+        WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+          ${buildSucursalFilter("f")}
       `),
     ]);
 
@@ -96,7 +96,7 @@ const fetchEficienciaKPIs = unstable_cache(
     return {
       ordenesHoy:     Number((ordenesHoyRes.recordset as ValorRow[])[0]?.valor ?? 0),
       volumenOrdenes: Number(stats.volumen_ordenes ?? 0),
-      promedioDiario: Math.round(Number(stats.promedio_ordenes_diarias ?? 0) * 100) / 100,
+      promedioDiario: Math.floor(Number(stats.promedio_ordenes_diarias ?? 0)),
       montoTotal:     Math.round(Number(stats.monto_total ?? 0) * 100) / 100,
     };
   },
@@ -111,7 +111,7 @@ export async function getEficienciaKPIs(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchEficienciaKPIs({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchEficienciaKPIs({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getEficienciaKPIs]", err);
@@ -123,31 +123,33 @@ export async function getEficienciaKPIs(
 
 const fetchTendenciaOrden = unstable_cache(
   async (params: FetchParams): Promise<TendenciaOrden[]> => {
-    const { endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT
-        dea.periodo                           AS periodo,
-        ISNULL(SUM(dea.total_ordenes), 0)     AS volumen_ordenes
-      FROM dbo.Dash_Eficiencia_Agregado dea
-      WHERE dea.fecha_pedido >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
-        AND dea.fecha_pedido <= CAST(@endDate AS DATE)
-        ${buildSucursalFilter("dea")}
-      GROUP BY dea.periodo
-      ORDER BY dea.periodo ASC
+        YEAR(f.fecha_pedido)                 AS anio,
+        f.periodo                            AS periodo,
+        DATENAME(MONTH, MIN(f.fecha_pedido)) AS mes_nombre,
+        COUNT(f.id_pedido)                   AS volumen_ordenes
+      FROM dbo.Fact_Eficiencia_Ordenes f
+      WHERE CAST(f.fecha_pedido AS DATE) >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
+        AND CAST(f.fecha_pedido AS DATE) <= CAST(@endDate AS DATE)
+        AND ISNULL(NULLIF(RTRIM(LTRIM(f.tipo_lente_descripcion)), ''), 'No Definido') IS NOT NULL
+        ${buildSucursalFilter("f")}
+      GROUP BY YEAR(f.fecha_pedido), f.periodo
+      ORDER BY f.periodo ASC
     `);
 
-    return (res.recordset as { periodo: string; volumen_ordenes: number }[]).map((r) => ({
-      mes_nombre:      MESES[parseInt(r.periodo.slice(5, 7), 10) - 1] ?? r.periodo,
+    return (res.recordset as TendenciaRow[]).map((r) => ({
+      mes_nombre:      `${MES_ABBR[r.mes_nombre] ?? r.mes_nombre} '${String(r.anio).slice(2)}`,
       volumen_ordenes: Number(r.volumen_ordenes ?? 0),
     }));
   },
@@ -162,7 +164,7 @@ export async function getTendenciaOrden(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchTendenciaOrden({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchTendenciaOrden({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getTendenciaOrden]", err);
@@ -174,27 +176,26 @@ export async function getTendenciaOrden(
 
 const fetchTipoLente = unstable_cache(
   async (params: FetchParams): Promise<TipoLenteDetalle[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("startDate",    startDate)
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("startDate",         startDate)
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT
-        ISNULL(dea.tipo_lente, 'Sin Definir')  AS tipo_lente_descripcion,
-        ISNULL(SUM(dea.total_ordenes), 0)       AS volumen_ordenes,
-        ISNULL(SUM(dea.monto_total),   0)       AS monto_total
-      FROM dbo.Dash_Eficiencia_Agregado dea
-      WHERE dea.fecha_pedido BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter("dea")}
-      GROUP BY dea.tipo_lente
+        ISNULL(NULLIF(RTRIM(LTRIM(f.tipo_lente_descripcion)), ''), 'No Definido') AS tipo_lente_descripcion,
+        COUNT(f.id_pedido)                                                          AS volumen_ordenes,
+        ISNULL(SUM(f.monto_total), 0)                                              AS monto_total
+      FROM dbo.Fact_Eficiencia_Ordenes f
+      WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+        ${buildSucursalFilter("f")}
+      GROUP BY RTRIM(LTRIM(f.tipo_lente_descripcion))
       ORDER BY volumen_ordenes DESC
     `);
 
@@ -215,7 +216,7 @@ export async function getTipoLente(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchTipoLente({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchTipoLente({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getTipoLente]", err);
@@ -227,26 +228,25 @@ export async function getTipoLente(
 
 const fetchOrdenesSucursal = unstable_cache(
   async (params: FetchParams): Promise<OrdenesSucursal[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("startDate",    startDate)
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("startDate",         startDate)
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT
         ds.nombre_sucursal,
-        ISNULL(SUM(dea.total_ordenes), 0) AS volumen_ordenes
-      FROM dbo.Dash_Eficiencia_Agregado dea
-      LEFT JOIN dbo.Dim_Sucursales ds ON dea.id_sucursal = ds.id_sucursal
-      WHERE dea.fecha_pedido BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter("dea")}
+        COUNT(f.id_pedido) AS volumen_ordenes
+      FROM dbo.Fact_Eficiencia_Ordenes f
+      LEFT JOIN dbo.Dim_Sucursales ds ON f.id_sucursal = ds.id_sucursal
+      WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+        ${buildSucursalFilter("f")}
       GROUP BY ds.nombre_sucursal
       ORDER BY volumen_ordenes DESC
     `);
@@ -267,7 +267,7 @@ export async function getOrdenesSucursal(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchOrdenesSucursal({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchOrdenesSucursal({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getOrdenesSucursal]", err);

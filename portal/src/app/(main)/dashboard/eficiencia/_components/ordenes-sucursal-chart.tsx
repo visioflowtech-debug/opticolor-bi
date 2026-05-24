@@ -19,8 +19,8 @@ interface Props {
 }
 
 const truncateLabel = (value: string) => {
-  if (value.length > 20) {
-    return value.substring(0, 20) + "...";
+  if (value.length > 15) {
+    return value.substring(0, 15) + "...";
   }
   return value;
 };
@@ -31,13 +31,12 @@ function ChartTooltip({
   label,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: Array<{ payload: OrdenesSucursal }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
 
-  const data = payload[0].payload as OrdenesSucursal;
+  const data = payload[0].payload;
 
   return (
     <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[200px]">
@@ -98,10 +97,10 @@ export function OrdenesSucursalChart({ data }: Props) {
             dataKey="nombre_sucursal"
             type="category"
             tickFormatter={truncateLabel}
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))", textAnchor: "end", style: { whiteSpace: "nowrap" } }}
             tickLine={false}
             axisLine={false}
-            width={80}
+            width={120}
           />
           <Tooltip
             cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}

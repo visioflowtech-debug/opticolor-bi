@@ -23,13 +23,12 @@ function ChartTooltip({
   label,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: Array<{ payload: TendenciaOrden }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
 
-  const data = payload[0].payload as TendenciaOrden;
+  const data = payload[0].payload;
 
   return (
     <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[150px]">
