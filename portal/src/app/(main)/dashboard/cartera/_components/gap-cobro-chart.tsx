@@ -27,6 +27,11 @@ const fmtMoney = (v: number) =>
 const fmtCurrency = (v: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
 
+const SERIES_LABELS: Record<string, string> = {
+  monto_total:     "Monto Pedidos",
+  saldo_pendiente: "Saldo Pendiente",
+};
+
 function ChartTooltip({
   active,
   payload,
@@ -48,7 +53,7 @@ function ChartTooltip({
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
             <span className="text-muted-foreground">
-              {p.name === "monto_total" ? "Monto Pedidos" : "Saldo Pendiente"}
+              {SERIES_LABELS[p.name] ?? p.name}
             </span>
           </div>
           <span className="font-semibold tabular-nums">
@@ -80,7 +85,7 @@ export function GapCobroChart({ data }: Props) {
             <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.2} />
             <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
           </linearGradient>
-          <linearGradient id="fillSaldo" x1="0" y1="0" x2="0" y2="1">
+<linearGradient id="fillSaldo" x1="0" y1="0" x2="0" y2="1">
             <stop offset="5%" stopColor="var(--destructive)" stopOpacity={0.2} />
             <stop offset="95%" stopColor="var(--destructive)" stopOpacity={0} />
           </linearGradient>
@@ -106,7 +111,7 @@ export function GapCobroChart({ data }: Props) {
           width={60}
         />
         <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.1 }} />
-        
+
         <Area
           type="linear"
           dataKey="monto_total"
@@ -117,7 +122,7 @@ export function GapCobroChart({ data }: Props) {
           fillOpacity={0.2}
           activeDot={{ r: 5, strokeWidth: 0 }}
         />
-        <Area
+<Area
           type="linear"
           dataKey="saldo_pendiente"
           name="saldo_pendiente"

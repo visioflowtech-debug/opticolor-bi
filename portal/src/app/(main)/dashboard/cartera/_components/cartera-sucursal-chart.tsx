@@ -1,6 +1,5 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
   Bar,
   BarChart,
@@ -60,14 +59,6 @@ function ChartTooltip({
 }
 
 export function CarteraSucursalChart({ data }: Props) {
-  const [isMobile, setIsMobile] = useState(false);
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640);
-    check();
-    window.addEventListener("resize", check, { passive: true });
-    return () => window.removeEventListener("resize", check);
-  }, []);
-
   if (!data.length) {
     return (
       <SafeChartContainer height="h-[500px]">
@@ -84,7 +75,7 @@ export function CarteraSucursalChart({ data }: Props) {
       <BarChart
         data={data}
         layout="horizontal"
-        margin={{ top: 20, right: 30, left: 20, bottom: isMobile ? 5 : 120 }}
+        margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
       >
         <CartesianGrid
           strokeDasharray="3 3"
@@ -96,13 +87,10 @@ export function CarteraSucursalChart({ data }: Props) {
         <XAxis
           dataKey="nombre_sucursal"
           type="category"
-          tick={isMobile ? false : { fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+          tick={false}
           tickLine={false}
           axisLine={false}
-          interval={0}
-          angle={-45}
-          textAnchor="end"
-          height={isMobile ? 5 : 60}
+          height={0}
         />
         <YAxis
           type="number"

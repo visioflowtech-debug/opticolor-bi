@@ -49,7 +49,6 @@ type Params = {
 type FetchParams = Params & {
   allowedSucursales: string;
   isSupervisor: boolean;
-  isMaster: boolean;
 };
 
 export type TrendParams = {
@@ -59,7 +58,6 @@ export type TrendParams = {
 type FetchTrendParams = TrendParams & {
   allowedSucursales: string;
   isSupervisor: boolean;
-  isMaster: boolean;
 };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
@@ -74,7 +72,7 @@ type MedioPagoRow       = { medioPago: string; monto: number };
 
 const fetchResumenKPIs = unstable_cache(
   async (params: FetchParams): Promise<KpiData> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor, isMaster } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
     const pool = await getConnection();
 
     // Fecha Venezuela GMT-4 — new Date() es UTC, restar 4 h para obtener la fecha local real
@@ -111,7 +109,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT ISNULL(ROUND(SUM(monto_neto), 2), 0) AS valor
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("", isMaster)}
+          ${buildSucursalFilter("")}
       `),
 
       // C-1.6 — Venta Neta YTD: query independiente — año en curso GMT-4, sin OR contaminante
@@ -119,7 +117,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT ISNULL(ROUND(SUM(monto_neto), 2), 0) AS valor
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @ytdStart AND @ytdEnd
-          ${buildSucursalFilter("", isMaster)}
+          ${buildSucursalFilter("")}
       `),
 
       // C-1.2 — Proyección: condicional mes histórico (→ venta real) vs mes en curso (→ extrapolación)
@@ -144,7 +142,7 @@ const fetchResumenKPIs = unstable_cache(
         END AS valor
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("", isMaster)}
+          ${buildSucursalFilter("")}
       `),
 
       // C-1.3 — Total Cobrado: Dash_Recaudo_Agregado (pre-calculado por el ETL)
@@ -152,7 +150,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT ISNULL(ROUND(SUM(monto_total), 2), 0) AS valor
         FROM dbo.Dash_Recaudo_Agregado
         WHERE fecha_recaudo BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("", isMaster)}
+          ${buildSucursalFilter("")}
       `),
 
       // C-1.5 + C-1.8 — Órdenes (DISTINCT id_pedido) y Clientes Nuevos
@@ -168,7 +166,7 @@ const fetchResumenKPIs = unstable_cache(
             ) THEN 1 ELSE 0 END AS es_nuevo
           FROM dbo.Fact_Pedidos fp
           WHERE CAST(fp.fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("fp", isMaster)}
+          ${buildSucursalFilter("fp")}
         )
         SELECT
           COUNT(DISTINCT id_pedido)                                   AS cantidadPedidos,
@@ -181,7 +179,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT COUNT(DISTINCT id_examen) AS valor
         FROM dbo.Fact_Examenes
         WHERE fecha_examen_completa BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("", isMaster)}
+          ${buildSucursalFilter("")}
       `),
     ]);
 
@@ -224,7 +222,6 @@ export async function getResumenKPIs(
       ...params,
       allowedSucursales,
       isSupervisor: auth.isSupervisor,
-      isMaster: auth.isMaster,
     });
     return { success: true, data };
   } catch (err) {
@@ -237,7 +234,7 @@ export async function getResumenKPIs(
 
 const fetchVentasDiarias = unstable_cache(
   async (params: FetchTrendParams): Promise<MonthlyTrendData[]> => {
-    const { sucursales, allowedSucursales, isSupervisor, isMaster } = params;
+    const { sucursales, allowedSucursales, isSupervisor } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -256,7 +253,7 @@ const fetchVentasDiarias = unstable_cache(
         COUNT(DISTINCT id_factura)                                                    AS trafico
       FROM dbo.KPI_Inf1_Venta_Neta
       WHERE anio_factura = 2026
-        ${buildSucursalFilter("", isMaster)}
+        ${buildSucursalFilter("")}
       GROUP BY anio_factura, mes_factura_nro, periodo_factura
       ORDER BY anio_factura, mes_factura_nro ASC
     `);
@@ -287,7 +284,6 @@ export async function getVentasDiarias(
       ...params,
       allowedSucursales,
       isSupervisor: auth.isSupervisor,
-      isMaster: auth.isMaster,
     });
     return { success: true, data };
   } catch (err) {
@@ -300,7 +296,7 @@ export async function getVentasDiarias(
 
 const fetchTopSucursales = unstable_cache(
   async (params: FetchParams): Promise<VentaSucursal[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor, isMaster } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -332,7 +328,7 @@ const fetchTopSucursales = unstable_cache(
           ISNULL(ROUND(SUM(monto_neto), 2), 0)  AS ventaNeta
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("", isMaster)}
+          ${buildSucursalFilter("")}
         GROUP BY id_sucursal
       ) vn
       INNER JOIN dbo.Dim_Sucursales ds ON ds.id_sucursal = vn.idSucursal
@@ -346,7 +342,7 @@ const fetchTopSucursales = unstable_cache(
           END, 2), 0) AS estimado
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("", isMaster)}
+          ${buildSucursalFilter("")}
         GROUP BY id_sucursal
       ) pv ON pv.id_sucursal = vn.idSucursal
       ORDER BY vn.ventaNeta DESC
@@ -374,7 +370,6 @@ export async function getTopSucursales(
       ...params,
       allowedSucursales,
       isSupervisor: auth.isSupervisor,
-      isMaster: auth.isMaster,
     });
     return { success: true, data };
   } catch (err) {
@@ -387,7 +382,7 @@ export async function getTopSucursales(
 
 const fetchMediosPago = unstable_cache(
   async (params: FetchParams): Promise<MedioPago[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor, isMaster } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -405,7 +400,7 @@ const fetchMediosPago = unstable_cache(
         ISNULL(SUM(monto_total), 0)       AS monto
       FROM dbo.Dash_Recaudo_Agregado
       WHERE fecha_recaudo BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter("", isMaster)}
+        ${buildSucursalFilter("")}
       GROUP BY metodo_pago
       ORDER BY monto DESC
     `);
@@ -436,7 +431,6 @@ export async function getMediosPago(
       ...params,
       allowedSucursales,
       isSupervisor: auth.isSupervisor,
-      isMaster: auth.isMaster,
     });
     return { success: true, data };
   } catch (err) {

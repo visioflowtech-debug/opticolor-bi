@@ -4,6 +4,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -30,6 +31,15 @@ export function ClientesDeudoresTable({ data }: Props) {
     );
   }
 
+  const totales = data.reduce(
+    (acc, c) => ({
+      monto_total:     acc.monto_total     + c.monto_total,
+      monto_pagado:    acc.monto_pagado    + c.monto_pagado,
+      saldo_pendiente: acc.saldo_pendiente + c.saldo_pendiente,
+    }),
+    { monto_total: 0, monto_pagado: 0, saldo_pendiente: 0 }
+  );
+
   return (
     <div className="w-full overflow-x-auto pb-2">
       <Table className="min-w-[700px]">
@@ -43,13 +53,16 @@ export function ClientesDeudoresTable({ data }: Props) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.map((cliente, index) => {
-            const pctPagado = cliente.monto_total > 0 
-              ? (cliente.monto_pagado / cliente.monto_total) * 100 
+          {data.map((cliente) => {
+            const pctPagado = cliente.monto_total > 0
+              ? (cliente.monto_pagado / cliente.monto_total) * 100
               : 0;
 
             return (
-              <TableRow key={index} className="group transition-colors">
+              <TableRow
+                key={`${cliente.nombre_sucursal}-${cliente.nombre_completo}`}
+                className="group transition-colors"
+              >
                 <TableCell className="font-medium text-sm truncate max-w-[150px] text-muted-foreground">
                   {cliente.nombre_sucursal}
                 </TableCell>
@@ -80,6 +93,22 @@ export function ClientesDeudoresTable({ data }: Props) {
             );
           })}
         </TableBody>
+        <TableFooter>
+          <TableRow className="bg-muted/30 font-semibold">
+            <TableCell colSpan={2} className="text-xs uppercase tracking-wider text-muted-foreground">
+              Total TOP {data.length}
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-sm">
+              {formatCurrency(totales.monto_total)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-sm">
+              {formatCurrency(totales.monto_pagado)}
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-sm text-destructive">
+              {formatCurrency(totales.saldo_pendiente)}
+            </TableCell>
+          </TableRow>
+        </TableFooter>
       </Table>
     </div>
   );

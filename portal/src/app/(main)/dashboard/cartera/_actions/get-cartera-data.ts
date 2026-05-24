@@ -49,7 +49,7 @@ export type Params = {
   sucursales: string | null; // IDs separados por coma, null = todas
 };
 
-type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
+type FetchParams = Params & { allowedSucursales: string };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
@@ -64,22 +64,16 @@ type ClienteDeudorRow = { nombre_sucursal: string; nombre_completo: string; mont
 // 1. KPIs
 const fetchCarteraKPIs = unstable_cache(
   async (params: FetchParams): Promise<CarteraKpiData> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
-
-    const startYM = parseInt(startDate.slice(0, 4) + startDate.slice(5, 7), 10);
-    const endYM   = parseInt(endDate.slice(0, 4)   + endDate.slice(5, 7),   10);
 
     const req = () =>
       pool
         .request()
-        .input("startDate",    startDate)
-        .input("endDate",      endDate)
-        .input("startYM",      startYM)
-        .input("endYM",        endYM)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("startDate",         startDate)
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const [
       montoPedidosRes,
@@ -89,7 +83,7 @@ const fetchCarteraKPIs = unstable_cache(
       pctCobroInmediatoRes,
       pctNivelAbonoRes,
     ] = await Promise.all([
-      // 1. Monto Pedidos
+      // C-2.1 Monto Pedidos
       req().query(`
         SELECT ISNULL(SUM(monto_total), 0) AS valor
         FROM dbo.KPI_Inf3_Monto_Pedidos
@@ -97,15 +91,15 @@ const fetchCarteraKPIs = unstable_cache(
           ${buildSucursalFilter()}
       `),
 
-      // 2. Recaudado
+      // C-2.2 Recaudado en Pedidos — dinero abonado sobre órdenes nacidas en el período
       req().query(`
-        SELECT ISNULL(SUM(dr.monto_total), 0) AS valor
-        FROM dbo.Dash_Recaudo_Agregado dr
-        WHERE dr.fecha_recaudo BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("dr")}
+        SELECT ISNULL(SUM(monto_pagado), 0) AS valor
+        FROM dbo.KPI_Inf3_Recaudado_Pedidos
+        WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
+          ${buildSucursalFilter()}
       `),
 
-      // 3. Saldo Pendiente
+      // C-2.3 Saldo Pendiente — acumulado vigente hasta @endDate
       req().query(`
         SELECT ROUND(COALESCE(SUM(saldo_pendiente), 0), 2) AS valor
         FROM dbo.KPI_Inf3_Saldo_Pendiente
@@ -113,7 +107,7 @@ const fetchCarteraKPIs = unstable_cache(
           ${buildSucursalFilter()}
       `),
 
-      // 4. Pedidos por Liquidar
+      // C-2.4 Pedidos por Liquidar — acumulado vigente hasta @endDate
       req().query(`
         SELECT COUNT(DISTINCT id_pedido) AS valor
         FROM dbo.KPI_Inf3_Pedidos_Liquidar
@@ -121,25 +115,25 @@ const fetchCarteraKPIs = unstable_cache(
           ${buildSucursalFilter()}
       `),
 
-      // 5. % Cobro Inmediato
+      // C-2.5 % Primer Abono — conteo de órdenes con pago inicial en el período exacto
       req().query(`
         SELECT ISNULL(
-          SUM(pedidos_cobrados) * 100.0 / NULLIF(SUM(total_pedidos), 0),
+          COUNT(CASE WHEN monto_pagado > 0 THEN 1 END) * 100.0 / NULLIF(COUNT(id_pedido), 0),
           0
         ) AS valor
-        FROM dbo.KPI_Inf3_Pct_Cobro_Inmediato
-        WHERE anio_pedido * 100 + mes_pedido_nro BETWEEN @startYM AND @endYM
+        FROM dbo.KPI_Inf3_Monto_Pedidos
+        WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
           ${buildSucursalFilter()}
       `),
 
-      // 6. % Nivel de Abono
+      // C-2.6 % Pago Total — conteo de órdenes completamente liquidadas en el período exacto
       req().query(`
         SELECT ISNULL(
-          SUM(monto_pagado) * 100.0 / NULLIF(SUM(monto_total), 0),
+          COUNT(CASE WHEN saldo_pendiente <= 0 THEN 1 END) * 100.0 / NULLIF(COUNT(id_pedido), 0),
           0
         ) AS valor
-        FROM dbo.KPI_Inf3_Pct_Nivel_Abono
-        WHERE anio_pedido * 100 + mes_pedido_nro BETWEEN @startYM AND @endYM
+        FROM dbo.KPI_Inf3_Monto_Pedidos
+        WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
           ${buildSucursalFilter()}
       `),
     ]);
@@ -164,7 +158,7 @@ export async function getCarteraKPIs(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchCarteraKPIs({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchCarteraKPIs({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getCarteraKPIs]", err);
@@ -172,33 +166,32 @@ export async function getCarteraKPIs(
   }
 }
 
-// 2. GAP Cobro
+// 2. GAP Cobro — 3 series: Monto Pedidos, Saldo Pendiente, Recaudado
 const fetchGapCobro = unstable_cache(
   async (params: FetchParams): Promise<GapCobro[]> => {
-    const { endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT
         mes_pedido_nombre,
-        YEAR(fecha_pedido_completa)  AS anio,
-        MONTH(fecha_pedido_completa) AS mes,
-        ISNULL(SUM(monto_total),       0) AS monto_total,
-        ISNULL(SUM(saldo_pendiente),   0) AS saldo_pendiente
-      FROM dbo.Fact_Pedidos
+        anio_pedido,
+        mes_pedido_nro,
+        ISNULL(SUM(monto_total),     0) AS monto_total,
+        ISNULL(SUM(saldo_pendiente), 0) AS saldo_pendiente
+      FROM dbo.KPI_Inf3_Monto_Pedidos
       WHERE CAST(fecha_pedido_completa AS DATE) >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
         AND CAST(fecha_pedido_completa AS DATE) <= @endDate
         ${buildSucursalFilter()}
-      GROUP BY mes_pedido_nombre, YEAR(fecha_pedido_completa), MONTH(fecha_pedido_completa)
-      ORDER BY YEAR(fecha_pedido_completa) ASC, MONTH(fecha_pedido_completa) ASC
+      GROUP BY mes_pedido_nombre, anio_pedido, mes_pedido_nro
+      ORDER BY anio_pedido ASC, mes_pedido_nro ASC
     `);
 
     return (res.recordset as GapCobroRow[]).map((r) => ({
@@ -218,7 +211,7 @@ export async function getGapCobroData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchGapCobro({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchGapCobro({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getGapCobroData]", err);
@@ -229,17 +222,16 @@ export async function getGapCobroData(
 // 3. Mix Ventas
 const fetchMixVentas = unstable_cache(
   async (params: FetchParams): Promise<MixVenta[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("startDate",    startDate)
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("startDate",         startDate)
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT
@@ -270,7 +262,7 @@ export async function getMixVentasData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchMixVentas({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchMixVentas({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getMixVentasData]", err);
@@ -281,16 +273,15 @@ export async function getMixVentasData(
 // 4. Cartera Sucursal
 const fetchCarteraSucursal = unstable_cache(
   async (params: FetchParams): Promise<CarteraSucursal[]> => {
-    const { endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT
@@ -320,7 +311,7 @@ export async function getCarteraSucursalData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchCarteraSucursal({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchCarteraSucursal({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getCarteraSucursalData]", err);
@@ -331,16 +322,16 @@ export async function getCarteraSucursalData(
 // 5. Clientes Deudores
 const fetchClientesDeudores = unstable_cache(
   async (params: FetchParams): Promise<ClienteDeudor[]> => {
-    const { endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",      endDate)
-        .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("startDate",         startDate)
+        .input("endDate",           endDate)
+        .input("sucursales",        sucursales)
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT TOP 10
@@ -352,7 +343,7 @@ const fetchClientesDeudores = unstable_cache(
       FROM dbo.Fact_Pedidos fp
       INNER JOIN dbo.Dim_Clientes    dc ON fp.id_cliente   = dc.id_cliente
       INNER JOIN dbo.Dim_Sucursales  ds ON fp.id_sucursal  = ds.id_sucursal
-      WHERE CAST(fp.fecha_pedido_completa AS DATE) <= @endDate
+      WHERE CAST(fp.fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
         ${buildSucursalFilter("fp")}
       GROUP BY ds.nombre_sucursal, dc.nombre_completo
       HAVING ISNULL(SUM(fp.saldo_pendiente), 0) > 0
@@ -378,7 +369,7 @@ export async function getClientesDeudoresTabla(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchClientesDeudores({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchClientesDeudores({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getClientesDeudoresTabla]", err);
