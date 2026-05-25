@@ -62,7 +62,7 @@ function ChartTooltip({
 function GeneroLegend({ data }: { data: GeneroExamen[] }) {
   const total = data.reduce((acc, curr) => acc + curr.total_examenes, 0);
   return (
-    <ul className="flex w-full flex-col gap-2">
+    <ul className="flex w-full flex-wrap justify-center gap-x-6 gap-y-2">
       {data.map((item, i) => {
         const pct = total > 0 ? (item.total_examenes / total) * 100 : 0;
         return (
@@ -72,7 +72,7 @@ function GeneroLegend({ data }: { data: GeneroExamen[] }) {
               style={{ backgroundColor: COLORS[i % COLORS.length] }}
             />
             <span
-              className="min-w-0 flex-1 truncate text-muted-foreground"
+              className="min-w-0 truncate text-muted-foreground"
               title={item.genero_label}
             >
               {item.genero_label}
@@ -90,7 +90,7 @@ function GeneroLegend({ data }: { data: GeneroExamen[] }) {
 export function GeneroChart({ data }: Props) {
   if (!data.length) {
     return (
-      <div className="flex h-52 items-center justify-center text-sm text-muted-foreground">
+      <div className="flex h-[380px] items-center justify-center text-sm text-muted-foreground">
         Sin datos para el período seleccionado
       </div>
     );
@@ -99,15 +99,15 @@ export function GeneroChart({ data }: Props) {
   const total = data.reduce((acc, curr) => acc + curr.total_examenes, 0);
 
   return (
-    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
-      <SafeChartContainer height="h-52" className="w-52 shrink-0">
+    <div className="flex flex-col items-center justify-between h-[380px] w-full min-w-0">
+      <SafeChartContainer height="h-full" className="w-full flex-grow relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius="32%"
+              innerRadius="52%"
               outerRadius="82%"
               paddingAngle={2}
               dataKey="total_examenes"
@@ -123,7 +123,7 @@ export function GeneroChart({ data }: Props) {
         </ResponsiveContainer>
       </SafeChartContainer>
 
-      <div className="min-w-0 flex-1">
+      <div className="w-full mt-4">
         <GeneroLegend data={data} />
       </div>
     </div>

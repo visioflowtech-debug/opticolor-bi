@@ -49,6 +49,12 @@ function ChartTooltip({
             {new Intl.NumberFormat("en-US").format(data.no_convertidos)}
           </span>
         </div>
+        <div className="flex items-center justify-between gap-6">
+          <span className="text-muted-foreground">Total Exámenes</span>
+          <span className="font-semibold tabular-nums text-foreground">
+            {new Intl.NumberFormat("en-US").format(data.total_examenes)}
+          </span>
+        </div>
         <div className="flex items-center justify-between gap-6 mt-1 border-t border-border pt-2">
           <span className="text-muted-foreground">% Conversión</span>
           <span className="font-semibold tabular-nums text-foreground">
@@ -72,11 +78,11 @@ export function VolumenConversionChart({ data }: Props) {
   }
 
   return (
-    <SafeChartContainer height="h-[350px]">
+    <SafeChartContainer height="h-full" className="w-full flex-grow relative">
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart
         data={data}
-        margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+        margin={{ top: 10, right: 5, left: -10, bottom: 5 }}
       >
         <CartesianGrid
           strokeDasharray="3 3"

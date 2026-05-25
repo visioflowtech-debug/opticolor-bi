@@ -102,6 +102,7 @@ export function TopSucursalesClinicaChart({ data }: Props) {
           axisLine={false}
           width={120}
           interval={0}
+          hide={true}
         />
         <Tooltip
           cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
