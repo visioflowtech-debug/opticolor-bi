@@ -1,11 +1,16 @@
-import { VarChar } from "@/lib/db";
+import { Int } from "@/lib/db";
 import { unstable_cache } from "next/cache";
 import { getConnection } from "@/lib/db";
 
 async function fetchUserAllowedSucursales(userId: string): Promise<string> {
+  const parsedId = parseInt(userId, 10);
+  if (!userId || isNaN(parsedId)) {
+    return "-1";
+  }
+
   const pool = await getConnection();
   const result = await pool.request()
-    .input("userId", VarChar, userId.trim())
+    .input("userId", Int, parsedId)
     .query(`
       SELECT id_sucursal
       FROM dbo.Seguridad_Usuarios_Sucursales
