@@ -1,9 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { startOfMonth } from "date-fns";
-import type { DateRange } from "react-day-picker";
 import { Layers, MapPin, Tag } from "lucide-react";
 
 import { DateRangePicker } from "@/components/date-range-picker";
@@ -20,8 +18,6 @@ export function ReportFilters({ sucursales }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const fromParam = searchParams.get("from");
-  const toParam = searchParams.get("to");
   const sucursalParam = searchParams.get("sucursal");
   const marcaParam = searchParams.get("marca");
   const grupoParam = searchParams.get("grupo");
@@ -48,45 +44,6 @@ export function ReportFilters({ sucursales }: Props) {
       })
       .catch(() => {/* fail silently */});
   }, [isInventario]);
-
-  // ── Date Range ────────────────────────────────────────────────────────────
-
-  const [localDateRange, setLocalDateRange] = useState<DateRange>({
-    from: fromParam ? new Date(fromParam) : startOfMonth(new Date()),
-    to: toParam ? new Date(toParam) : new Date(),
-  });
-
-  const debounceTimer = useRef<NodeJS.Timeout | null>(null);
-
-  const handleDateChange = useCallback(
-    (range: DateRange | undefined) => {
-      if (!range?.from) return;
-      const fromDate = range.from;
-      const toDate = range.to;
-
-      const newFromStr = fromDate.toISOString();
-      const newToStr = toDate ? toDate.toISOString() : null;
-
-      const currentParams = new URLSearchParams(window.location.search);
-      const currentFrom = currentParams.get("from");
-      const currentTo = currentParams.get("to");
-
-      if (currentFrom === newFromStr && currentTo === newToStr) return;
-
-      setLocalDateRange(range);
-
-      if (debounceTimer.current) clearTimeout(debounceTimer.current);
-
-      debounceTimer.current = setTimeout(() => {
-        const freshParams = new URLSearchParams(window.location.search);
-        freshParams.set("from", newFromStr);
-        if (newToStr) freshParams.set("to", newToStr);
-        else freshParams.delete("to");
-        router.replace(`${pathname}?${freshParams.toString()}`, { scroll: false });
-      }, 500);
-    },
-    [pathname, router],
-  );
 
   const handleSucursalChange = useCallback(
     (vals: string[]) => {
@@ -131,7 +88,7 @@ export function ReportFilters({ sucursales }: Props) {
 
       {/* ── Permanentes: siempre visibles en cualquier ruta de /dashboard ── */}
       <div className="shrink-0 w-full sm:w-auto">
-        <DateRangePicker value={localDateRange} onChange={handleDateChange} />
+        <DateRangePicker />
       </div>
 
       <div className="shrink-0 min-w-[150px] md:min-w-[180px] xl:min-w-[220px]">
