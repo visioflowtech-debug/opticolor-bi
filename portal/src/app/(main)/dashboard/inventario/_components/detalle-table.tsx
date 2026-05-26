@@ -8,8 +8,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCompactCurrency, formatCurrency } from "@/lib/utils";
+import { formatBsCurrency } from "@/lib/utils";
 import type { MarcaItem } from "../_actions/get-inventario-data";
+
 
 interface Props {
   data: MarcaItem[];
@@ -55,9 +56,9 @@ export function DetalleTable({ data }: Props) {
               </TableCell>
               <TableCell
                 className="text-right tabular-nums font-medium"
-                title={formatCurrency(item.ventaNeta)}
+                title={formatBsCurrency(item.ventaNeta)}
               >
-                {formatCompactCurrency(item.ventaNeta)}
+                {formatBsCurrency(item.ventaNeta)}
               </TableCell>
             </TableRow>
           ))}

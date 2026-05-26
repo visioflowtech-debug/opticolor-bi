@@ -28,7 +28,9 @@ const EMPTY_KPIS = {
   capitalInvertido: 0,
   unidadesVendidas: 0,
   ventaNetaProducto: 0,
-  cantidadFacturas: 0,
+  upt: 0,
+  asp: 0,
+  volumenUnidades: 0,
 };
 
 export default async function InventarioPage({
@@ -57,12 +59,6 @@ export default async function InventarioPage({
   });
   const kpis = result.data ?? EMPTY_KPIS;
 
-  // Métricas derivadas
-  const upt =
-    kpis.cantidadFacturas > 0 ? kpis.unidadesVendidas / kpis.cantidadFacturas : 0;
-  const asp =
-    kpis.unidadesVendidas > 0 ? kpis.ventaNetaProducto / kpis.unidadesVendidas : 0;
-
   return (
     <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
@@ -72,8 +68,8 @@ export default async function InventarioPage({
         </div>
       )}
 
-      {/* ── Fila 1: 5 KPI Cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      {/* ── Fila 1: 6 KPI Cards ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           title="Stock Físico"
           value={formatCompactNumber(kpis.stockFisico)}
@@ -97,16 +93,23 @@ export default async function InventarioPage({
         />
         <KpiCard
           title="UPT"
-          value={upt.toFixed(2)}
+          value={kpis.upt.toFixed(2)}
           subtitle="Unidades por ticket"
           iconName="bar-chart-2"
         />
         <KpiCard
           title="ASP"
-          value={formatCompactCurrency(asp)}
-          fullValue={formatCurrency(asp)}
+          value={formatCompactCurrency(kpis.asp)}
+          fullValue={formatCurrency(kpis.asp)}
           subtitle="Precio promedio de venta"
           iconName="tag"
+        />
+        <KpiCard
+          title="Volumen Total"
+          value={formatCompactNumber(kpis.volumenUnidades)}
+          fullValue={kpis.volumenUnidades.toLocaleString("en-US")}
+          subtitle="Control analítico · sin exclusiones"
+          iconName="layers"
         />
       </div>
 

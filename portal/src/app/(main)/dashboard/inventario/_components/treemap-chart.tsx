@@ -6,15 +6,14 @@ import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCurrency } from "@/lib/utils";
 import type { GrupoMix } from "../_actions/get-inventario-data";
 
-const PALETTE = [
-  "#0f172a",
-  "#1e3a5f",
-  "#1d4ed8",
-  "#0891b2",
-  "#0d9488",
-  "#059669",
-  "#047857",
-];
+// Tokens semánticos del Design System — var() resuelve el valor OKLCH nativo (Tailwind v4)
+const CHART_TOKENS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
+] as const;
 
 interface Props {
   data: GrupoMix[];
@@ -67,7 +66,7 @@ function TreemapCell(props: {
   // El nodo raíz (depth=0) no se renderiza
   if (depth === 0) return <g />;
 
-  const color = PALETTE[index % PALETTE.length];
+  const color = CHART_TOKENS[index % CHART_TOKENS.length];
   const showLabel = width > 80 && height > 48;
   const showPct   = width > 80 && height > 72;
 
@@ -83,7 +82,7 @@ function TreemapCell(props: {
         height={height - 4}
         rx={6}
         fill={color}
-        stroke="hsl(var(--background))"
+        stroke="var(--background)"
         strokeWidth={2}
       />
       {showLabel && (
@@ -92,7 +91,7 @@ function TreemapCell(props: {
           x={x + width / 2}
           y={y + height / 2 + (showPct ? -8 : 5)}
           textAnchor="middle"
-          fill="white"
+          fill="var(--primary-foreground)"
           fontSize={10}
           fontWeight={600}
           className="select-none"
@@ -106,7 +105,8 @@ function TreemapCell(props: {
           x={x + width / 2}
           y={y + height / 2 + 10}
           textAnchor="middle"
-          fill="rgba(255,255,255,0.75)"
+          fill="var(--primary-foreground)"
+          fillOpacity={0.75}
           fontSize={10}
           className="select-none"
         >

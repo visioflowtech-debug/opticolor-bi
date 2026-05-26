@@ -12,6 +12,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MarcaItem } from "../_actions/get-inventario-data";
+import { formatBsCurrency } from "@/lib/utils";
 
 interface Props {
   data: MarcaItem[];
@@ -23,30 +24,54 @@ function truncate(s: string) {
   return s.length > MAX_LABEL_LEN ? `${s.slice(0, MAX_LABEL_LEN - 1)}…` : s;
 }
 
-function RankingTooltip({
-  active,
-  payload,
-  label,
-}: {
+interface RankingTooltipProps {
   active?: boolean;
-  payload?: Array<{ value: number }>;
-  label?: string;
-}) {
+  payload?: Array<{
+    payload: {
+      marca?: string;
+      ventaNeta?: number;
+      unidadesVendidas?: number;
+      stockFisico?: number;
+    };
+  }>;
+}
+
+function RankingTooltip({ active, payload }: RankingTooltipProps) {
   if (!active || !payload?.length) return null;
+  const d = payload[0]?.payload;
+  if (!d) return null;
+
+  const asp = d.unidadesVendidas && d.unidadesVendidas > 0 
+    ? (d.ventaNeta ?? 0) / d.unidadesVendidas 
+    : 0;
+
   return (
     <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm">
-      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide">
-        {label}
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground">
+        {d.marca ?? "SIN MARCA"}
       </p>
-      <div className="flex items-center gap-4 text-xs">
-        <span className="text-muted-foreground">Unidades Vendidas</span>
-        <span className="font-medium tabular-nums">
-          {payload[0].value.toLocaleString("en-US")}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+        <span className="text-muted-foreground">Venta Neta Producto:</span>
+        <span className="text-right font-medium tabular-nums text-foreground">
+          {formatBsCurrency(d.ventaNeta ?? 0)}
+        </span>
+        <span className="text-muted-foreground">Unidades Vendidas:</span>
+        <span className="text-right font-medium tabular-nums text-foreground">
+          {d.unidadesVendidas?.toLocaleString("en-US") ?? "0"}
+        </span>
+        <span className="text-muted-foreground">Stock Físico Unidades:</span>
+        <span className="text-right font-medium tabular-nums text-foreground">
+          {d.stockFisico?.toLocaleString("en-US") ?? "0"}
+        </span>
+        <span className="text-muted-foreground">ASP Precio Promedio:</span>
+        <span className="text-right font-medium tabular-nums text-foreground">
+          {formatBsCurrency(asp)}
         </span>
       </div>
     </div>
   );
 }
+
 
 export function RankingMarcasChart({ data }: Props) {
   if (!data.length) {
@@ -59,11 +84,14 @@ export function RankingMarcasChart({ data }: Props) {
     );
   }
 
-  // Tomar top 20 para no colapsar el eje Y con demasiadas marcas
-  const chartData = data.slice(0, 20).map((m) => ({
-    ...m,
-    labelTrunc: truncate(m.marca),
-  }));
+  // Tomar top 20 ordenados por ventaNeta desc para no colapsar el eje Y con demasiadas marcas
+  const chartData = [...data]
+    .sort((a, b) => b.ventaNeta - a.ventaNeta)
+    .slice(0, 20)
+    .map((m) => ({
+      ...m,
+      labelTrunc: truncate(m.marca),
+    }));
 
   return (
     <SafeChartContainer height="h-[500px]">
@@ -76,7 +104,7 @@ export function RankingMarcasChart({ data }: Props) {
           <CartesianGrid
             horizontal={false}
             strokeDasharray="3 3"
-            stroke="hsl(var(--border))"
+            stroke="var(--border)"
             strokeOpacity={0.6}
           />
 
@@ -85,36 +113,32 @@ export function RankingMarcasChart({ data }: Props) {
             type="category"
             dataKey="labelTrunc"
             width={120}
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
           />
 
           <XAxis
             type="number"
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            dataKey="ventaNeta"
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) =>
-              v.toLocaleString("en-US", { notation: "compact" })
-            }
+            tickFormatter={(v: number) => {
+              const formatted = v.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 });
+              return `Bs. ${formatted}`;
+            }}
           />
 
           {/* Tooltip muestra el nombre completo (desde el campo marca) */}
           <Tooltip
-            content={({ active, payload }) => (
-              <RankingTooltip
-                active={active}
-                payload={payload as unknown as Array<{ value: number }>}
-                label={payload?.[0]?.payload?.marca}
-              />
-            )}
-            cursor={{ fill: "hsl(var(--muted))", opacity: 0.4 }}
+            content={<RankingTooltip />}
+            cursor={{ fill: "var(--muted)", opacity: 0.4 }}
           />
 
           <Bar
-            dataKey="unidadesVendidas"
-            fill="#1d4ed8"
+            dataKey="ventaNeta"
+            fill="var(--chart-1)"
             radius={[0, 4, 4, 0]}
             maxBarSize={22}
             opacity={0.9}

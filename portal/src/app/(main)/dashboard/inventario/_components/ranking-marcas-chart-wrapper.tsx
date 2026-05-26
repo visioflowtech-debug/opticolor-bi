@@ -18,7 +18,7 @@ export async function RankingMarcasChartWrapper({ startDate, endDate, sucursales
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Ranking de Marcas · Unidades Vendidas
+          Ranking de Marcas · Venta Neta
         </CardTitle>
       </CardHeader>
       <CardContent>

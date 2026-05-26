@@ -1,4 +1,4 @@
-import { getMarcasDetalleData } from "../_actions/get-inventario-data";
+import { getDispersionData } from "../_actions/get-inventario-data";
 import { DispersionChart } from "./dispersion-chart";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -11,7 +11,7 @@ interface WrapperProps {
 }
 
 export async function DispersionChartWrapper({ startDate, endDate, sucursales, marcaFilter, grupoFilter }: WrapperProps) {
-  const result = await getMarcasDetalleData({ startDate, endDate, sucursales, marcaFilter, grupoFilter });
+  const result = await getDispersionData({ startDate, endDate, sucursales, marcaFilter, grupoFilter });
   const data = result.data ?? [];
 
   return (
