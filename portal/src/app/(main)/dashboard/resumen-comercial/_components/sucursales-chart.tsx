@@ -6,20 +6,12 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
 import type { VentaSucursal } from "../_actions/get-resumen-data";
 
 interface Props {
   data: VentaSucursal[];
 }
-
-const fmtCompact = (v: number) =>
-  new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-    style: "currency",
-    currency: "USD",
-  }).format(v);
 
 export function SucursalesChart({ data }: Props) {
   if (!data.length) {
@@ -78,7 +70,7 @@ export function SucursalesChart({ data }: Props) {
 
                   {/* Value */}
                   <span className="w-20 shrink-0 text-right text-xs font-semibold tabular-nums sm:w-24">
-                    {fmtCompact(item.ventaNeta)}
+                    {formatCompactCurrency(item.ventaNeta)}
                   </span>
                 </div>
               </TooltipTrigger>

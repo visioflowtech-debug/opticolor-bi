@@ -7,6 +7,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import type { GeneroExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 
@@ -17,8 +19,8 @@ interface Props {
 const COLORS = [
   "var(--chart-1)",
   "var(--chart-2)",
-  "hsl(var(--muted-foreground)/0.4)",
-  "hsl(var(--muted-foreground)/0.8)",
+  "color-mix(in oklch, var(--muted-foreground) 40%, transparent)",
+  "color-mix(in oklch, var(--muted-foreground) 80%, transparent)",
 ];
 
 function ChartTooltip({
@@ -27,8 +29,7 @@ function ChartTooltip({
   total,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: TooltipContentProps<ValueType, NameType>["payload"];
   total: number;
 }) {
   if (!active || !payload?.length) return null;

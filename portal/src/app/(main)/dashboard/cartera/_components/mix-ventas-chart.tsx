@@ -9,23 +9,15 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import type { MixVenta } from "../_actions/get-cartera-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
+import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
 
 interface Props {
   data: MixVenta[];
 }
-
-const fmtMoney = (v: number) =>
-  new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-    style: "currency",
-    currency: "USD",
-  }).format(v);
-
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
 
 const truncateLabel = (value: string) => {
   if (value.length > 20) {
@@ -41,8 +33,7 @@ function ChartTooltip({
   totalVenta,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: TooltipContentProps<ValueType, NameType>["payload"];
   label?: string;
   totalVenta: number;
 }) {
@@ -60,7 +51,7 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">Venta Neta</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {fmtCurrency(data.venta_neta)}
+            {formatCurrency(data.venta_neta)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
@@ -105,13 +96,13 @@ export function MixVentasChart({ data }: Props) {
           strokeDasharray="3 3"
           horizontal={true}
           vertical={false}
-          stroke="hsl(var(--border))"
+          stroke="var(--border)"
           strokeOpacity={0.6}
         />
         <XAxis
           type="number"
-          tickFormatter={fmtMoney}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tickFormatter={formatCompactCurrency}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
         />
@@ -119,12 +110,12 @@ export function MixVentasChart({ data }: Props) {
           dataKey="categoria_agrupada"
           type="category"
           tickFormatter={truncateLabel}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           width={80}
         />
-        <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }} content={<ChartTooltip totalVenta={totalVenta} />} />
+        <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.2 }} content={<ChartTooltip totalVenta={totalVenta} />} />
         <Bar
           dataKey="venta_neta"
           name="Venta Neta"

@@ -9,6 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import type { TipoLenteDetalle } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
@@ -31,8 +33,7 @@ function ChartTooltip({
   totalVolumen,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: TooltipContentProps<ValueType, NameType>["payload"];
   label?: string;
   totalVolumen: number;
 }) {
@@ -89,14 +90,14 @@ export function TipoLenteChart({ data }: Props) {
             strokeDasharray="3 3"
             horizontal={true}
             vertical={false}
-            stroke="hsl(var(--border))"
+            stroke="var(--border)"
             strokeOpacity={0.6}
           />
           <XAxis
             dataKey="tipo_lente_descripcion"
             type="category"
             tickFormatter={truncateLabel}
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             angle={-45}
             textAnchor="end"
             height={70}
@@ -107,13 +108,13 @@ export function TipoLenteChart({ data }: Props) {
           <YAxis
             type="number"
             tickFormatter={(value) => formatCompactNumber(value)}
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
             tickMargin={10}
           />
           <Tooltip
-            cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
+            cursor={{ fill: "var(--muted)", opacity: 0.2 }}
             content={<ChartTooltip totalVolumen={totalVolumen} />}
           />
           <Bar

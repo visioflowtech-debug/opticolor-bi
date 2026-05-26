@@ -13,21 +13,11 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MonthlyTrendData } from "../_actions/get-resumen-data";
+import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
 
 interface Props {
   data: MonthlyTrendData[];
 }
-
-const fmtMoney = (v: number) =>
-  new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-    style: "currency",
-    currency: "USD",
-  }).format(v);
-
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
 
 // Tooltip personalizado
 function ChartTooltip({
@@ -54,7 +44,7 @@ function ChartTooltip({
           </span>
           <span className="ml-auto font-semibold tabular-nums">
             {p.name === "ventaNeta"
-              ? fmtCurrency(p.value)
+              ? formatCurrency(p.value)
               : p.value.toLocaleString("en-US")}
           </span>
         </div>
@@ -81,14 +71,14 @@ export function VentasChart({ data }: Props) {
         <CartesianGrid
           strokeDasharray="3 3"
           vertical={false}
-          stroke="hsl(var(--border))"
+          stroke="var(--border)"
           strokeOpacity={0.6}
         />
 
         {/* Eje X: etiqueta mensual ("Ene", "Feb"…) */}
         <XAxis
           dataKey="label"
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           angle={-45} textAnchor="end" height={70} interval={0}
           tickLine={false}
           axisLine={false}
@@ -97,8 +87,8 @@ export function VentasChart({ data }: Props) {
         {/* Eje Y izquierdo: montos (barras) */}
         <YAxis
           yAxisId="left"
-          tickFormatter={fmtMoney}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tickFormatter={formatCompactCurrency}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           width={60}
@@ -108,7 +98,7 @@ export function VentasChart({ data }: Props) {
         <YAxis
           yAxisId="right"
           orientation="right"
-          tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           width={36}
@@ -119,7 +109,7 @@ export function VentasChart({ data }: Props) {
 
         <Tooltip
           content={<ChartTooltip />}
-          cursor={{ fill: "hsl(var(--muted))", opacity: 0.35 }}
+          cursor={{ fill: "var(--muted)", opacity: 0.35 }}
         />
 
         {/* Barras redondeadas: Venta Neta — azul profundo */}

@@ -10,6 +10,8 @@ import {
   YAxis,
   ReferenceLine,
 } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import type { SucursalExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
@@ -30,8 +32,7 @@ function ChartTooltip({
   payload,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: TooltipContentProps<ValueType, NameType>["payload"];
 }) {
   if (!active || !payload?.length) return null;
 
@@ -82,13 +83,13 @@ export function TopSucursalesClinicaChart({ data }: Props) {
           strokeDasharray="3 3"
           horizontal={false}
           vertical={true}
-          stroke="hsl(var(--border))"
+          stroke="var(--border)"
           strokeOpacity={0.6}
         />
         <XAxis
           type="number"
           tickFormatter={(value) => formatCompactNumber(value)}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           tickMargin={10}
@@ -97,7 +98,7 @@ export function TopSucursalesClinicaChart({ data }: Props) {
           dataKey="nombre_sucursal"
           type="category"
           tickFormatter={truncateLabel}
-          tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))", textAnchor: "end" }}
+          tick={{ fontSize: 10, fill: "var(--muted-foreground)", textAnchor: "end" }}
           tickLine={false}
           axisLine={false}
           width={120}
@@ -105,18 +106,18 @@ export function TopSucursalesClinicaChart({ data }: Props) {
           hide={true}
         />
         <Tooltip
-          cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
+          cursor={{ fill: "var(--muted)", opacity: 0.2 }}
           content={<ChartTooltip />}
         />
         <ReferenceLine
           x={promedio}
-          stroke="hsl(var(--destructive))"
+          stroke="var(--destructive)"
           strokeDasharray="3 3"
           strokeOpacity={0.8}
           label={{
             position: "top",
             value: `Promedio: ${formatCompactNumber(promedio)}`,
-            fill: "hsl(var(--destructive))",
+            fill: "var(--destructive)",
             fontSize: 10,
           }}
         />

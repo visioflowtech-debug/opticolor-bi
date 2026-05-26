@@ -82,13 +82,13 @@ export function OrdenesSucursalChart({ data }: Props) {
             strokeDasharray="3 3"
             horizontal={true}
             vertical={false}
-            stroke="hsl(var(--border))"
+            stroke="var(--border)"
             strokeOpacity={0.6}
           />
           <XAxis
             type="number"
             tickFormatter={(value) => formatCompactNumber(value)}
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
             tickMargin={10}
@@ -97,24 +97,24 @@ export function OrdenesSucursalChart({ data }: Props) {
             dataKey="nombre_sucursal"
             type="category"
             tickFormatter={truncateLabel}
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))", textAnchor: "end", style: { whiteSpace: "nowrap" } }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)", textAnchor: "end", style: { whiteSpace: "nowrap" } }}
             tickLine={false}
             axisLine={false}
             width={120}
           />
           <Tooltip
-            cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
+            cursor={{ fill: "var(--muted)", opacity: 0.2 }}
             content={<ChartTooltip />}
           />
           <ReferenceLine
             x={promedio}
-            stroke="hsl(var(--destructive))"
+            stroke="var(--destructive)"
             strokeDasharray="3 3"
             strokeOpacity={0.8}
             label={{
               position: "top",
               value: `Promedio: ${formatCompactNumber(promedio)}`,
-              fill: "hsl(var(--destructive))",
+              fill: "var(--destructive)",
               fontSize: 10,
             }}
           />

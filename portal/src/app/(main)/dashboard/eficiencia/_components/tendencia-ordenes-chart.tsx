@@ -69,12 +69,12 @@ export function TendenciaOrdenesChart({ data }: Props) {
             strokeDasharray="3 3"
             horizontal={true}
             vertical={false}
-            stroke="hsl(var(--border))"
+            stroke="var(--border)"
             strokeOpacity={0.6}
           />
           <XAxis
             dataKey="mes_nombre"
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             angle={-45} textAnchor="end" height={70} interval={0}
             tickLine={false}
             axisLine={false}
@@ -82,13 +82,13 @@ export function TendenciaOrdenesChart({ data }: Props) {
           />
           <YAxis
             tickFormatter={(value) => formatCompactNumber(value)}
-            tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
             tickMargin={10}
           />
           <Tooltip
-            cursor={{ stroke: "hsl(var(--muted))", strokeWidth: 2 }}
+            cursor={{ stroke: "var(--muted)", strokeWidth: 2 }}
             content={<ChartTooltip />}
           />
           <Line

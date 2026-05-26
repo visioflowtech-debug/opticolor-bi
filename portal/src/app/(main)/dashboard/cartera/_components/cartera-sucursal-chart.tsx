@@ -11,21 +11,11 @@ import {
 } from "recharts";
 import type { CarteraSucursal } from "../_actions/get-cartera-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
+import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
 
 interface Props {
   data: CarteraSucursal[];
 }
-
-const fmtMoney = (v: number) =>
-  new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-    style: "currency",
-    currency: "USD",
-  }).format(v);
-
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
 
 function ChartTooltip({
   active,
@@ -50,7 +40,7 @@ function ChartTooltip({
             <span className="text-muted-foreground">Saldo Pendiente</span>
           </div>
           <span className="font-semibold tabular-nums">
-            {fmtCurrency(p.value)}
+            {formatCurrency(p.value)}
           </span>
         </div>
       ))}
@@ -81,7 +71,7 @@ export function CarteraSucursalChart({ data }: Props) {
           strokeDasharray="3 3"
           horizontal={true}
           vertical={false}
-          stroke="hsl(var(--border))"
+          stroke="var(--border)"
           strokeOpacity={0.6}
         />
         <XAxis
@@ -94,13 +84,13 @@ export function CarteraSucursalChart({ data }: Props) {
         />
         <YAxis
           type="number"
-          tickFormatter={fmtMoney}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tickFormatter={formatCompactCurrency}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           width={60}
         />
-        <Tooltip cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }} content={<ChartTooltip />} />
+        <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.2 }} content={<ChartTooltip />} />
         <Bar
           dataKey="saldo_pendiente"
           name="Saldo Pendiente"

@@ -11,21 +11,11 @@ import {
 } from "recharts";
 import type { GapCobro } from "../_actions/get-cartera-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
+import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
 
 interface Props {
   data: GapCobro[];
 }
-
-const fmtMoney = (v: number) =>
-  new Intl.NumberFormat("en-US", {
-    notation: "compact",
-    maximumFractionDigits: 1,
-    style: "currency",
-    currency: "USD",
-  }).format(v);
-
-const fmtCurrency = (v: number) =>
-  new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(v);
 
 const SERIES_LABELS: Record<string, string> = {
   monto_total:     "Monto Pedidos",
@@ -57,7 +47,7 @@ function ChartTooltip({
             </span>
           </div>
           <span className="font-semibold tabular-nums">
-            {fmtCurrency(p.value)}
+            {formatCurrency(p.value)}
           </span>
         </div>
       ))}
@@ -93,24 +83,24 @@ export function GapCobroChart({ data }: Props) {
         <CartesianGrid
           strokeDasharray="3 3"
           vertical={false}
-          stroke="hsl(var(--border))"
+          stroke="var(--border)"
           strokeOpacity={0.6}
         />
         <XAxis
           dataKey="mes_pedido_nombre"
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           angle={-45} textAnchor="end" height={70} interval={0}
           tickLine={false}
           axisLine={false}
         />
         <YAxis
-          tickFormatter={fmtMoney}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tickFormatter={formatCompactCurrency}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           width={60}
         />
-        <Tooltip content={<ChartTooltip />} cursor={{ fill: "hsl(var(--muted))", opacity: 0.1 }} />
+        <Tooltip content={<ChartTooltip />} cursor={{ fill: "var(--muted)", opacity: 0.1 }} />
 
         <Area
           type="linear"

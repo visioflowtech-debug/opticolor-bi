@@ -9,6 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import type { EdadExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
@@ -23,8 +25,7 @@ function ChartTooltip({
   total,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: TooltipContentProps<ValueType, NameType>["payload"];
   total: number;
 }) {
   if (!active || !payload?.length) return null;
@@ -80,13 +81,13 @@ export function EdadChart({ data }: Props) {
           strokeDasharray="3 3"
           horizontal={true}
           vertical={false}
-          stroke="hsl(var(--border))"
+          stroke="var(--border)"
           strokeOpacity={0.6}
         />
         <XAxis
           dataKey="rango_edad_descripcion"
           type="category"
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           angle={-45}
           textAnchor="end"
           height={70}
@@ -97,13 +98,13 @@ export function EdadChart({ data }: Props) {
         <YAxis
           type="number"
           tickFormatter={(value) => formatCompactNumber(value)}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           tickMargin={10}
         />
         <Tooltip
-          cursor={{ fill: "hsl(var(--muted))", opacity: 0.2 }}
+          cursor={{ fill: "var(--muted)", opacity: 0.2 }}
           content={<ChartTooltip total={total} />}
         />
         <Bar

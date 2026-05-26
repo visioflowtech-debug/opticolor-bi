@@ -9,6 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import type { TooltipContentProps } from "recharts";
+import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import type { TendenciaExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
@@ -22,8 +24,7 @@ function ChartTooltip({
   payload,
 }: {
   active?: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  payload?: any[];
+  payload?: TooltipContentProps<ValueType, NameType>["payload"];
 }) {
   if (!active || !payload?.length) return null;
 
@@ -68,12 +69,12 @@ export function TendenciaExamenesChart({ data }: Props) {
           strokeDasharray="3 3"
           horizontal={true}
           vertical={false}
-          stroke="hsl(var(--border))"
+          stroke="var(--border)"
           strokeOpacity={0.6}
         />
         <XAxis
           dataKey="mes_examen_nombre"
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           angle={-45} textAnchor="end" height={70} interval={0}
           tickLine={false}
           axisLine={false}
@@ -81,13 +82,13 @@ export function TendenciaExamenesChart({ data }: Props) {
         />
         <YAxis
           tickFormatter={(value) => formatCompactNumber(value)}
-          tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }}
+          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
           tickMargin={10}
         />
         <Tooltip
-          cursor={{ stroke: "hsl(var(--muted))", strokeWidth: 2 }}
+          cursor={{ stroke: "var(--muted)", strokeWidth: 2 }}
           content={<ChartTooltip />}
         />
         <Line
