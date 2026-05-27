@@ -92,8 +92,7 @@ const fetchResumenKPIs = unstable_cache(
         .input("ytdStart",          ytdStart)
         .input("ytdEnd",            ytdEnd)
         .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor",      isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
 
     const [
       ventaNetaRes,
@@ -241,8 +240,7 @@ const fetchVentasDiarias = unstable_cache(
       pool
         .request()
         .input("sucursales", sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT
@@ -252,7 +250,7 @@ const fetchVentasDiarias = unstable_cache(
         ISNULL(SUM(monto_neto), 0)                                                   AS ventaMensual,
         COUNT(DISTINCT id_factura)                                                    AS trafico
       FROM dbo.KPI_Inf1_Venta_Neta
-      WHERE anio_factura = 2026
+      WHERE anio_factura = YEAR(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00'))
         ${buildSucursalFilter("")}
       GROUP BY anio_factura, mes_factura_nro, periodo_factura
       ORDER BY anio_factura, mes_factura_nro ASC
@@ -305,8 +303,7 @@ const fetchTopSucursales = unstable_cache(
         .input("startDate", startDate)
         .input("endDate", endDate)
         .input("sucursales", sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       DECLARE @DiaHoyGMT4  INT = DAY(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
@@ -391,8 +388,7 @@ const fetchMediosPago = unstable_cache(
         .input("startDate", startDate)
         .input("endDate", endDate)
         .input("sucursales", sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
       SELECT

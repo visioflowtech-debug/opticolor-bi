@@ -336,12 +336,12 @@ const fetchClientesDeudores = unstable_cache(
     const res = await req().query(`
       SELECT TOP 10
         ds.nombre_sucursal,
-        dc.nombre_completo,
+        ISNULL(dc.nombre_completo, 'CLIENTE NO CATALOGADO') AS nombre_completo,
         ISNULL(SUM(fp.monto_total),     0) AS monto_total,
         ISNULL(SUM(fp.monto_pagado),    0) AS monto_pagado,
         ISNULL(SUM(fp.saldo_pendiente), 0) AS saldo_pendiente
       FROM dbo.Fact_Pedidos fp
-      INNER JOIN dbo.Dim_Clientes    dc ON fp.id_cliente   = dc.id_cliente
+      LEFT JOIN dbo.Dim_Clientes     dc ON fp.id_cliente   = dc.id_cliente
       INNER JOIN dbo.Dim_Sucursales  ds ON fp.id_sucursal  = ds.id_sucursal
       WHERE CAST(fp.fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
         ${buildSucursalFilter("fp")}

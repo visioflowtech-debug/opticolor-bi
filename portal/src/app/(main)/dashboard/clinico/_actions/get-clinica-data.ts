@@ -6,6 +6,7 @@ import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { getUserAllowedSucursales } from "@/lib/security";
+import { MAP_MES_NUM_TO_ABBR as MES_ABBR } from "@/lib/date-utils";
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -55,7 +56,7 @@ export type Params = {
 };
 
 // F-9: isSupervisor eliminado — buildSucursalFilter() nunca lo referencia en SQL
-type FetchParams = Params & { allowedSucursales: string };
+type FetchParams = Params & { allowedSucursales: string; excludedClinica: string };
 
 // C-4.3: KPI fetcher necesita rangos de "hoy" calculados fuera del cache
 type KpiParams = FetchParams & { inicioHoy: string; finHoy: string };
@@ -83,11 +84,6 @@ function extractMinAge(rango: string): number {
 }
 
 // F-8: Abreviatura mes con sufijo de año ("Ene '25") — evita ambigüedad al cruzar años
-const MES_ABBR: Record<string, string> = {
-  "01": "Ene", "02": "Feb", "03": "Mar", "04": "Abr",
-  "05": "May", "06": "Jun", "07": "Jul", "08": "Ago",
-  "09": "Sep", "10": "Oct", "11": "Nov", "12": "Dic",
-};
 
 function buildMesLabel(periodo: string): string {
   const year  = periodo.slice(2, 4);
@@ -99,7 +95,7 @@ function buildMesLabel(periodo: string): string {
 
 const fetchClinicaKPIs = unstable_cache(
   async (params: KpiParams): Promise<ClinicaKpis> => {
-    const { startDate, endDate, sucursales, allowedSucursales, inicioHoy, finHoy } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, inicioHoy, finHoy, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -108,7 +104,8 @@ const fetchClinicaKPIs = unstable_cache(
         .input("startDate",         startDate)
         .input("endDate",           endDate)
         .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales);
+        .input("allowedSucursales", allowedSucursales)
+        .input("excludedClinica",   excludedClinica);
 
     const [examenesHoyRes, periodoStatsRes] = await Promise.all([
       // C-4.3: Exámenes Hoy — fuente transaccional, sin lag ETL de ~3h
@@ -118,12 +115,13 @@ const fetchClinicaKPIs = unstable_cache(
         .input("finHoy",            finHoy)
         .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales)
+        .input("excludedClinica",   excludedClinica)
         .query(`
           SELECT COUNT(DISTINCT fe.id_examen) AS valor
           FROM dbo.Fact_Examenes fe
           WHERE fe.fecha_examen_completa >= @inicioHoy
             AND fe.fecha_examen_completa <= @finHoy
-            AND fe.id_sucursal NOT IN (3, 4)
+            AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
             ${buildSucursalFilter("fe")}
         `),
 
@@ -138,7 +136,7 @@ const fetchClinicaKPIs = unstable_cache(
         FROM dbo.Fact_Examenes fe
         WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
           AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
-          AND fe.id_sucursal NOT IN (3, 4)
+          AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
           ${buildSucursalFilter("fe")}
       `),
     ]);
@@ -173,7 +171,8 @@ export async function getClinicaKPIs(
     const hoy       = new Date().toLocaleDateString("en-CA", { timeZone: "America/Caracas" });
     const inicioHoy = `${hoy} 00:00:00`;
     const finHoy    = `${hoy} 23:59:59`;
-    const data = await fetchClinicaKPIs({ ...params, allowedSucursales, inicioHoy, finHoy });
+    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const data = await fetchClinicaKPIs({ ...params, allowedSucursales, inicioHoy, finHoy, excludedClinica });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getClinicaKPIs]", err);
@@ -185,7 +184,7 @@ export async function getClinicaKPIs(
 
 const fetchTendenciaExamen = unstable_cache(
   async (params: FetchParams): Promise<TendenciaExamen[]> => {
-    const { endDate, sucursales, allowedSucursales } = params;
+    const { endDate, sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -193,7 +192,8 @@ const fetchTendenciaExamen = unstable_cache(
         .request()
         .input("endDate",           endDate)
         .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales);
+        .input("allowedSucursales", allowedSucursales)
+        .input("excludedClinica",   excludedClinica);
 
     const res = await req().query(`
       SELECT 
@@ -202,7 +202,7 @@ const fetchTendenciaExamen = unstable_cache(
       FROM dbo.Fact_Examenes fe
       WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
-        AND fe.id_sucursal NOT IN (3, 4)
+        AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
         ${buildSucursalFilter("fe")}
       GROUP BY CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120)
       ORDER BY periodo ASC
@@ -224,7 +224,8 @@ export async function getTendenciaExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchTendenciaExamen({ ...params, allowedSucursales });
+    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const data = await fetchTendenciaExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getTendenciaExamen]", err);
@@ -236,7 +237,7 @@ export async function getTendenciaExamen(
 
 const fetchVolumenConversion = unstable_cache(
   async (params: FetchParams): Promise<VolumenConversion[]> => {
-    const { endDate, sucursales, allowedSucursales } = params;
+    const { endDate, sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -244,7 +245,8 @@ const fetchVolumenConversion = unstable_cache(
         .request()
         .input("endDate",           endDate)
         .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales);
+        .input("allowedSucursales", allowedSucursales)
+        .input("excludedClinica",   excludedClinica);
 
     const res = await req().query(`
       SELECT 
@@ -255,7 +257,7 @@ const fetchVolumenConversion = unstable_cache(
       FROM dbo.Fact_Examenes fe
       WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
-        AND fe.id_sucursal NOT IN (3, 4)
+        AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
         ${buildSucursalFilter("fe")}
       GROUP BY CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120)
       ORDER BY periodo ASC
@@ -284,7 +286,8 @@ export async function getVolumenConversion(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchVolumenConversion({ ...params, allowedSucursales });
+    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const data = await fetchVolumenConversion({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getVolumenConversion]", err);
@@ -296,7 +299,7 @@ export async function getVolumenConversion(
 
 const fetchGeneroExamen = unstable_cache(
   async (params: FetchParams): Promise<GeneroExamen[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -305,7 +308,8 @@ const fetchGeneroExamen = unstable_cache(
         .input("startDate",         startDate)
         .input("endDate",           endDate)
         .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales);
+        .input("allowedSucursales", allowedSucursales)
+        .input("excludedClinica",   excludedClinica);
 
     const res = await req().query(`
       SELECT
@@ -323,7 +327,7 @@ const fetchGeneroExamen = unstable_cache(
       LEFT JOIN dbo.Dim_Clientes dc ON fe.id_cliente = dc.id_cliente
       WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
-        AND fe.id_sucursal NOT IN (3, 4)
+        AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
         ${buildSucursalFilter("fe")}
       GROUP BY
         CASE
@@ -350,7 +354,8 @@ export async function getGeneroExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchGeneroExamen({ ...params, allowedSucursales });
+    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const data = await fetchGeneroExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getGeneroExamen]", err);
@@ -362,7 +367,7 @@ export async function getGeneroExamen(
 
 const fetchEdadExamen = unstable_cache(
   async (params: FetchParams): Promise<EdadExamen[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -371,7 +376,8 @@ const fetchEdadExamen = unstable_cache(
         .input("startDate",         startDate)
         .input("endDate",           endDate)
         .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales);
+        .input("allowedSucursales", allowedSucursales)
+        .input("excludedClinica",   excludedClinica);
 
     // F-2-b: Rangos calculados dinámicamente — CASE WHEN sobre c.edad
     // Fuente: Fact_Examenes LEFT JOIN Dim_Clientes (cubre huérfanos y nulos)
@@ -391,7 +397,7 @@ const fetchEdadExamen = unstable_cache(
       LEFT JOIN dbo.Dim_Clientes c ON fe.id_cliente = c.id_cliente
       WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
-        AND fe.id_sucursal NOT IN (3, 4)
+        AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
         ${buildSucursalFilter("fe")}
       GROUP BY
         CASE
@@ -427,7 +433,8 @@ export async function getEdadExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchEdadExamen({ ...params, allowedSucursales });
+    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const data = await fetchEdadExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getEdadExamen]", err);
@@ -439,7 +446,7 @@ export async function getEdadExamen(
 
 const fetchTopSucursalesExamen = unstable_cache(
   async (params: FetchParams): Promise<SucursalExamen[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales } = params;
+    const { startDate, endDate, sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -448,7 +455,8 @@ const fetchTopSucursalesExamen = unstable_cache(
         .input("startDate",         startDate)
         .input("endDate",           endDate)
         .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales);
+        .input("allowedSucursales", allowedSucursales)
+        .input("excludedClinica",   excludedClinica);
 
     const res = await req().query(`
       SELECT 
@@ -458,7 +466,7 @@ const fetchTopSucursalesExamen = unstable_cache(
       LEFT JOIN dbo.Dim_Sucursales s ON fe.id_sucursal = s.id_sucursal
       WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
-        AND fe.id_sucursal NOT IN (3, 4)
+        AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
         ${buildSucursalFilter("fe")}
       GROUP BY s.nombre_sucursal
       ORDER BY total_examenes DESC
@@ -480,7 +488,8 @@ export async function getTopSucursalesExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchTopSucursalesExamen({ ...params, allowedSucursales });
+    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const data = await fetchTopSucursalesExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getTopSucursalesExamen]", err);

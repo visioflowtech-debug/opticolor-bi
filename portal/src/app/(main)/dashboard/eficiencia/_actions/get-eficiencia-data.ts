@@ -6,6 +6,7 @@ import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { getUserAllowedSucursales } from "@/lib/security";
+import { MAP_MES_NAME_TO_ABBR as MES_ABBR } from "@/lib/date-utils";
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -48,11 +49,7 @@ type TendenciaRow    = { periodo: string; anio: number; mes_nombre: string; volu
 type TipoLenteRow    = { tipo_lente_descripcion: string; volumen_ordenes: number; monto_total: number };
 type SucursalRow     = { nombre_sucursal: string; volumen_ordenes: number };
 
-const MES_ABBR: Record<string, string> = {
-  Enero: "Ene", Febrero: "Feb", Marzo: "Mar",  Abril: "Abr",
-  Mayo:  "May", Junio:   "Jun", Julio: "Jul",  Agosto: "Ago",
-  Septiembre: "Sep", Octubre: "Oct", Noviembre: "Nov", Diciembre: "Dic",
-};
+
 
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 

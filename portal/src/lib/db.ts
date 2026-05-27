@@ -17,9 +17,9 @@ const sqlConfig: mssql.config = {
     connectionTimeout: 180000,
     requestTimeout: 180000,
     pool: {
-        max: 10,
+        max: 25,
         min: 0,
-        idleTimeoutMillis: 180000,
+        idleTimeoutMillis: 30000,
     },
     options: {
         encrypt: true,

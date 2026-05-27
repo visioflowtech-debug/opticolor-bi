@@ -77,9 +77,7 @@ const fetchInventarioKPIs = unstable_cache(
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
     const pool = await getConnection();
 
-    // ── Auditoría forense de fechas ──────────────────────────────────────────
-    console.log("=== AUDITORÍA FORENSE INVENTARIO ===");
-    console.log("Rango UI -> Start:", startDate, " | End:", endDate);
+
 
     // Filtros dimensionales compartidos — alias dp presente en stock (fi LEFT JOIN dp) y ventas (dvr LEFT JOIN dp)
     const marcaSql = !isAll(marcaFilter)
@@ -95,8 +93,7 @@ const fetchInventarioKPIs = unstable_cache(
         .input("startDate",    startDate)
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
       if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
       if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
       return r;
@@ -200,8 +197,7 @@ const fetchMarcasDetalle = unstable_cache(
         .input("startDate",    startDate)
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
       if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
       if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
       return r;
@@ -313,8 +309,7 @@ const fetchGruposMix = unstable_cache(
         .input("startDate",    startDate)
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
       if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
       if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
       return r;
@@ -383,8 +378,7 @@ const fetchDispersionData = unstable_cache(
         .input("startDate",    startDate)
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("isSupervisor", isSupervisor ? 1 : 0);
+        .input("allowedSucursales", allowedSucursales);
       if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
       if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
       return r;
