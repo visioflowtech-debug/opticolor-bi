@@ -58,16 +58,16 @@ export const authOptions: NextAuthOptions = {
             rol: user.nombre_rol || "USUARIO",
             nivel: user.nivel_jerarquico || 0,
           };
-        } catch (error: any) {
-          console.error("Error en autorización:", error);
-          throw new Error(error.message || "Error al autenticar al usuario.");
+        } catch (error) {
+          console.error("[SECURITY_AUDIT][AUTH_FAILURE] Intento de autorización fallido:", error);
+          throw new Error("Credenciales inválidas o error de comunicación seguro.");
         }
       },
     }),
   ],
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 días
+    maxAge: 8 * 60 * 60, // 8 horas
   },
   pages: {
     signIn: "/login",

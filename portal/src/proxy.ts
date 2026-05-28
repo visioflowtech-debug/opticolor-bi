@@ -1,6 +1,15 @@
 import { withAuth } from "next-auth/middleware";
 import { NextResponse } from "next/server";
 
+function applySecurityHeaders(res: NextResponse): NextResponse {
+    res.headers.set("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';");
+    res.headers.set("X-Frame-Options", "DENY");
+    res.headers.set("X-Content-Type-Options", "nosniff");
+    res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+    res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    return res;
+}
+
 export default withAuth(
     function middleware(req) {
         const token = req.nextauth.token;
@@ -10,10 +19,10 @@ export default withAuth(
 
         // Proteger rutas de Configuración para el rol SUPERVISOR
         if (isSupervisor && (path.startsWith("/dashboard/usuarios") || path.startsWith("/dashboard/sucursales"))) {
-            return NextResponse.redirect(new URL("/dashboard/resumen-comercial", req.url));
+            return applySecurityHeaders(NextResponse.redirect(new URL("/dashboard/resumen-comercial", req.url)));
         }
 
-        return NextResponse.next();
+        return applySecurityHeaders(NextResponse.next());
     },
     {
         callbacks: {

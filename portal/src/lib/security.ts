@@ -16,11 +16,12 @@ async function fetchUserAllowedSucursales(userId: string): Promise<string> {
     const isNumeric = !isNaN(Number(userId)) && String(userId).trim() !== "";
 
     if (isNumeric) {
-      // Si es un ID numérico (ej: "1" o 12), lo mandamos como INT nativo
-      request.input("userId", sql.Int, Number(userId));
+      // Al pasar el número directamente sin el segundo argumento de tipo, 
+      // el driver mssql mapea el primitivo de JS a INT/FLOAT automáticamente sin romper su validador.
+      request.input("userId", Number(userId));
     } else {
-      // Si es un email o string alfanumérico, lo mandamos como VarChar
-      request.input("userId", sql.VarChar, String(userId).trim());
+      // Para strings o correos, usamos sql.VarChar como función invocada
+      request.input("userId", sql.VarChar(100), String(userId).trim());
     }
 
     const result = await request.query(`
