@@ -87,8 +87,23 @@ export async function crearUsuario(input: unknown): Promise<{
         VALUES (@id_usuario, @id_rol, 1)
       `);
 
+    // Inyección de Sucursales por Defecto para Roles MASTER
+    const rolResult = await pool
+      .request()
+      .input("id_rol", id_rol)
+      .query("SELECT nombre_rol FROM dbo.Seguridad_Roles WHERE id_rol = @id_rol");
+    const esMaster = rolResult.recordset[0]?.nombre_rol === "MASTER";
+
+    let sucursalesAAsignar = ids_sucursales;
+    if (esMaster) {
+      const sucursalesResult = await pool
+        .request()
+        .query("SELECT id_sucursal FROM dbo.Maestro_Sucursales");
+      sucursalesAAsignar = sucursalesResult.recordset.map((s: { id_sucursal: number }) => s.id_sucursal);
+    }
+
     // INSERT sucursales
-    for (const id_sucursal of ids_sucursales) {
+    for (const id_sucursal of sucursalesAAsignar) {
       await pool
         .request()
         .input("id_usuario", id_nuevo)
@@ -100,7 +115,7 @@ export async function crearUsuario(input: unknown): Promise<{
     }
 
     // Auditoría
-    const nuevosValores = JSON.stringify({ nombre_completo, email, id_rol, ids_sucursales });
+    const nuevosValores = JSON.stringify({ nombre_completo, email, id_rol, ids_sucursales: sucursalesAAsignar });
     await pool
       .request()
       .input("id_usuario", session.user.id)

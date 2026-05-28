@@ -30,14 +30,14 @@ export function formatCompactNumber(value: number): string {
   return `${sign}${abs.toFixed(0)}`;
 }
 
-// Versión con símbolo de moneda: 271_811_337.91 → "$271.8 M"
+// Versión con símbolo de moneda: 271_811_337.91 → "Bs. 271.8 M"
 export function formatCompactCurrency(value: number): string {
   const abs = Math.abs(value);
   const sign = value < 0 ? "-" : "";
-  if (abs >= 1_000_000_000) return `${sign}$${(abs / 1_000_000_000).toFixed(1)} B`;
-  if (abs >= 1_000_000)     return `${sign}$${(abs / 1_000_000).toFixed(1)} M`;
-  if (abs >= 1_000)         return `${sign}$${(abs / 1_000).toFixed(1)} K`;
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+  if (abs >= 1_000_000_000) return `${sign}Bs. ${(abs / 1_000_000_000).toFixed(1)} B`;
+  if (abs >= 1_000_000)     return `${sign}Bs. ${(abs / 1_000_000).toFixed(1)} M`;
+  if (abs >= 1_000)         return `${sign}Bs. ${(abs / 1_000).toFixed(1)} K`;
+  return formatCurrency(value);
 }
 
 export function formatCurrency(
@@ -50,16 +50,15 @@ export function formatCurrency(
     noDecimals?: boolean;
   },
 ) {
-  const { currency = "USD", locale = "en-US", minimumFractionDigits, maximumFractionDigits, noDecimals } = opts ?? {};
+  const { locale = "en-US", minimumFractionDigits, maximumFractionDigits, noDecimals } = opts ?? {};
 
   const formatOptions: Intl.NumberFormatOptions = {
-    style: "currency",
-    currency,
-    minimumFractionDigits: noDecimals ? 0 : minimumFractionDigits,
-    maximumFractionDigits: noDecimals ? 0 : maximumFractionDigits,
+    minimumFractionDigits: noDecimals ? 0 : minimumFractionDigits ?? 2,
+    maximumFractionDigits: noDecimals ? 0 : maximumFractionDigits ?? 2,
   };
 
-  return new Intl.NumberFormat(locale, formatOptions).format(amount);
+  const formatted = new Intl.NumberFormat(locale, formatOptions).format(amount);
+  return `Bs. ${formatted}`;
 }
 
 export function formatBsCurrency(value: number): string {

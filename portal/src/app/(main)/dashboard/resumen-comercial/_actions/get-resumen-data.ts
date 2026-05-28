@@ -255,7 +255,7 @@ const fetchVentasDiarias = unstable_cache(
       const mesNum = Number(r.mes_nro ?? 1);
       return {
         periodo:          String(r.periodo ?? `${r.anio}-${String(mesNum).padStart(2, "0")}`),
-        label:            MES_ABBR[String(mesNum).padStart(2, "0")] ?? String(mesNum),
+        label:            `${MES_ABBR[String(mesNum).padStart(2, "0")] ?? String(mesNum)} '${String(r.anio).slice(-2)}`,
         ventaNeta:        Number(r.ventaMensual ?? 0),
         cantidadFacturas: Number(r.trafico ?? 0),
       };
