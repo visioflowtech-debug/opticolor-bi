@@ -3,7 +3,9 @@ import { unstable_cache } from "next/cache";
 import { getConnection } from "@/lib/db";
 
 async function fetchUserAllowedSucursales(userId: string): Promise<string> {
-  console.log("[AUDITORÍA-PERMISOS] Valor recibido en userId:", userId, " | Tipo:", typeof userId);
+  if (process.env.NODE_ENV !== "production") {
+    console.log("[AUDITORÍA-PERMISOS] Valor recibido en userId:", userId, " | Tipo:", typeof userId);
+  }
 
   if (!userId) {
     return "-1";

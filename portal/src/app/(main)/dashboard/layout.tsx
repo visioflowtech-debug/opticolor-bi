@@ -10,10 +10,17 @@ import { getPreference } from "@/server/server-actions";
 
 import { SessionWatcher } from "@/components/auth/SessionWatcher";
 
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { redirect } from "next/navigation";
+
 import { getMisSucursales } from "./_actions/get-mis-sucursales";
 import { DashboardHeader } from "./_components/navbar/dashboard-header";
 
 export default async function Layout({ children }: Readonly<{ children: ReactNode }>) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) redirect("/login");
+
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
 

@@ -222,8 +222,7 @@ const fetchMarcasDetalle = unstable_cache(
           ISNULL(SUM(dvr.monto_total), 0)           AS ventaNeta
         FROM dbo.Dash_Ventas_Resumen dvr
         LEFT JOIN dbo.Dim_Productos dp ON dvr.id_producto = dp.SK_Producto
-        WHERE dvr.fecha_factura >= @startDate
-          AND dvr.fecha_factura <= @endDate
+        WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${marcaSql}
           ${grupoSql}
           ${buildSucursalFilter("dvr")}
@@ -317,8 +316,7 @@ const fetchGruposMix = unstable_cache(
         ISNULL(SUM(dvr.monto_total), 0)           AS ventaNeta
       FROM dbo.Dash_Ventas_Resumen dvr
       LEFT JOIN dbo.Dim_Productos dp ON dvr.id_producto = dp.SK_Producto
-      WHERE dvr.fecha_factura >= @startDate
-        AND dvr.fecha_factura <= @endDate
+      WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
         ${marcaSql}
         ${grupoSql}
         ${buildSucursalFilter("dvr")}
@@ -402,8 +400,7 @@ const fetchDispersionData = unstable_cache(
           ISNULL(SUM(dvr.monto_total), 0)           AS ventaNeta
         FROM dbo.Dash_Ventas_Resumen dvr
         LEFT JOIN dbo.Dim_Productos dp ON dvr.id_producto = dp.SK_Producto
-        WHERE dvr.fecha_factura >= @startDate
-          AND dvr.fecha_factura <= @endDate
+        WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${marcaSql}
           ${grupoSql}
           ${buildSucursalFilter("dvr")}

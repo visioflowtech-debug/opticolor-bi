@@ -69,7 +69,7 @@ const fetchEficienciaKPIs = unstable_cache(
       req().query(`
         SELECT COUNT(DISTINCT id_pedido) AS valor
         FROM dbo.Fact_Eficiencia_Ordenes
-        WHERE fecha_pedido = CAST(GETDATE() AT TIME ZONE 'UTC' AT TIME ZONE 'SA Western Standard Time' AS DATE)
+        WHERE CAST(fecha_pedido AS DATE) = CAST(SWITCHOFFSET(TODATETIMEOFFSET(GETDATE(), '+00:00'), '-04:00') AS DATE)
           ${buildSucursalFilter()}
       `),
 

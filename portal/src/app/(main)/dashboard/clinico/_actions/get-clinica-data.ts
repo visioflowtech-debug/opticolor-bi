@@ -56,9 +56,6 @@ export type Params = ReportParams;
 // F-9: isSupervisor eliminado — buildSucursalFilter() nunca lo referencia en SQL
 type FetchParams = Params & { allowedSucursales: string; excludedClinica: string };
 
-// C-4.3: KPI fetcher necesita rangos de "hoy" calculados fuera del cache
-type KpiParams = FetchParams & { inicioHoy: string; finHoy: string };
-
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
 type ValorRow        = { valor: number };
@@ -103,8 +100,8 @@ function buildMesLabel(periodo: string): string {
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
 const fetchClinicaKPIs = unstable_cache(
-  async (params: KpiParams): Promise<ClinicaKpis> => {
-    const { startDate, endDate, sucursales, allowedSucursales, inicioHoy, finHoy, excludedClinica } = params;
+  async (params: FetchParams): Promise<ClinicaKpis> => {
+    const { startDate, endDate, sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -120,16 +117,13 @@ const fetchClinicaKPIs = unstable_cache(
       // C-4.3: Exámenes Hoy — fuente transaccional, sin lag ETL de ~3h
       pool
         .request()
-        .input("inicioHoy",         inicioHoy)
-        .input("finHoy",            finHoy)
         .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("excludedClinica",   excludedClinica)
         .query(`
           SELECT COUNT(DISTINCT fe.id_examen) AS valor
           FROM dbo.Fact_Examenes fe
-          WHERE fe.fecha_examen_completa >= @inicioHoy
-            AND fe.fecha_examen_completa <= @finHoy
+          WHERE CAST(fe.fecha_examen_completa AS DATE) = CAST(SWITCHOFFSET(TODATETIMEOFFSET(GETDATE(), '+00:00'), '-04:00') AS DATE)
             AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
             ${buildSucursalFilter("fe")}
         `),
@@ -176,12 +170,8 @@ export async function getClinicaKPIs(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    // C-4.3: Rango "hoy" calculado fuera del cache en hora Venezuela (sin lag ETL)
-    const hoy       = new Date().toLocaleDateString("en-CA", { timeZone: "America/Caracas" });
-    const inicioHoy = `${hoy} 00:00:00`;
-    const finHoy    = `${hoy} 23:59:59`;
     const excludedClinica = getExcludedClinicaIds();
-    const data = await fetchClinicaKPIs({ ...params, allowedSucursales, inicioHoy, finHoy, excludedClinica });
+    const data = await fetchClinicaKPIs({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getClinicaKPIs]", err);
