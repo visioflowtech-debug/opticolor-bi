@@ -412,11 +412,13 @@ export function UsuarioDetalleClient({ usuario, roles, todasSucursales, currentU
                       <SelectValue placeholder="Seleccionar rol…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {roles.map((r) => (
-                        <SelectItem key={r.id_rol} value={String(r.id_rol)}>
-                          {r.nombre_rol}
-                        </SelectItem>
-                      ))}
+                      {roles
+                        .filter((r) => r.nombre_rol === "MASTER" || r.nombre_rol === "SUPERVISOR")
+                        .map((r) => (
+                          <SelectItem key={r.id_rol} value={String(r.id_rol)}>
+                            {r.nombre_rol}
+                          </SelectItem>
+                        ))}
                     </SelectContent>
                   </Select>
                   <Button
