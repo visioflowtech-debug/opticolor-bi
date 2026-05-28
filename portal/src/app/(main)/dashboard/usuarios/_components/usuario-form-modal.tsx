@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition, useRef, useCallback, useMemo } from "react";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, FieldPath } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
@@ -30,14 +30,15 @@ import { cn } from "@/lib/utils";
 import { PasswordChecklist } from "@/components/password-checklist";
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
-const baseSchema = z.object({
+const baseSchemaObj = z.object({
   nombre_completo: z.string().min(3, "Mínimo 3 caracteres."),
   email: z.string().email("Correo no válido."),
   id_rol: z.string(),                                   // puede estar vacío al editar Super Admin
-  ids_sucursales: z.array(z.number()).optional().default([]),
+  ids_sucursales: z.array(z.number()),
 });
 
-const createSchema = baseSchema.extend({
+const createSchemaObj = baseSchemaObj.extend({
+  action: z.literal("create"),
   id_rol: z.string().min(1, "Selecciona un rol."),
   password: z.string()
     .min(8, "Mínimo 8 caracteres.")
@@ -46,12 +47,10 @@ const createSchema = baseSchema.extend({
     .regex(/[0-9]/, "Debe contener al menos un número.")
     .regex(/[^A-Za-z0-9]/, "Debe contener al menos un carácter especial (!@#$%^&*…)."),
   confirm_password: z.string().min(1, "Confirma la contraseña."),
-}).refine((d) => d.password === d.confirm_password, {
-  message: "Las contraseñas no coinciden.",
-  path: ["confirm_password"],
 });
 
-const editSchema = baseSchema.extend({
+const editSchemaObj = baseSchemaObj.extend({
+  action: z.literal("edit"),
   password: z.string()
     .refine((v) => !v || v.length >= 8,           "Mínimo 8 caracteres.")
     .refine((v) => !v || /[A-Z]/.test(v),         "Debe contener al menos una letra mayúscula.")
@@ -60,14 +59,32 @@ const editSchema = baseSchema.extend({
     .refine((v) => !v || /[^A-Za-z0-9]/.test(v), "Debe contener al menos un carácter especial (!@#$%^&*…).")
     .optional(),
   confirm_password: z.string().optional(),
-}).refine((d) => !d.password || d.password === d.confirm_password, {
-  message: "Las contraseñas no coinciden.",
-  path: ["confirm_password"],
 });
 
-type CreateForm = z.infer<typeof createSchema>;
-type EditForm = z.infer<typeof editSchema>;
-type AnyForm = CreateForm | EditForm;
+const unionSchema = z.discriminatedUnion("action", [
+  createSchemaObj,
+  editSchemaObj,
+]).superRefine((data, ctx) => {
+  if (data.action === "create") {
+    if (data.password !== data.confirm_password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Las contraseñas no coinciden.",
+        path: ["confirm_password"],
+      });
+    }
+  } else if (data.action === "edit") {
+    if (data.password && data.password !== data.confirm_password) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Las contraseñas no coinciden.",
+        path: ["confirm_password"],
+      });
+    }
+  }
+});
+
+type AnyForm = z.infer<typeof unionSchema>;
 
 // ─── FieldWrapper ─────────────────────────────────────────────────────────────
 function FieldWrapper({
@@ -314,8 +331,9 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
     watch,
     formState: { errors },
   } = useForm<AnyForm>({
-    resolver: zodResolver(isEdit ? editSchema : (createSchema as any)),
+    resolver: zodResolver(unionSchema),
     defaultValues: {
+      action: isEdit ? "edit" : "create",
       nombre_completo: "",
       email: "",
       password: "",
@@ -331,6 +349,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
     if (!isEdit || !usuario) {
       // Modo crear: limpiar todo
       reset({
+        action: "create",
         nombre_completo: "",
         email: "",
         password: "",
@@ -343,6 +362,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
 
     // Modo editar: pre-poblar con los datos del usuario primero (sincrónico)
     reset({
+      action: "edit",
       nombre_completo: usuario.nombre_completo,
       email: usuario.email,
       password: "",
@@ -356,6 +376,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
     getDatosEdicion(usuario.id_usuario).then((res) => {
       if (res.success && res.data) {
         reset({
+          action: "edit",
           nombre_completo: usuario.nombre_completo,
           email: usuario.email,
           password: "",
@@ -376,7 +397,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
         ...(isEdit ? { id_usuario: usuario!.id_usuario } : {}),
         nombre_completo: values.nombre_completo,
         email: values.email,
-        password: (values as any).password || undefined,
+        password: values.password || undefined,
         // Cuando id_rol === 0 significa auto-edición con campo oculto: no modificar rol
         id_rol: esAutoEdicion ? 0 : Number(values.id_rol),
         ids_sucursales: values.ids_sucursales ?? [],
@@ -390,7 +411,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
         onSaved();
       } else if (res.fieldErrors) {
         Object.entries(res.fieldErrors).forEach(([field, msgs]) => {
-          setError(field as any, { message: (msgs as string[])[0] });
+          setError(field as FieldPath<AnyForm>, { message: (msgs as string[])[0] });
         });
       } else {
         toast.error(res.error ?? "Error desconocido.");
@@ -459,7 +480,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
               <div className="grid grid-cols-2 gap-3">
                 <FieldWrapper
                   label={isEdit ? "Nueva Contraseña" : "Contraseña"}
-                  error={(errors as any).password?.message}
+                  error={errors.password?.message}
                 >
                   <Input
                     type="password"
@@ -469,7 +490,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
                 </FieldWrapper>
                 <FieldWrapper
                   label="Confirmar Contraseña"
-                  error={(errors as any).confirm_password?.message}
+                  error={errors.confirm_password?.message}
                 >
                   <Input type="password" placeholder="Repetir contraseña" {...register("confirm_password")} />
                 </FieldWrapper>
@@ -513,7 +534,7 @@ export function UsuarioFormModal({ open, onOpenChange, usuario, roles, sucursale
               {/* Sucursales */}
               <FieldWrapper
                 label="Sucursales Asignadas"
-                error={(errors as any).ids_sucursales?.message}
+                error={errors.ids_sucursales?.message}
               >
                 <Controller
                   control={control}

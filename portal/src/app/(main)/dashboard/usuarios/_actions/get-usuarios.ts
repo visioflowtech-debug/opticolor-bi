@@ -36,8 +36,9 @@ export async function getUsuarios(): Promise<{
       ORDER BY u.nombre_completo ASC
     `);
     return { success: true, data: result.recordset };
-  } catch (error: any) {
-    console.error("[ERROR][get-usuarios]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][get-usuarios]", errMsg);
     return { success: false, data: [], error: "No se pudieron cargar los usuarios." };
   }
 }

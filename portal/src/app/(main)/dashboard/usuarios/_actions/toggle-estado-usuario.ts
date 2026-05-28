@@ -56,8 +56,9 @@ export async function toggleEstadoUsuario(
       `);
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[ERROR][toggle-estado-usuario]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][toggle-estado-usuario]", errMsg);
     return { success: false, error: "Error interno al cambiar el estado." };
   }
 }

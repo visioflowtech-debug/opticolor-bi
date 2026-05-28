@@ -40,15 +40,11 @@ export type GrupoMix = {
   porcentaje: number; // 1 decimal
 };
 
-export type Params = {
-  startDate: string;
-  endDate: string;
-  sucursales: string | null;   // IDs separados por coma, null = todas
-  marcaFilter: string | null;  // nombres separados por coma, null = todas
-  grupoFilter: string | null;  // nombres separados por coma, null = todos
-};
+import { ReportParams } from "@/types/dashboard";
 
-type FetchParams = Params & { allowedSucursales: string; isSupervisor: boolean };
+export type Params = ReportParams;
+
+type FetchParams = Params & { allowedSucursales: string };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
@@ -68,13 +64,13 @@ type VentaFusedRow = {
 const EXCLUSION = `AND dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS')`;
 
 // Helper: Blindaje de Filtros Vacíos/Globales ("TODOS", "%")
-const isAll = (val: string | null) => !val || val.toUpperCase() === 'TODOS' || val === '%';
+const isAll = (val: string | null | undefined) => !val || val.toUpperCase() === 'TODOS' || val === '%';
 
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
 const fetchInventarioKPIs = unstable_cache(
   async (params: FetchParams): Promise<InventarioKpis> => {
-    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
 
@@ -169,7 +165,7 @@ export async function getInventarioKPIs(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchInventarioKPIs({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchInventarioKPIs({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getInventarioKPIs]", err);
@@ -181,7 +177,7 @@ export async function getInventarioKPIs(
 
 const fetchMarcasDetalle = unstable_cache(
   async (params: FetchParams): Promise<MarcaItem[]> => {
-    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
     const marcaSql = !isAll(marcaFilter)
@@ -281,7 +277,7 @@ export async function getMarcasDetalleData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchMarcasDetalle({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchMarcasDetalle({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getMarcasDetalleData]", err);
@@ -293,7 +289,7 @@ export async function getMarcasDetalleData(
 
 const fetchGruposMix = unstable_cache(
   async (params: FetchParams): Promise<GrupoMix[]> => {
-    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
     const marcaSql = !isAll(marcaFilter)
@@ -350,7 +346,7 @@ export async function getGruposMixData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchGruposMix({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchGruposMix({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getGruposMixData]", err);
@@ -362,7 +358,7 @@ export async function getGruposMixData(
 
 const fetchDispersionData = unstable_cache(
   async (params: FetchParams): Promise<DispersionItem[]> => {
-    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
     const marcaSql = !isAll(marcaFilter)
@@ -459,7 +455,7 @@ export async function getDispersionData(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchDispersionData({ ...params, allowedSucursales, isSupervisor: auth.isSupervisor });
+    const data = await fetchDispersionData({ ...params, allowedSucursales });
     return { success: true, data };
   } catch (err) {
     console.error("[ERROR][getDispersionData]", err);

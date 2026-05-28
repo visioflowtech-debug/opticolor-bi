@@ -9,11 +9,13 @@ import {
   Tooltip,
   XAxis,
   YAxis,
+  TooltipProps,
 } from "recharts";
+import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MonthlyTrendData } from "../_actions/get-resumen-data";
-import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
+import { formatCurrency, formatCompactCurrency, formatCompactNumber } from "@/lib/utils";
 
 interface Props {
   data: MonthlyTrendData[];
@@ -26,7 +28,7 @@ function ChartTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ name: string; value: number; color: string }>;
+  payload?: Payload<ValueType, NameType>[];
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
@@ -44,8 +46,8 @@ function ChartTooltip({
           </span>
           <span className="ml-auto font-semibold tabular-nums">
             {p.name === "ventaNeta"
-              ? formatCurrency(p.value)
-              : p.value.toLocaleString("en-US")}
+              ? formatCurrency(Number(p.value ?? 0))
+              : Number(p.value ?? 0).toLocaleString("en-US")}
           </span>
         </div>
       ))}
@@ -102,9 +104,7 @@ export function VentasChart({ data }: Props) {
           tickLine={false}
           axisLine={false}
           width={36}
-          tickFormatter={(v: number) =>
-            v.toLocaleString("en-US", { notation: "compact" })
-          }
+          tickFormatter={(v) => formatCompactNumber(v)}
         />
 
         <Tooltip

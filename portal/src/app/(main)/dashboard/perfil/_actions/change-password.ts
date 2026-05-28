@@ -148,12 +148,13 @@ export async function changePassword(formData: FormData) {
 
       await transaction.commit();
       return { success: true };
-    } catch (e: any) {
+    } catch (e: unknown) {
       await transaction.rollback();
       throw e; // Lanzamos para que lo capture el catch principal y audite el error SQL
     }
-  } catch (error: any) {
-    console.error("[ERROR][change-password]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][change-password]", errMsg);
     const msg = "Ha ocurrido un error inesperado al cambiar la contraseña.";
     
     try {
@@ -171,7 +172,7 @@ export async function changePassword(formData: FormData) {
           .input("registro_id", session.user.id)
           .input("valores_anteriores", "[HASH_ACTUAL_PROTEGIDO]")
           .input("resultado", "ERROR")
-          .input("mensaje_error", error.message || msg)
+          .input("mensaje_error", errMsg)
           .input("ip_origen", ip_origen)
           .query(`
             INSERT INTO dbo.Seguridad_Auditoria (

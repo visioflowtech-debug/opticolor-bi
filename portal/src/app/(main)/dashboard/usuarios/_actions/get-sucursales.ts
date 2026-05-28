@@ -21,8 +21,9 @@ export async function getSucursalesParaSelector(): Promise<{
       ORDER BY nombre_sucursal ASC
     `);
     return { success: true, data: result.recordset };
-  } catch (error: any) {
-    console.error("[ERROR][get-sucursales]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][get-sucursales]", errMsg);
     return { success: false, data: [], error: "No se pudieron cargar las sucursales." };
   }
 }

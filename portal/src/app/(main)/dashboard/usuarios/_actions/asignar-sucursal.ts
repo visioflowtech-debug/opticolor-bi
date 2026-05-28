@@ -82,8 +82,9 @@ export async function asignarSucursal(
       `);
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[ERROR][asignar-sucursal]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][asignar-sucursal]", errMsg);
     return { success: false, error: "Error interno al asignar la sucursal." };
   }
 }

@@ -120,8 +120,9 @@ export async function crearUsuario(input: unknown): Promise<{
       `);
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[ERROR][crear-usuario]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][crear-usuario]", errMsg);
     return { success: false, error: "Error interno al crear el usuario." };
   }
 }

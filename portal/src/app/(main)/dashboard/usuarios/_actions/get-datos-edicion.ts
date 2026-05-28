@@ -45,8 +45,9 @@ export async function getDatosEdicion(idUsuario: number): Promise<{
         ),
       },
     };
-  } catch (error: any) {
-    console.error("[ERROR][get-datos-edicion]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][get-datos-edicion]", errMsg);
     return { success: false, data: null, error: "No se pudieron cargar los datos." };
   }
 }

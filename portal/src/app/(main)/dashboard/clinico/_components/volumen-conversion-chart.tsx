@@ -11,8 +11,8 @@ import {
   YAxis,
   Legend,
 } from "recharts";
-import type { TooltipContentProps } from "recharts";
-import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { TooltipProps } from "recharts";
+import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { VolumenConversion } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
@@ -24,9 +24,8 @@ interface Props {
 function ChartTooltip({
   active,
   payload,
-}: {
-  active?: boolean;
-  payload?: TooltipContentProps<ValueType, NameType>["payload"];
+}: TooltipProps<ValueType, NameType> & {
+  payload?: Payload<ValueType, NameType>[];
 }) {
   if (!active || !payload?.length) return null;
 

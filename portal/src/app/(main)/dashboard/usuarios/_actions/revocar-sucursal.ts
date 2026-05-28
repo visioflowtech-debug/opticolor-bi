@@ -50,8 +50,9 @@ export async function revocarSucursal(
       `);
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[ERROR][revocar-sucursal]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][revocar-sucursal]", errMsg);
     return { success: false, error: "Error interno al revocar la sucursal." };
   }
 }

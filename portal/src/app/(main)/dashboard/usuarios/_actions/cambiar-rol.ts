@@ -113,8 +113,9 @@ export async function cambiarRol(
       `);
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[ERROR][cambiar-rol]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][cambiar-rol]", errMsg);
     return { success: false, error: "Error interno al cambiar el rol." };
   }
 }

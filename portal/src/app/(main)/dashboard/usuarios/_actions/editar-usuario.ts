@@ -223,8 +223,9 @@ export async function editarUsuario(input: unknown): Promise<{
       `);
 
     return { success: true };
-  } catch (error: any) {
-    console.error("[ERROR][editar-usuario]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][editar-usuario]", errMsg);
     return { success: false, error: "Error interno al editar el usuario." };
   }
 }

@@ -43,11 +43,9 @@ export type ClienteDeudor = {
   saldo_pendiente: number;
 };
 
-export type Params = {
-  startDate: string; // "YYYY-MM-DD"
-  endDate: string;   // "YYYY-MM-DD"
-  sucursales: string | null; // IDs separados por coma, null = todas
-};
+import { ReportParams } from "@/types/dashboard";
+
+export type Params = ReportParams;
 
 type FetchParams = Params & { allowedSucursales: string };
 

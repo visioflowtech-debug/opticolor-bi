@@ -22,8 +22,9 @@ export async function getUsuariosBySucursal(
       `);
 
     return { success: true, data: result.recordset };
-  } catch (error: any) {
-    console.error("[ERROR][get-usuarios-sucursal]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][get-usuarios-sucursal]", errMsg);
     return { success: false, data: [], error: "Error al obtener usuarios." };
   }
 }

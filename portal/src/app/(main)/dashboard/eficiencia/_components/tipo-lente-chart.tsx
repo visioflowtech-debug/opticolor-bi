@@ -9,8 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { TooltipContentProps } from "recharts";
-import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { TooltipProps } from "recharts";
+import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { TipoLenteDetalle } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
@@ -29,12 +29,9 @@ const truncateLabel = (value: string) => {
 function ChartTooltip({
   active,
   payload,
-  label,
   totalVolumen,
-}: {
-  active?: boolean;
-  payload?: TooltipContentProps<ValueType, NameType>["payload"];
-  label?: string;
+}: TooltipProps<ValueType, NameType> & {
+  payload?: Payload<ValueType, NameType>[];
   totalVolumen: number;
 }) {
   if (!active || !payload?.length) return null;

@@ -49,11 +49,9 @@ export type SucursalExamen = {
   total_examenes: number;
 };
 
-export type Params = {
-  startDate: string; // "YYYY-MM-DD"
-  endDate: string;   // "YYYY-MM-DD"
-  sucursales: string | null; // IDs separados por coma, null = todas
-};
+import { ReportParams } from "@/types/dashboard";
+
+export type Params = ReportParams;
 
 // F-9: isSupervisor eliminado — buildSucursalFilter() nunca lo referencia en SQL
 type FetchParams = Params & { allowedSucursales: string; excludedClinica: string };

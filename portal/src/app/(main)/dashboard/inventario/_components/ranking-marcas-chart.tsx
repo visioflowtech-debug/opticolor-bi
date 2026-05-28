@@ -12,7 +12,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MarcaItem } from "../_actions/get-inventario-data";
-import { formatBsCurrency } from "@/lib/utils";
+import { formatBsCurrency, formatCompactNumber } from "@/lib/utils";
 
 interface Props {
   data: MarcaItem[];
@@ -124,10 +124,7 @@ export function RankingMarcasChart({ data }: Props) {
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) => {
-              const formatted = v.toLocaleString("en-US", { notation: "compact", maximumFractionDigits: 1 });
-              return `Bs. ${formatted}`;
-            }}
+            tickFormatter={(v) => formatCompactNumber(v)}
           />
 
           {/* Tooltip muestra el nombre completo (desde el campo marca) */}

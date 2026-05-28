@@ -118,8 +118,9 @@ export async function getUsuarioDetalle(idUsuario: number): Promise<{
         auditoria: auditoriaResult.recordset,
       },
     };
-  } catch (error: any) {
-    console.error("[ERROR][get-usuario-detalle]", error);
+  } catch (error: unknown) {
+    const errMsg = error instanceof Error ? error.message : "Error desconocido";
+    console.error("[ERROR][get-usuario-detalle]", errMsg);
     return { success: false, data: null, error: "No se pudo cargar el usuario." };
   }
 }

@@ -9,8 +9,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { TooltipContentProps } from "recharts";
-import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { TooltipProps } from "recharts";
+import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { MixVenta } from "../_actions/get-cartera-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
@@ -29,12 +29,9 @@ const truncateLabel = (value: string) => {
 function ChartTooltip({
   active,
   payload,
-  label,
   totalVenta,
-}: {
-  active?: boolean;
-  payload?: TooltipContentProps<ValueType, NameType>["payload"];
-  label?: string;
+}: TooltipProps<ValueType, NameType> & {
+  payload?: Payload<ValueType, NameType>[];
   totalVenta: number;
 }) {
   if (!active || !payload?.length) return null;

@@ -7,8 +7,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from "recharts";
-import type { TooltipContentProps } from "recharts";
-import type { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent";
+import { TooltipProps } from "recharts";
+import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { GeneroExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 
@@ -27,14 +27,13 @@ function ChartTooltip({
   active,
   payload,
   total,
-}: {
-  active?: boolean;
-  payload?: TooltipContentProps<ValueType, NameType>["payload"];
+}: TooltipProps<ValueType, NameType> & {
+  payload?: Payload<ValueType, NameType>[];
   total: number;
 }) {
   if (!active || !payload?.length) return null;
 
-  const item = payload[0].payload;
+  const item = payload[0].payload as GeneroExamen;
   const pct = total > 0 ? (item.total_examenes / total) * 100 : 0;
 
   return (

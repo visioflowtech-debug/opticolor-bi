@@ -13,7 +13,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { DispersionItem } from "../_actions/get-inventario-data";
-import { formatBsCurrency } from "@/lib/utils";
+import { formatBsCurrency, formatCompactNumber } from "@/lib/utils";
 
 // Tokens semánticos del Design System — var() resuelve el valor OKLCH nativo (Tailwind v4)
 const CHART_TOKENS = [
@@ -105,9 +105,7 @@ export function DispersionChart({ data }: Props) {
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) =>
-              v.toLocaleString("en-US", { notation: "compact" })
-            }
+            tickFormatter={(v) => formatCompactNumber(v)}
             label={{
               value: "Unidades Vendidas",
               position: "insideBottom",
@@ -125,9 +123,7 @@ export function DispersionChart({ data }: Props) {
             tickLine={false}
             axisLine={false}
             width={52}
-            tickFormatter={(v: number) =>
-              v.toLocaleString("en-US", { notation: "compact" })
-            }
+            tickFormatter={(v) => formatCompactNumber(v)}
             label={{
               value: "Stock Físico (unidades)",
               angle: -90,

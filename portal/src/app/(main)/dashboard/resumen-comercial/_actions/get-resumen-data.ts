@@ -6,6 +6,8 @@ import { getConnection } from "@/lib/db";
 import { buildSucursalFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { getUserAllowedSucursales } from "@/lib/security";
+import { ReportParams } from "@/types/dashboard";
+import { MAP_MES_NUM_TO_ABBR as MES_ABBR } from "@/lib/date-utils";
 
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
@@ -40,15 +42,10 @@ export type MedioPago = {
   porcentaje: number; // con 1 decimal (ej: 45.2)
 };
 
-type Params = {
-  startDate: string; // "YYYY-MM-DD"
-  endDate: string;   // "YYYY-MM-DD"
-  sucursales: string | null; // IDs separados por coma, null = todas
-};
+export type Params = ReportParams;
 
 type FetchParams = Params & {
   allowedSucursales: string;
-  isSupervisor: boolean;
 };
 
 export type TrendParams = {
@@ -57,7 +54,6 @@ export type TrendParams = {
 
 type FetchTrendParams = TrendParams & {
   allowedSucursales: string;
-  isSupervisor: boolean;
 };
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
@@ -72,7 +68,7 @@ type MedioPagoRow       = { medioPago: string; monto: number };
 
 const fetchResumenKPIs = unstable_cache(
   async (params: FetchParams): Promise<KpiData> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     // Fecha Venezuela GMT-4 — new Date() es UTC, restar 4 h para obtener la fecha local real
@@ -220,7 +216,6 @@ export async function getResumenKPIs(
     const data = await fetchResumenKPIs({
       ...params,
       allowedSucursales,
-      isSupervisor: auth.isSupervisor,
     });
     return { success: true, data };
   } catch (err) {
@@ -233,7 +228,7 @@ export async function getResumenKPIs(
 
 const fetchVentasDiarias = unstable_cache(
   async (params: FetchTrendParams): Promise<MonthlyTrendData[]> => {
-    const { sucursales, allowedSucursales, isSupervisor } = params;
+    const { sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -256,12 +251,11 @@ const fetchVentasDiarias = unstable_cache(
       ORDER BY anio_factura, mes_factura_nro ASC
     `);
 
-    const MESES_SHORT = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     return (res.recordset as VentasKpiRow[]).map((r) => {
       const mesNum = Number(r.mes_nro ?? 1);
       return {
         periodo:          String(r.periodo ?? `${r.anio}-${String(mesNum).padStart(2, "0")}`),
-        label:            MESES_SHORT[mesNum - 1] ?? String(mesNum),
+        label:            MES_ABBR[String(mesNum).padStart(2, "0")] ?? String(mesNum),
         ventaNeta:        Number(r.ventaMensual ?? 0),
         cantidadFacturas: Number(r.trafico ?? 0),
       };
@@ -281,7 +275,6 @@ export async function getVentasDiarias(
     const data = await fetchVentasDiarias({
       ...params,
       allowedSucursales,
-      isSupervisor: auth.isSupervisor,
     });
     return { success: true, data };
   } catch (err) {
@@ -294,7 +287,7 @@ export async function getVentasDiarias(
 
 const fetchTopSucursales = unstable_cache(
   async (params: FetchParams): Promise<VentaSucursal[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -366,7 +359,6 @@ export async function getTopSucursales(
     const data = await fetchTopSucursales({
       ...params,
       allowedSucursales,
-      isSupervisor: auth.isSupervisor,
     });
     return { success: true, data };
   } catch (err) {
@@ -379,7 +371,7 @@ export async function getTopSucursales(
 
 const fetchMediosPago = unstable_cache(
   async (params: FetchParams): Promise<MedioPago[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales, isSupervisor } = params;
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
@@ -426,7 +418,6 @@ export async function getMediosPago(
     const data = await fetchMediosPago({
       ...params,
       allowedSucursales,
-      isSupervisor: auth.isSupervisor,
     });
     return { success: true, data };
   } catch (err) {
