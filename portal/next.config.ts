@@ -9,9 +9,31 @@ const nextConfig: NextConfig = {
   // ✅ Next.js 16: Define la raíz de rastreo de archivos en /portal de forma nativa
   outputFileTracingRoot: __dirname,
 
-  // ✅ Omite bloqueos de construcción por errores estrictos de tipos (ej. Recharts)
+  // ✅ Habilita la verificación estricta de tipos de TypeScript durante la construcción
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
+  },
+
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+        ],
+      },
+    ];
   },
 
   // 💡 Nota: El bloque 'eslint' fue removido en Next.js 16 porque 'next build' 

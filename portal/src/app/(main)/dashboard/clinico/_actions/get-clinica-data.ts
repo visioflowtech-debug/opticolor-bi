@@ -76,6 +76,17 @@ type SucursalRow     = { nombre_sucursal: string; total_examenes: number };
 
 // ─── Auxiliares ───────────────────────────────────────────────────────────────
 
+function getExcludedClinicaIds(): string {
+  const ids = process.env.EXCLUDED_CLINICA_IDS;
+  if (!ids) {
+    console.warn(
+      "[WARNING][get-clinica-data] La variable de entorno EXCLUDED_CLINICA_IDS no está configurada. Usando fallback '3,4'."
+    );
+    return "3,4";
+  }
+  return ids;
+}
+
 function extractMinAge(rango: string): number {
   const match = rango.match(/\d+/);
   return match ? parseInt(match[0], 10) : 0;
@@ -169,7 +180,7 @@ export async function getClinicaKPIs(
     const hoy       = new Date().toLocaleDateString("en-CA", { timeZone: "America/Caracas" });
     const inicioHoy = `${hoy} 00:00:00`;
     const finHoy    = `${hoy} 23:59:59`;
-    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const excludedClinica = getExcludedClinicaIds();
     const data = await fetchClinicaKPIs({ ...params, allowedSucursales, inicioHoy, finHoy, excludedClinica });
     return { success: true, data };
   } catch (err) {
@@ -222,7 +233,7 @@ export async function getTendenciaExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const excludedClinica = getExcludedClinicaIds();
     const data = await fetchTendenciaExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
@@ -284,7 +295,7 @@ export async function getVolumenConversion(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const excludedClinica = getExcludedClinicaIds();
     const data = await fetchVolumenConversion({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
@@ -352,7 +363,7 @@ export async function getGeneroExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const excludedClinica = getExcludedClinicaIds();
     const data = await fetchGeneroExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
@@ -431,7 +442,7 @@ export async function getEdadExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const excludedClinica = getExcludedClinicaIds();
     const data = await fetchEdadExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {
@@ -486,7 +497,7 @@ export async function getTopSucursalesExamen(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const excludedClinica = process.env.EXCLUDED_CLINICA_IDS || "3,4";
+    const excludedClinica = getExcludedClinicaIds();
     const data = await fetchTopSucursalesExamen({ ...params, allowedSucursales, excludedClinica });
     return { success: true, data };
   } catch (err) {

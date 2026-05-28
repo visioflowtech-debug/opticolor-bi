@@ -26,8 +26,7 @@ function ChartTooltip({
   active,
   payload,
   label,
-}: {
-  active?: boolean;
+}: TooltipProps<ValueType, NameType> & {
   payload?: Payload<ValueType, NameType>[];
   label?: string;
 }) {
