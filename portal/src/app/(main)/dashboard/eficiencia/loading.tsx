@@ -15,8 +15,8 @@ export default function EficienciaLoading() {
 
       {/* ── Fila 3: Gráficos ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Skeleton className="h-[580px] w-full rounded-2xl" />
-        <Skeleton className="h-[580px] w-full rounded-2xl" />
+        <Skeleton className="h-[400px] md:h-[500px] w-full rounded-2xl" />
+        <Skeleton className="h-[400px] md:h-[500px] w-full rounded-2xl" />
       </div>
 
       {/* ── Fila 4: Tabla ────────── */}

@@ -103,22 +103,22 @@ function SucursalesList({
             <TooltipContent
               side="top"
               align="start"
-              className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[220px]"
+              className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm"
             >
-              <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-foreground border-b border-border pb-2">
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-foreground">
                 {item.nombreSucursal}
               </p>
-              <div className="flex flex-col gap-2 text-xs">
-                <div className="flex items-center justify-between gap-6">
+              <div className="space-y-0.5 text-xs">
+                <div className="flex items-center justify-between gap-5">
                   <span className="text-muted-foreground">Venta Neta</span>
-                  <span className="font-semibold tabular-nums text-foreground">
+                  <span className="font-medium tabular-nums text-foreground">
                     {formatCurrency(item.ventaNeta)}
                   </span>
                 </div>
                 {item.estimadoCierre > 0 && (
-                  <div className="flex items-center justify-between gap-6">
+                  <div className="flex items-center justify-between gap-5">
                     <span className="text-muted-foreground">Proyección Cierre</span>
-                    <span className="font-semibold tabular-nums text-foreground">
+                    <span className="font-medium tabular-nums text-foreground">
                       {formatCurrency(item.estimadoCierre)}
                     </span>
                   </div>

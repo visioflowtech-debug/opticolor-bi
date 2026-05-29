@@ -12,6 +12,7 @@ import {
 import type { TendenciaOrden } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   data: TendenciaOrden[];
@@ -48,6 +49,8 @@ function ChartTooltip({
 }
 
 export function TendenciaOrdenesChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   if (!data.length) {
     return (
       <SafeChartContainer height="h-72">
@@ -63,7 +66,7 @@ export function TendenciaOrdenesChart({ data }: Props) {
       <ResponsiveContainer width="100%" height="100%">
         <LineChart
           data={data}
-          margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
+          margin={isMobile ? { top: 10, right: 15, left: -20, bottom: 5 } : { top: 20, right: 30, left: 10, bottom: 20 }}
         >
           <CartesianGrid
             strokeDasharray="3 3"
@@ -74,8 +77,11 @@ export function TendenciaOrdenesChart({ data }: Props) {
           />
           <XAxis
             dataKey="mes_nombre"
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-            angle={-45} textAnchor="end" height={70} interval={0}
+            tick={{ fontSize: isMobile ? 10 : 11, fill: "var(--muted-foreground)" }}
+            angle={isMobile ? 0 : -45}
+            textAnchor={isMobile ? "middle" : "end"}
+            height={isMobile ? 30 : 70}
+            interval={isMobile ? "preserveStartEnd" : 0}
             tickLine={false}
             axisLine={false}
             tickMargin={10}
