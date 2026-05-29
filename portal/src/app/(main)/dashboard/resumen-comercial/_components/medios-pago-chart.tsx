@@ -53,20 +53,22 @@ function DonutTooltip({
 // Leyenda: solo nombre + porcentaje (sin montos)
 function LegendList({ data }: { data: MedioPago[] }) {
   return (
-    <ul className="flex w-full flex-col gap-2">
+    <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 w-full max-w-xl mx-auto pt-4 border-t border-slate-50">
       {data.map((item, i) => (
-        <li key={i} className="flex min-w-0 items-center gap-2 text-xs">
-          <span
-            className="h-2.5 w-2.5 shrink-0 rounded-full"
-            style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
-          />
-          <span
-            className="min-w-0 flex-1 truncate text-muted-foreground"
-            title={item.medioPago}
-          >
-            {item.medioPago}
-          </span>
-          <span className="shrink-0 font-semibold tabular-nums">
+        <li key={i} className="flex items-center justify-between text-xs font-medium text-slate-600 w-full whitespace-nowrap">
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="h-2.5 w-2.5 shrink-0 rounded-full"
+              style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
+            />
+            <span
+              className="min-w-0 truncate text-muted-foreground"
+              title={item.medioPago}
+            >
+              {item.medioPago}
+            </span>
+          </div>
+          <span className="shrink-0 font-semibold tabular-nums ml-2">
             {item.porcentaje.toFixed(1)}%
           </span>
         </li>
@@ -85,9 +87,9 @@ export function MediosPagoChart({ data }: Props) {
   }
 
   return (
-    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center">
+    <div className="flex flex-col items-center justify-center gap-6 w-full">
       {/* Donut — anillo más grueso y prominente */}
-      <SafeChartContainer height="h-52" className="w-52 shrink-0">
+      <SafeChartContainer height="h-64 md:h-72" className="w-64 h-64 shrink-0 md:w-72 md:h-72">
         <ResponsiveContainer width="100%" height="100%" minHeight={180}>
           <PieChart>
             <Pie
@@ -114,7 +116,7 @@ export function MediosPagoChart({ data }: Props) {
       </SafeChartContainer>
 
       {/* Leyenda: nombre + porcentaje */}
-      <div className="min-w-0 flex-1">
+      <div className="w-full">
         <LegendList data={data} />
       </div>
     </div>

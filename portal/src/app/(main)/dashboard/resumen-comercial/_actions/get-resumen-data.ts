@@ -307,7 +307,7 @@ const fetchTopSucursales = unstable_cache(
       DECLARE @MesStart  INT = MONTH(CAST(@startDate AS DATE));
       DECLARE @AnioStart INT = YEAR(CAST(@startDate AS DATE));
 
-      SELECT TOP 10
+      SELECT
         vn.idSucursal,
         ds.nombre_sucursal              AS nombreSucursal,
         vn.ventaNeta,
