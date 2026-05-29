@@ -332,7 +332,7 @@ const fetchClientesDeudores = unstable_cache(
         .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
-      SELECT TOP 10
+      SELECT
         ds.nombre_sucursal,
         ISNULL(dc.nombre_completo, 'CLIENTE NO CATALOGADO') AS nombre_completo,
         ISNULL(SUM(fp.monto_total),     0) AS monto_total,

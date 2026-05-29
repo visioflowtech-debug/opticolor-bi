@@ -16,7 +16,7 @@ export async function ClientesDeudoresTableWrapper({ startDate, endDate, sucursa
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Top 10 de Clientes Deudores
+          Clientes Deudores
         </CardTitle>
       </CardHeader>
       <CardContent>

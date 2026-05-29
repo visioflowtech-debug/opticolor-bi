@@ -13,17 +13,17 @@ export async function MixVentasChartWrapper({ startDate, endDate, sucursales }: 
   const data = result.data ?? [];
 
   return (
-    <Card className="overflow-hidden rounded-2xl shadow-md">
+    <Card className="overflow-hidden rounded-2xl shadow-md h-full flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
           Mix de Ventas · Participación y Monto Neto
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="h-full flex-1 flex flex-col min-h-0">
         {result.error && (
           <div className="text-sm text-destructive pb-2">{result.error}</div>
         )}
-        <div className="w-full h-[400px] md:h-[500px] min-w-0">
+        <div className="w-full h-[320px] md:h-[480px] min-w-0 md:pb-0 flex-1">
           <MixVentasChart data={data} />
         </div>
       </CardContent>

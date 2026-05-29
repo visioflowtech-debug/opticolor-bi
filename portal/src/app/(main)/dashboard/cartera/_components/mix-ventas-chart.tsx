@@ -14,14 +14,16 @@ import type { NameType, ValueType, Payload } from "recharts/types/component/Defa
 import type { MixVenta } from "../_actions/get-cartera-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCurrency, formatCompactCurrency } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   data: MixVenta[];
 }
 
-const truncateLabel = (value: string) => {
-  if (value.length > 20) {
-    return value.substring(0, 20) + "...";
+const truncateLabel = (value: string, isMobile: boolean) => {
+  const maxLength = isMobile ? 10 : 20; // Limitar a 10 caracteres en smartphone
+  if (value.length > maxLength) {
+    return value.substring(0, maxLength) + "...";
   }
   return value;
 };
@@ -69,9 +71,14 @@ function ChartTooltip({
 }
 
 export function MixVentasChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   if (!data.length) {
     return (
-      <SafeChartContainer height="h-[500px]">
+      <SafeChartContainer 
+        height={isMobile ? "h-[260px]" : "h-full"} 
+        className={isMobile ? "md:pb-0 md:p-0" : "min-h-[440px] w-full md:pb-0 md:p-0"}
+      >
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           Sin datos para el período seleccionado
         </div>
@@ -82,45 +89,57 @@ export function MixVentasChart({ data }: Props) {
   const totalVenta = data.reduce((acc, curr) => acc + curr.venta_neta, 0);
 
   return (
-    <SafeChartContainer height="h-[500px]">
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart
-        data={data}
-        layout="vertical"
-        margin={{ top: 20, right: 30, left: 80, bottom: 20 }}
-      >
-        <CartesianGrid
-          strokeDasharray="3 3"
-          horizontal={true}
-          vertical={false}
-          stroke="var(--border)"
-          strokeOpacity={0.6}
-        />
-        <XAxis
-          type="number"
-          tickFormatter={formatCompactCurrency}
-          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis
-          dataKey="categoria_agrupada"
-          type="category"
-          tickFormatter={truncateLabel}
-          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          tickLine={false}
-          axisLine={false}
-          width={80}
-        />
-        <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.2 }} content={<ChartTooltip totalVenta={totalVenta} />} />
-        <Bar
-          dataKey="venta_neta"
-          name="Venta Neta"
-          fill="var(--chart-1)"
-          radius={[0, 4, 4, 0]}
-          barSize={24}
-        />
-      </BarChart>
+    <SafeChartContainer 
+      height={isMobile ? "h-[260px]" : "h-full"} 
+      className={isMobile ? "md:pb-0 md:p-0" : "min-h-[440px] w-full md:pb-0 md:p-0"}
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          layout="vertical"
+          margin={{
+            top: 10,
+            right: 15,
+            left: isMobile ? 15 : 10,
+            bottom: 10
+          }}
+        >
+          <CartesianGrid
+            strokeDasharray="3 3"
+            horizontal={true}
+            vertical={false}
+            stroke="var(--border)"
+            strokeOpacity={0.6}
+          />
+          <XAxis
+            type="number"
+            tickFormatter={formatCompactCurrency}
+            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            dataKey="categoria_agrupada"
+            type="category"
+            tickFormatter={(val) => truncateLabel(val, isMobile)}
+            tick={{ fontSize: isMobile ? 10 : 11, fill: "#475569" }}
+            tickLine={false}
+            axisLine={false}
+            width={isMobile ? 65 : 120}
+          />
+          <Tooltip
+            cursor={{ fill: "var(--muted)", opacity: 0.2 }}
+            content={<ChartTooltip totalVenta={totalVenta} />}
+            trigger={isMobile ? "click" : "hover"}
+          />
+          <Bar
+            dataKey="venta_neta"
+            name="Venta Neta"
+            fill="var(--chart-1)"
+            radius={[0, 4, 4, 0]}
+            barSize={24}
+          />
+        </BarChart>
       </ResponsiveContainer>
     </SafeChartContainer>
   );

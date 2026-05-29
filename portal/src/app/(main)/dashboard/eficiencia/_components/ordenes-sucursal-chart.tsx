@@ -13,6 +13,7 @@ import {
 import type { OrdenesSucursal } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   data: OrdenesSucursal[];
@@ -56,6 +57,8 @@ function ChartTooltip({
 }
 
 export function OrdenesSucursalChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   if (!data.length) {
     return (
       <SafeChartContainer height="h-[500px]">
@@ -76,7 +79,7 @@ export function OrdenesSucursalChart({ data }: Props) {
         <BarChart
           data={data}
           layout="vertical"
-          margin={{ top: 20, right: 40, left: 80, bottom: 20 }}
+          margin={isMobile ? { top: 8, right: 10, left: 5, bottom: 8 } : { top: 20, right: 40, left: 80, bottom: 20 }}
         >
           <CartesianGrid
             strokeDasharray="3 3"
@@ -97,10 +100,11 @@ export function OrdenesSucursalChart({ data }: Props) {
             dataKey="nombre_sucursal"
             type="category"
             tickFormatter={truncateLabel}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)", textAnchor: "end", style: { whiteSpace: "nowrap" } }}
+            tick={{ fontSize: 10, fill: "var(--muted-foreground)", textAnchor: "end", style: { whiteSpace: "nowrap" } }}
             tickLine={false}
             axisLine={false}
-            width={120}
+            width={isMobile ? 0 : 120}
+            hide={isMobile}
           />
           <Tooltip
             cursor={{ fill: "var(--muted)", opacity: 0.2 }}

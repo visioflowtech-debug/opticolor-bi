@@ -23,7 +23,7 @@ export async function CarteraSucursalChartWrapper({ startDate, endDate, sucursal
         {result.error && (
           <div className="text-sm text-destructive pb-2">{result.error}</div>
         )}
-        <div className="w-full h-[400px] md:h-[500px] min-w-0">
+        <div className="w-full h-auto md:h-[500px] min-w-0">
           <CarteraSucursalChart data={data} />
         </div>
       </CardContent>

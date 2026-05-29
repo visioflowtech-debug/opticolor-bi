@@ -110,8 +110,8 @@ export default async function CarteraPage({
         </Suspense>
       </div>
 
-      {/* ── Fila 4: Top Clientes Deudores ────────── */}
-      <Suspense fallback={<TableSkeleton title="Top 10 de Clientes Deudores" rows={10} />}>
+      {/* ── Fila 4: Clientes Deudores ────────── */}
+      <Suspense fallback={<TableSkeleton title="Clientes Deudores" rows={10} />}>
         <ClientesDeudoresTableWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
       </Suspense>
     </div>
