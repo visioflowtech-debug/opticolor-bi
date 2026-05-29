@@ -129,8 +129,8 @@ export function OrdenesSucursalChart({ data, error }: Props) {
                   {item.nombre_sucursal}
                 </span>
                 <div className="min-w-0 flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-600 rounded-full transition-all duration-300" 
+                  <div
+                    className="h-full bg-emerald-600 rounded-full transition-all duration-300"
                     style={{ width: `${(item.volumen_ordenes / maxVolumen) * 100}%` }}
                   />
                 </div>
@@ -192,7 +192,7 @@ export function OrdenesSucursalChart({ data, error }: Props) {
                 <BarChart
                   data={top10Data}
                   layout="vertical"
-                  margin={{ top: 10, right: 30, left: -15, bottom: 15 }}
+                  margin={{ top: 25, right: 30, left: -15, bottom: 15 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"
@@ -228,10 +228,13 @@ export function OrdenesSucursalChart({ data, error }: Props) {
                     strokeDasharray="3 3"
                     strokeOpacity={0.8}
                     label={{
-                      position: "top",
                       value: `Promedio: ${formatCompactNumber(promedio)}`,
+                      position: "top",
+                      dx: 8,
+                      dy: -10,
                       fill: "var(--destructive)",
                       fontSize: 10,
+                      fontWeight: 600,
                     }}
                   />
                   <Bar
@@ -252,8 +255,8 @@ export function OrdenesSucursalChart({ data, error }: Props) {
         <Dialog>
           <div className="w-full py-2 flex justify-center mt-auto border-t bg-muted/5">
             <DialogTrigger asChild>
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 transition-colors"
               >
                 Ver todas las sucursales (+{data.length - 10})
@@ -261,56 +264,56 @@ export function OrdenesSucursalChart({ data, error }: Props) {
             </DialogTrigger>
           </div>
           <DialogContent className="w-[95%] md:max-w-3xl lg:max-w-4xl rounded-2xl p-6">
-              <DialogHeader>
-                <DialogTitle className="text-base font-bold text-foreground">
-                  Todas las Sucursales - Volumen de Órdenes
-                </DialogTitle>
-              </DialogHeader>
-              <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-3 p-1">
-                {data.slice(0, modalCount).map((item, index) => (
-                  <div key={index} className="flex items-center gap-3 w-full">
-                    <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                      {item.nombre_sucursal}
-                    </span>
-                    <div className="min-w-0 flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-emerald-600 rounded-full transition-all duration-300" 
-                        style={{ width: `${(item.volumen_ordenes / maxVolumen) * 100}%` }}
-                      />
-                    </div>
-                    <span className="w-20 shrink-0 text-right text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                      {item.volumen_ordenes} órds.
-                    </span>
+            <DialogHeader>
+              <DialogTitle className="text-base font-bold text-foreground">
+                Todas las Sucursales - Volumen de Órdenes
+              </DialogTitle>
+            </DialogHeader>
+            <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-3 p-1">
+              {data.slice(0, modalCount).map((item, index) => (
+                <div key={index} className="flex items-center gap-3 w-full">
+                  <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                    {item.nombre_sucursal}
+                  </span>
+                  <div className="min-w-0 flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-emerald-600 rounded-full transition-all duration-300"
+                      style={{ width: `${(item.volumen_ordenes / maxVolumen) * 100}%` }}
+                    />
                   </div>
-                ))}
-                
-                {(data.length > modalCount || modalCount > 10) && (
-                  <div className="pt-4 flex justify-center gap-2">
-                    {data.length > modalCount && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs font-semibold text-primary"
-                        onClick={() => setModalCount((prev) => prev + 10)}
-                      >
-                        Ver más (+{Math.min(10, data.length - modalCount)})
-                      </Button>
-                    )}
-                    {modalCount > 10 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs font-semibold text-muted-foreground"
-                        onClick={() => setModalCount(10)}
-                      >
-                        Colapsar
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
+                  <span className="w-20 shrink-0 text-right text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                    {item.volumen_ordenes} órds.
+                  </span>
+                </div>
+              ))}
+
+              {(data.length > modalCount || modalCount > 10) && (
+                <div className="pt-4 flex justify-center gap-2">
+                  {data.length > modalCount && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-semibold text-primary"
+                      onClick={() => setModalCount((prev) => prev + 10)}
+                    >
+                      Ver más (+{Math.min(10, data.length - modalCount)})
+                    </Button>
+                  )}
+                  {modalCount > 10 && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs font-semibold text-muted-foreground"
+                      onClick={() => setModalCount(10)}
+                    >
+                      Colapsar
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
     </Card>
   );
