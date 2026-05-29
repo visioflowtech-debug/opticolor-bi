@@ -11,6 +11,7 @@ import { TooltipProps } from "recharts";
 import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { GeneroExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   data: GeneroExamen[];
@@ -88,6 +89,8 @@ function GeneroLegend({ data }: { data: GeneroExamen[] }) {
 }
 
 export function GeneroChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   if (!data.length) {
     return (
       <div className="flex h-[380px] items-center justify-center text-sm text-muted-foreground">
@@ -99,15 +102,15 @@ export function GeneroChart({ data }: Props) {
   const total = data.reduce((acc, curr) => acc + curr.total_examenes, 0);
 
   return (
-    <div className="flex flex-col items-center justify-between h-[380px] w-full min-w-0">
-      <SafeChartContainer height="h-full" className="w-full flex-grow relative">
+    <div className="flex flex-col h-full w-full items-center justify-center min-h-0 pt-4">
+      <SafeChartContainer height={isMobile ? "h-[300px]" : "h-[380px]"} className="w-full relative">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
               data={data}
               cx="50%"
               cy="50%"
-              innerRadius="52%"
+              innerRadius="32%"
               outerRadius="82%"
               paddingAngle={2}
               dataKey="total_examenes"

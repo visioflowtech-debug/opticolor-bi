@@ -11,18 +11,18 @@ export default function ClinicaLoading() {
       </div>
 
       {/* ── Fila 2: Tendencia (Full Width) ────────── */}
-      <Skeleton className="h-[560px] w-full rounded-2xl" />
+      <Skeleton className="h-[288px] w-full rounded-2xl" />
 
       {/* ── Fila 3: Género y Edad ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Skeleton className="h-[560px] w-full rounded-2xl" />
-        <Skeleton className="h-[560px] w-full rounded-2xl" />
+        <Skeleton className="h-[380px] w-full rounded-2xl" />
+        <Skeleton className="h-[350px] w-full rounded-2xl" />
       </div>
 
       {/* ── Fila 4: Top Sucursales y Volumen vs Conversión ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Skeleton className="h-[560px] w-full rounded-2xl" />
-        <Skeleton className="h-[560px] w-full rounded-2xl" />
+        <Skeleton className="h-[480px] w-full rounded-2xl" />
+        <Skeleton className="h-[480px] w-full rounded-2xl" />
       </div>
     </div>
   );

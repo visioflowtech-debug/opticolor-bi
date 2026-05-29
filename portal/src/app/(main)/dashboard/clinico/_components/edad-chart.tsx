@@ -14,6 +14,7 @@ import type { NameType, ValueType, Payload } from "recharts/types/component/Defa
 import type { EdadExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCompactNumber } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   data: EdadExamen[];
@@ -56,65 +57,71 @@ function ChartTooltip({
 }
 
 export function EdadChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   if (!data.length) {
     return (
-      <SafeChartContainer height="h-[350px]">
-        <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-          Sin datos para el período seleccionado
-        </div>
-      </SafeChartContainer>
+      <div className="flex h-full items-center justify-center text-sm text-muted-foreground min-h-[300px]">
+        Sin datos para el período seleccionado
+      </div>
     );
   }
 
   const total = data.reduce((acc, curr) => acc + curr.total_examenes, 0);
 
   return (
-    <SafeChartContainer height="h-[350px]">
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart
-        data={data}
-        layout="horizontal"
-        margin={{ top: 20, right: 30, left: 10, bottom: 40 }}
-      >
-        <CartesianGrid
-          strokeDasharray="3 3"
-          horizontal={true}
-          vertical={false}
-          stroke="var(--border)"
-          strokeOpacity={0.6}
-        />
-        <XAxis
-          dataKey="rango_edad_descripcion"
-          type="category"
-          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          angle={-45}
-          textAnchor="end"
-          height={70}
-          interval={0}
-          tickLine={false}
-          axisLine={false}
-        />
-        <YAxis
-          type="number"
-          tickFormatter={(value) => formatCompactNumber(value)}
-          tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-          tickLine={false}
-          axisLine={false}
-          tickMargin={10}
-        />
-        <Tooltip
-          cursor={{ fill: "var(--muted)", opacity: 0.2 }}
-          content={<ChartTooltip total={total} />}
-        />
-        <Bar
-          dataKey="total_examenes"
-          name="Total Exámenes"
-          fill="var(--chart-1)"
-          radius={[4, 4, 0, 0]}
-          barSize={40}
-        />
-      </BarChart>
-      </ResponsiveContainer>
-    </SafeChartContainer>
+    <div className="flex flex-col h-full w-full min-h-0 justify-between">
+      <SafeChartContainer height={isMobile ? "h-[300px]" : "h-[380px]"} className="w-full relative">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart
+            data={data}
+            layout="horizontal"
+            margin={
+              isMobile
+                ? { top: 10, right: 10, left: -10, bottom: 20 }
+                : { top: 15, right: 20, left: 10, bottom: 30 }
+            }
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              horizontal={true}
+              vertical={false}
+              stroke="var(--border)"
+              strokeOpacity={0.6}
+            />
+            <XAxis
+              dataKey="rango_edad_descripcion"
+              type="category"
+              tick={{ fontSize: isMobile ? 10 : 11, fill: "var(--muted-foreground)" }}
+              angle={isMobile ? 0 : -45}
+              textAnchor={isMobile ? "middle" : "end"}
+              height={isMobile ? 30 : 60}
+              interval={isMobile ? "preserveStartEnd" : 0}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              type="number"
+              tickFormatter={(value) => formatCompactNumber(value)}
+              tick={{ fontSize: isMobile ? 10 : 11, fill: "var(--muted-foreground)" }}
+              tickLine={false}
+              axisLine={false}
+              tickMargin={10}
+            />
+            <Tooltip
+              cursor={{ fill: "var(--muted)", opacity: 0.2 }}
+              content={<ChartTooltip total={total} />}
+            />
+            <Bar
+              dataKey="total_examenes"
+              name="Total Exámenes"
+              fill="var(--chart-1)"
+              radius={[4, 4, 0, 0]}
+              barSize={isMobile ? 16 : 40}
+            />
+          </BarChart>
+        </ResponsiveContainer>
+      </SafeChartContainer>
+    </div>
   );
 }

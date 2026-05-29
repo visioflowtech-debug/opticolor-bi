@@ -13,17 +13,17 @@ export async function EdadChartWrapper({ startDate, endDate, sucursales }: Wrapp
   const data = result.data ?? [];
 
   return (
-    <Card className="overflow-hidden rounded-2xl shadow-md">
+    <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col w-full h-auto md:h-[480px] min-w-0">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
           Pacientes por Rango de Edad
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-grow flex flex-col min-h-0 pt-0 pb-4">
         {result.error && (
           <div className="text-sm text-destructive pb-2">{result.error}</div>
         )}
-        <div className="w-full h-[300px] md:h-[350px] min-w-0">
+        <div className="w-full h-full min-h-0 flex-grow relative">
           <EdadChart data={data} />
         </div>
       </CardContent>
