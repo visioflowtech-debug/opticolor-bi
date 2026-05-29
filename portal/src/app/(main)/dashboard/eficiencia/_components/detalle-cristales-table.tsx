@@ -105,7 +105,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
                     <TableCell className="font-medium text-sm text-muted-foreground">
                       {item.tipo_lente_descripcion}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums text-sm font-medium">
+                    <TableCell className="text-right tabular-nums text-sm">
                       {new Intl.NumberFormat("en-US").format(item.volumen_ordenes)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
