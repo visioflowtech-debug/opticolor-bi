@@ -179,7 +179,7 @@ export function TreemapChart({ data }: Props) {
                     className="w-3 h-3 rounded-sm mr-2 flex-shrink-0" 
                     style={{ backgroundColor: color }} 
                   />
-                  <span className="truncate text-slate-700 dark:text-slate-200 uppercase font-semibold text-[10px]">{item.name}</span>
+                  <span className="truncate text-foreground uppercase font-semibold text-[10px]">{item.name}</span>
                 </div>
                 <span className="text-muted-foreground ml-1 font-bold">{item.porcentaje}%</span>
               </div>

@@ -61,7 +61,7 @@ function SucursalesList({
             }}
           >
             <TooltipTrigger asChild>
-              <div className="flex cursor-default items-center gap-3 py-1 hover:bg-slate-50/50 rounded-lg px-1.5 transition-colors">
+              <div className="flex cursor-default items-center gap-3 py-1 hover:bg-muted/50 rounded-lg px-1.5 transition-colors">
                 {/* Rank */}
                 <span className="w-4 shrink-0 text-right text-[11px] tabular-nums text-muted-foreground">
                   {startRank + i + 1}
@@ -171,7 +171,7 @@ export function SucursalesChart({ data }: Props) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-xs font-semibold text-primary hover:bg-slate-50"
+                className="text-xs font-semibold text-primary hover:bg-muted/50"
                 onClick={() => setVisibleCount((prev) => prev + 10)}
               >
                 Ver más sucursales (+{Math.min(10, sortedData.length - visibleCount)})
@@ -198,7 +198,7 @@ export function SucursalesChart({ data }: Props) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="text-xs font-semibold text-primary hover:bg-slate-50 w-full"
+                  className="text-xs font-semibold text-primary hover:bg-muted/50 w-full"
                 >
                   Ver todas las sucursales ({sortedData.length})
                 </Button>
@@ -224,7 +224,7 @@ export function SucursalesChart({ data }: Props) {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-xs font-semibold text-primary hover:bg-slate-50"
+                      className="text-xs font-semibold text-primary hover:bg-muted/50"
                       onClick={() => setModalCount((prev) => prev + 10)}
                     >
                       Ver más sucursales (+{Math.min(10, sortedData.length - modalCount)})

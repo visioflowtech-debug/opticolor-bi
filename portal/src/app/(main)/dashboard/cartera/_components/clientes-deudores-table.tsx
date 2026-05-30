@@ -91,11 +91,11 @@ export function ClientesDeudoresTable({ data }: Props) {
             <Table className="min-w-[700px]">
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider h-8">Sucursal</TableHead>
-                  <TableHead className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider h-8">Cliente</TableHead>
-                  <TableHead className="text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider h-8">Monto Órdenes</TableHead>
-                  <TableHead className="text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider h-8">Recaudado</TableHead>
-                  <TableHead className="text-right text-[11px] font-semibold text-slate-500 uppercase tracking-wider h-8">Saldo Pendiente</TableHead>
+                  <TableHead className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider h-8">Sucursal</TableHead>
+                  <TableHead className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider h-8">Cliente</TableHead>
+                  <TableHead className="text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wider h-8">Monto Órdenes</TableHead>
+                  <TableHead className="text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wider h-8">Recaudado</TableHead>
+                  <TableHead className="text-right text-[11px] font-semibold text-muted-foreground uppercase tracking-wider h-8">Saldo Pendiente</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -109,16 +109,16 @@ export function ClientesDeudoresTable({ data }: Props) {
                       key={`${cliente.nombre_sucursal}-${cliente.nombre_completo}`}
                       className="group transition-colors"
                     >
-                      <TableCell className="text-xs font-medium text-slate-700 max-w-[150px] sm:max-w-none truncate py-2">
+                      <TableCell className="text-xs font-medium text-foreground max-w-[150px] sm:max-w-none truncate py-2">
                         {cliente.nombre_sucursal}
                       </TableCell>
-                      <TableCell className="text-xs font-medium text-slate-700 max-w-[150px] sm:max-w-none truncate py-2">
+                      <TableCell className="text-xs font-medium text-foreground max-w-[150px] sm:max-w-none truncate py-2">
                         {cliente.nombre_completo}
                       </TableCell>
-                      <TableCell className="text-right text-xs font-medium text-slate-900 whitespace-nowrap py-2">
+                      <TableCell className="text-right text-xs font-medium text-foreground whitespace-nowrap py-2">
                         {formatCurrency(cliente.monto_total)}
                       </TableCell>
-                      <TableCell className="text-right text-xs font-medium text-slate-900 whitespace-nowrap py-2">
+                      <TableCell className="text-right text-xs font-medium text-foreground whitespace-nowrap py-2">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -144,10 +144,10 @@ export function ClientesDeudoresTable({ data }: Props) {
                   <TableCell colSpan={2} className="text-xs uppercase tracking-wider text-muted-foreground">
                     Total General ({filteredData.length} Clientes)
                   </TableCell>
-                  <TableCell className="text-right text-xs font-bold text-slate-900 whitespace-nowrap py-2">
+                  <TableCell className="text-right text-xs font-bold text-foreground whitespace-nowrap py-2">
                     {formatCurrency(totales.monto_total)}
                   </TableCell>
-                  <TableCell className="text-right text-xs font-bold text-slate-900 whitespace-nowrap py-2">
+                  <TableCell className="text-right text-xs font-bold text-foreground whitespace-nowrap py-2">
                     {formatCurrency(totales.monto_pagado)}
                   </TableCell>
                   <TableCell className="text-right text-xs font-bold text-destructive whitespace-nowrap py-2">
@@ -170,7 +170,7 @@ export function ClientesDeudoresTable({ data }: Props) {
               >
                 Anterior
               </Button>
-              <div className="flex items-center text-xs font-medium text-slate-500">
+              <div className="flex items-center text-xs font-medium text-muted-foreground">
                 <span>Página</span>
                 <Input
                   type="number"
@@ -183,7 +183,7 @@ export function ClientesDeudoresTable({ data }: Props) {
                       setCurrentPage(val);
                     }
                   }}
-                  className="w-12 h-8 text-center p-0 text-sm mx-1 rounded-md border-slate-200"
+                  className="w-12 h-8 text-center p-0 text-sm mx-1 rounded-md"
                 />
                 <span>de {totalPages}</span>
               </div>

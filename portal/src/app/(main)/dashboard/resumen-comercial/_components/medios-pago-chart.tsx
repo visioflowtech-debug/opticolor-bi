@@ -53,9 +53,9 @@ function DonutTooltip({
 // Leyenda: solo nombre + porcentaje (sin montos)
 function LegendList({ data }: { data: MedioPago[] }) {
   return (
-    <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 w-full max-w-xl mx-auto pt-4 border-t border-slate-50">
+    <ul className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-2 w-full max-w-xl mx-auto pt-4 border-t border-border">
       {data.map((item, i) => (
-        <li key={i} className="flex items-center justify-between text-xs font-medium text-slate-600 w-full whitespace-nowrap">
+        <li key={i} className="flex items-center justify-between text-xs font-medium text-muted-foreground w-full whitespace-nowrap">
           <div className="flex items-center gap-2 min-w-0">
             <span
               className="h-2.5 w-2.5 shrink-0 rounded-full"

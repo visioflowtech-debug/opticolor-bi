@@ -14,7 +14,7 @@ import { TooltipProps } from "recharts";
 import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { TipoLenteDetalle } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCompactNumber } from "@/lib/utils";
+import { formatCompactNumber, truncateText } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,13 +23,6 @@ interface Props {
   data: TipoLenteDetalle[];
   error?: string | null;
 }
-
-const truncateLabel = (value: string) => {
-  if (value.length > 15) {
-    return value.substring(0, 15) + "...";
-  }
-  return value;
-};
 
 function ChartTooltip({
   active,
@@ -113,16 +106,16 @@ export function TipoLenteChart({ data, error }: Props) {
           <div className="w-full h-auto space-y-3 p-1 overflow-visible">
             {displayData.map((item, index) => (
               <div key={index} className="flex items-center gap-3 w-full">
-                <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-muted-foreground">
                   {item.tipo_lente_descripcion}
                 </span>
-                <div className="min-w-0 flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-blue-600 rounded-full transition-all duration-300" 
+                <div className="min-w-0 flex-1 h-3 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-[var(--chart-1)] rounded-full transition-all duration-300"
                     style={{ width: `${(item.volumen_ordenes / maxVolumen) * 100}%` }}
                   />
                 </div>
-                <span className="w-20 shrink-0 text-right text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                <span className="w-20 shrink-0 text-right text-xs font-bold text-foreground whitespace-nowrap">
                   {item.volumen_ordenes} órds.
                 </span>
               </div>
@@ -188,7 +181,7 @@ export function TipoLenteChart({ data, error }: Props) {
                   <XAxis
                     dataKey="tipo_lente_descripcion"
                     type="category"
-                    tickFormatter={truncateLabel}
+                    //tickFormatter={truncateText}
                     tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                     angle={-45}
                     textAnchor="end"

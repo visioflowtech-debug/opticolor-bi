@@ -11,41 +11,12 @@ import {
 } from "recharts";
 import type { TendenciaOrden } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
+import { ChartTooltipContainer } from "@/components/ui/chart-tooltip-container";
 import { formatCompactNumber } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   data: TendenciaOrden[];
-}
-
-function ChartTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: TendenciaOrden }>;
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-
-  const data = payload[0].payload;
-
-  return (
-    <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[150px]">
-      <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-foreground border-b border-border pb-2">
-        {data.mes_nombre}
-      </p>
-      <div className="flex flex-col gap-2 text-xs">
-        <div className="flex items-center justify-between gap-6">
-          <span className="text-muted-foreground">Volumen</span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {new Intl.NumberFormat("en-US").format(data.volumen_ordenes)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function TendenciaOrdenesChart({ data }: Props) {
@@ -95,11 +66,12 @@ export function TendenciaOrdenesChart({ data }: Props) {
           />
           <Tooltip
             cursor={{ stroke: "var(--muted)", strokeWidth: 2 }}
-            content={<ChartTooltip />}
+            content={<ChartTooltipContainer />}
           />
           <Line
             type="linear"
             dataKey="volumen_ordenes"
+            name="Volumen de Órdenes"
             stroke="var(--chart-1)"
             strokeWidth={3}
             dot={{ r: 4, fill: "var(--background)", strokeWidth: 2 }}

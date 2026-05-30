@@ -9,42 +9,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { TooltipProps } from "recharts";
-import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { TendenciaExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
+import { ChartTooltipContainer } from "@/components/ui/chart-tooltip-container";
 import { formatCompactNumber } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
   data: TendenciaExamen[];
-}
-
-function ChartTooltip({
-  active,
-  payload,
-}: TooltipProps<ValueType, NameType> & {
-  payload?: Payload<ValueType, NameType>[];
-}) {
-  if (!active || !payload?.length) return null;
-
-  const data = payload[0].payload as TendenciaExamen;
-
-  return (
-    <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[150px]">
-      <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-foreground border-b border-border pb-2">
-        {data.mes_examen_nombre}
-      </p>
-      <div className="flex flex-col gap-2 text-xs">
-        <div className="flex items-center justify-between gap-6">
-          <span className="text-muted-foreground">Exámenes</span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {new Intl.NumberFormat("en-US").format(data.total_examenes)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function TendenciaExamenesChart({ data }: Props) {
@@ -94,11 +66,12 @@ export function TendenciaExamenesChart({ data }: Props) {
           />
           <Tooltip
             cursor={{ stroke: "var(--muted)", strokeWidth: 2 }}
-            content={<ChartTooltip />}
+            content={<ChartTooltipContainer />}
           />
           <Line
             type="linear"
             dataKey="total_examenes"
+            name="Total Exámenes"
             stroke="var(--chart-1)"
             strokeWidth={3}
             dot={{ r: 4, fill: "var(--background)", strokeWidth: 2 }}

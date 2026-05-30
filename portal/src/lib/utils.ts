@@ -61,6 +61,11 @@ export function formatCurrency(
   return `Bs. ${formatted}`;
 }
 
+export function truncateText(value: string, limit: number = 15): string {
+  if (!value) return "";
+  return value.length > limit ? `${value.substring(0, limit)}...` : value;
+}
+
 export function formatBsCurrency(value: number): string {
   const formatted = new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 2,

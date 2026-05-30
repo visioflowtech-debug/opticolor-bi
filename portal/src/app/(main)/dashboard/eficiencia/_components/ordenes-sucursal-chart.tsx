@@ -13,7 +13,8 @@ import {
 } from "recharts";
 import type { OrdenesSucursal } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCompactNumber } from "@/lib/utils";
+import { ChartTooltipContainer } from "@/components/ui/chart-tooltip-container";
+import { formatCompactNumber, truncateText } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,43 +29,6 @@ import {
 interface Props {
   data: OrdenesSucursal[];
   error?: string | null;
-}
-
-const truncateLabel = (value: string) => {
-  if (value.length > 15) {
-    return value.substring(0, 15) + "...";
-  }
-  return value;
-};
-
-function ChartTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload: OrdenesSucursal }>;
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-
-  const data = payload[0].payload;
-
-  return (
-    <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[200px]">
-      <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-foreground border-b border-border pb-2">
-        {data.nombre_sucursal}
-      </p>
-      <div className="flex flex-col gap-2 text-xs">
-        <div className="flex items-center justify-between gap-6">
-          <span className="text-muted-foreground">Volumen</span>
-          <span className="font-semibold tabular-nums text-foreground">
-            {new Intl.NumberFormat("en-US").format(data.volumen_ordenes)}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 export function OrdenesSucursalChart({ data, error }: Props) {
@@ -98,14 +62,6 @@ export function OrdenesSucursalChart({ data, error }: Props) {
   const totalVolumen = data.reduce((acc, curr) => acc + curr.volumen_ordenes, 0);
   const promedio = data.length > 0 ? totalVolumen / data.length : 0;
 
-  const formatLabel = (value: string) => {
-    const limit = isMobile ? 10 : 15;
-    if (value.length > limit) {
-      return value.substring(0, limit) + "...";
-    }
-    return value;
-  };
-
   const maxVolumen = Math.max(...data.map((item) => item.volumen_ordenes), 1);
 
   if (isMobile) {
@@ -125,16 +81,16 @@ export function OrdenesSucursalChart({ data, error }: Props) {
           <div className="w-full h-auto space-y-3 p-1 overflow-visible">
             {displayData.map((item, index) => (
               <div key={index} className="flex items-center gap-3 w-full">
-                <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-muted-foreground">
                   {item.nombre_sucursal}
                 </span>
-                <div className="min-w-0 flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div className="min-w-0 flex-1 h-3 bg-muted rounded-full overflow-hidden">
                   <div
-                    className="h-full bg-emerald-600 rounded-full transition-all duration-300"
+                    className="h-full bg-[var(--chart-1)] rounded-full transition-all duration-300"
                     style={{ width: `${(item.volumen_ordenes / maxVolumen) * 100}%` }}
                   />
                 </div>
-                <span className="w-20 shrink-0 text-right text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                <span className="w-20 shrink-0 text-right text-xs font-bold text-foreground whitespace-nowrap">
                   {item.volumen_ordenes} órds.
                 </span>
               </div>
@@ -212,7 +168,7 @@ export function OrdenesSucursalChart({ data, error }: Props) {
                   <YAxis
                     dataKey="nombre_sucursal"
                     type="category"
-                    tickFormatter={formatLabel}
+                    tickFormatter={(v) => truncateText(v, isMobile ? 10 : 15)}
                     tick={{ fontSize: 11, fill: "var(--muted-foreground)", textAnchor: "end", style: { whiteSpace: "nowrap" } }}
                     tickLine={false}
                     axisLine={false}
@@ -220,7 +176,7 @@ export function OrdenesSucursalChart({ data, error }: Props) {
                   />
                   <Tooltip
                     cursor={{ fill: "var(--muted)", opacity: 0.2 }}
-                    content={<ChartTooltip />}
+                    content={<ChartTooltipContainer />}
                   />
                   <ReferenceLine
                     x={promedio}
@@ -257,34 +213,34 @@ export function OrdenesSucursalChart({ data, error }: Props) {
             <DialogTrigger asChild>
               <Button
                 variant="ghost"
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 hover:bg-blue-50/50 transition-colors"
+                className="text-xs font-semibold text-primary hover:text-primary/90 hover:bg-muted/50 transition-colors w-full h-full py-2.5"
               >
                 Ver todas las sucursales (+{data.length - 10})
               </Button>
             </DialogTrigger>
           </div>
-          <DialogContent className="w-[95%] md:max-w-3xl lg:max-w-4xl rounded-2xl p-6">
-            <DialogHeader>
+          <DialogContent className="max-w-sm sm:max-w-xl md:max-w-3xl lg:max-w-4xl bg-background border border-border shadow-2xl overflow-hidden p-0 gap-0">
+            <DialogHeader className="p-6 pb-4 border-b border-border/60 bg-muted/5">
               <DialogTitle className="text-base font-bold text-foreground">
                 Todas las Sucursales - Volumen de Órdenes
               </DialogTitle>
             </DialogHeader>
-            <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-3 p-1">
+            <div className="overflow-y-auto max-h-[80vh] p-6 pt-2 space-y-3">
               {data.slice(0, modalCount).map((sucursal, index) => (
                 <div key={index} className="flex items-center justify-between w-full py-1 gap-3">
                   <div className="flex items-center font-medium text-sm w-40 shrink-0 pr-2">
                     <span className="text-muted-foreground/50 font-normal mr-3 w-6 inline-block text-left shrink-0">
                       {index + 1}
                     </span>
-                    <span className="text-slate-800 dark:text-slate-200 font-normal truncate">{sucursal.nombre_sucursal}</span>
+                    <span className="text-foreground font-normal truncate">{sucursal.nombre_sucursal}</span>
                   </div>
-                  <div className="min-w-0 flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div className="min-w-0 flex-1 h-3 bg-muted rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-emerald-600 rounded-full transition-all duration-300"
+                      className="h-full rounded-full transition-all bg-[var(--chart-1)]"
                       style={{ width: `${(sucursal.volumen_ordenes / maxVolumen) * 100}%` }}
                     />
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                  <span className="w-20 shrink-0 text-right text-xs font-semibold text-foreground whitespace-nowrap">
                     {sucursal.volumen_ordenes} órds.
                   </span>
                 </div>

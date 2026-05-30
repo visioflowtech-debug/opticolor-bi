@@ -13,7 +13,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MarcaItem } from "../_actions/get-inventario-data";
-import { formatBsCurrency, formatCompactNumber } from "@/lib/utils";
+import { formatBsCurrency, formatCompactNumber, truncateText } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,9 +29,6 @@ interface Props {
   data: MarcaItem[];
 }
 
-function truncate(s: string, limit = 18) {
-  return s.length > limit ? `${s.slice(0, limit - 1)}…` : s;
-}
 
 interface RankingTooltipProps {
   active?: boolean;
@@ -128,7 +125,7 @@ export function RankingMarcasChart({ data }: Props) {
                     <span className="text-muted-foreground/50 font-normal mr-2 w-5 inline-block text-left">
                       {index + 1}
                     </span>
-                    <span className="text-slate-800 dark:text-slate-200 font-normal truncate">{brand.marca}</span>
+                    <span className="text-foreground font-normal truncate">{brand.marca}</span>
                   </div>
                   <span className="tabular-nums text-muted-foreground">
                     {formatBsCurrency(brand.ventaNeta)} ({brand.unidadesVendidas.toLocaleString("en-US")} und)
@@ -136,7 +133,7 @@ export function RankingMarcasChart({ data }: Props) {
                 </div>
                 <div className="w-full h-3 rounded-full bg-secondary overflow-hidden">
                   <div
-                    className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                    className="bg-[var(--chart-1)] h-full rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
                   />
                 </div>
@@ -148,7 +145,7 @@ export function RankingMarcasChart({ data }: Props) {
         <div className="w-full py-3 flex flex-row items-center justify-between gap-4 px-4 border-t bg-muted/30">
           {showVerMas ? (
             <button
-              className="text-xs font-semibold text-blue-600 hover:text-blue-700 p-2"
+              className="text-xs font-semibold text-primary hover:text-primary/80 p-2"
               onClick={() => setVisibleCount((prev) => prev + 10)}
             >
               Ver más marcas (+10)
@@ -158,7 +155,7 @@ export function RankingMarcasChart({ data }: Props) {
           )}
           {visibleCount > 10 && (
             <button
-              className="text-xs font-semibold text-slate-500 hover:text-slate-600 p-2"
+              className="text-xs font-semibold text-muted-foreground hover:text-foreground p-2"
               onClick={() => setVisibleCount(10)}
             >
               Colapsar
@@ -172,7 +169,7 @@ export function RankingMarcasChart({ data }: Props) {
   // Vista Escritorio/Tablet (!isMobile): Limita rígidamente a un Top 10 estricto
   const chartData = sortedData.slice(0, 10).map((m) => ({
     ...m,
-    labelTrunc: truncate(m.marca, limit),
+    labelTrunc: truncateText(m.marca, limit),
   }));
 
   return (
@@ -233,7 +230,7 @@ export function RankingMarcasChart({ data }: Props) {
             <DialogTrigger asChild>
               <Button
                 variant="ghost"
-                className="text-xs font-semibold text-blue-600 hover:text-blue-700 w-full h-full py-1.5"
+                className="text-xs font-semibold text-primary hover:text-primary/80 w-full h-full py-1.5"
               >
                 Ver todas las marcas (+{data.length - 10})
               </Button>
@@ -259,11 +256,11 @@ export function RankingMarcasChart({ data }: Props) {
                           <span className="text-muted-foreground/50 font-normal mr-3 w-6 inline-block text-left shrink-0">
                             {index + 1}
                           </span>
-                          <span className="text-slate-800 dark:text-slate-200 font-normal truncate">{brand.marca}</span>
+                          <span className="text-foreground font-normal truncate">{brand.marca}</span>
                         </div>
 
                         {/* Bloque Derecho: Métricas Financieras (Bs. y Unidades uniformes) */}
-                        <div className="text-right font-medium text-slate-600 dark:text-slate-300 shrink-0">
+                        <div className="text-right font-medium text-muted-foreground shrink-0">
                           {formatBsCurrency(brand.ventaNeta)}{" "}
                           <span className="text-muted-foreground font-normal text-xs ml-1">
                             ({brand.unidadesVendidas.toLocaleString("en-US")} und)
@@ -272,7 +269,7 @@ export function RankingMarcasChart({ data }: Props) {
                       </div>
                       <div className="w-full h-3 rounded-full bg-secondary overflow-hidden">
                         <div
-                          className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                          className="bg-[var(--chart-1)] h-full rounded-full transition-all duration-300"
                           style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
                         />
                       </div>
@@ -283,12 +280,12 @@ export function RankingMarcasChart({ data }: Props) {
 
               <div className="w-full pt-4 flex items-center justify-center gap-6 border-t mt-4">
                 {sortedData.length > modalLimit && (
-                  <Button variant="ghost" className="text-xs text-blue-600 font-medium" onClick={incrementLimit}>
+                  <Button variant="ghost" className="text-xs text-primary font-medium" onClick={incrementLimit}>
                     Ver más marcas (+10)
                   </Button>
                 )}
                 {modalLimit > 10 && (
-                  <Button variant="ghost" className="text-xs text-slate-500 font-medium" onClick={resetLimit}>
+                  <Button variant="ghost" className="text-xs text-muted-foreground font-medium" onClick={resetLimit}>
                     Ver menos (Colapsar)
                   </Button>
                 )}

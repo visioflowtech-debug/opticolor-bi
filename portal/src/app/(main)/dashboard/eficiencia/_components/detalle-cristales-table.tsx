@@ -146,7 +146,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
                         </Button>
 
                         <span className="text-xs text-muted-foreground px-1">Ir a:</span>
-                        <input
+                        <Input
                           type="number"
                           min={1}
                           max={totalPages || 1}
@@ -157,7 +157,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
                               setCurrentPage(Math.min(Math.max(val, 1), totalPages || 1));
                             }
                           }}
-                          className="w-12 h-8 text-center p-0 text-sm mx-1 rounded-md border border-slate-200"
+                          className="w-12 h-8 text-center p-0 text-sm mx-1 rounded-md"
                         />
 
                         <Button
