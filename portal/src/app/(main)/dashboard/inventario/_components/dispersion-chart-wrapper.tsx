@@ -15,17 +15,17 @@ export async function DispersionChartWrapper({ startDate, endDate, sucursales, m
   const data = result.data ?? [];
 
   return (
-    <Card className="overflow-hidden rounded-2xl shadow-md">
-      <CardHeader className="pb-3">
+    <Card className="w-full h-full flex flex-col justify-between min-w-0 overflow-hidden rounded-2xl shadow-md border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <CardHeader className="shrink-0 pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
           Eficiencia de Inventario · Stock vs Ventas
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex flex-col min-h-0 pb-4">
         {result.error && (
           <div className="text-sm text-destructive pb-2">{result.error}</div>
         )}
-        <div className="w-full h-[400px] md:h-[500px] min-w-0">
+        <div className="w-full h-full min-h-0 flex-grow relative">
           <DispersionChart data={data} />
         </div>
       </CardContent>

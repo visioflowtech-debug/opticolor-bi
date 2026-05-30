@@ -6,6 +6,8 @@ import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { formatCurrency } from "@/lib/utils";
 import type { GrupoMix } from "../_actions/get-inventario-data";
 
+import { useIsMobile } from "@/hooks/use-mobile";
+
 // Tokens semánticos del Design System — var() resuelve el valor OKLCH nativo (Tailwind v4)
 const CHART_TOKENS = [
   "var(--chart-1)",
@@ -118,9 +120,11 @@ function TreemapCell(props: {
 }
 
 export function TreemapChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   if (!data.length) {
     return (
-      <SafeChartContainer height="h-[500px]">
+      <SafeChartContainer height="h-[380px]">
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           Sin datos para el período seleccionado
         </div>
@@ -128,19 +132,61 @@ export function TreemapChart({ data }: Props) {
     );
   }
 
+  // Si isMobile es verdadero, agrupamos a partir del Top 6 en "OTROS"
+  let processedData = data;
+  if (isMobile && data.length > 6) {
+    const top6 = data.slice(0, 6);
+    const residuo = data.slice(6);
+    const sumaDelResiduo = residuo.reduce((sum, item) => sum + item.size, 0);
+    const sumaPorcentaje = residuo.reduce((sum, item) => sum + item.porcentaje, 0);
+
+    const otrosGrupo: GrupoMix & { grupo: string; ventaNeta: number } = {
+      name: "OTROS",
+      grupo: "OTROS",
+      size: sumaDelResiduo,
+      ventaNeta: sumaDelResiduo,
+      porcentaje: Number(sumaPorcentaje.toFixed(1)),
+    };
+    processedData = [...top6, otrosGrupo];
+  }
+
   return (
-    <SafeChartContainer height="h-[500px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <Treemap
-          data={data}
-          dataKey="size"
-          aspectRatio={4 / 3}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          content={<TreemapCell />}
-        >
-          <Tooltip content={<TreemapTooltip />} />
-        </Treemap>
-      </ResponsiveContainer>
-    </SafeChartContainer>
+    <div className="flex flex-col w-full h-full min-h-0 justify-between">
+      <div className="flex-grow min-h-0 relative">
+        <SafeChartContainer height={isMobile ? "h-[260px]" : "h-[380px]"}>
+          <ResponsiveContainer width="100%" height="100%">
+            <Treemap
+              data={processedData}
+              dataKey="size"
+              aspectRatio={4 / 3}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              content={<TreemapCell />}
+            >
+              <Tooltip content={<TreemapTooltip />} />
+            </Treemap>
+          </ResponsiveContainer>
+        </SafeChartContainer>
+      </div>
+
+      {isMobile && (
+        <div className="w-full mt-4 border-t pt-3 grid grid-cols-2 gap-x-4 gap-y-2 px-2 text-xs font-medium">
+          {processedData.map((item, index) => {
+            const color = CHART_TOKENS[index % CHART_TOKENS.length]; 
+            return (
+              <div key={item.name} className="flex items-center justify-between w-full">
+                <div className="flex items-center min-w-0">
+                  <span 
+                    className="w-3 h-3 rounded-sm mr-2 flex-shrink-0" 
+                    style={{ backgroundColor: color }} 
+                  />
+                  <span className="truncate text-slate-700 dark:text-slate-200 uppercase font-semibold text-[10px]">{item.name}</span>
+                </div>
+                <span className="text-muted-foreground ml-1 font-bold">{item.porcentaje}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
   );
 }

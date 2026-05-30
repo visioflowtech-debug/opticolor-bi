@@ -15,6 +15,8 @@ import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { DispersionItem } from "../_actions/get-inventario-data";
 import { formatBsCurrency, formatCompactNumber } from "@/lib/utils";
 
+import { useIsMobile } from "@/hooks/use-mobile";
+
 // Tokens semánticos del Design System — var() resuelve el valor OKLCH nativo (Tailwind v4)
 const CHART_TOKENS = [
   "var(--chart-1)",
@@ -68,11 +70,12 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
   );
 }
 
-
 export function DispersionChart({ data }: Props) {
+  const isMobile = useIsMobile();
+
   if (!data.length) {
     return (
-      <SafeChartContainer height="h-[500px]">
+      <SafeChartContainer height={isMobile ? "h-[300px]" : "h-full"} className="w-full flex-grow min-h-0 flex flex-col">
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           Sin datos para el período seleccionado
         </div>
@@ -89,82 +92,98 @@ export function DispersionChart({ data }: Props) {
   }));
 
   return (
-    <SafeChartContainer height="h-[500px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <ScatterChart margin={{ top: 12, right: 20, left: 8, bottom: 32 }}>
-          <CartesianGrid
-            strokeDasharray="3 3"
-            stroke="var(--border)"
-            strokeOpacity={0.6}
-          />
+    <SafeChartContainer height={isMobile ? "h-[300px]" : "h-full"} className="w-full flex-grow min-h-0 flex flex-col">
+      <div className="flex-1 w-full h-full min-h-0">
+        <ResponsiveContainer width="100%" height={isMobile ? 300 : "100%"}>
+          <ScatterChart
+            margin={
+              isMobile
+                ? { top: 15, right: 15, left: -10, bottom: 15 }
+                : { top: 25, right: 25, left: 15, bottom: 20 }
+            }
+          >
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="var(--border)"
+              strokeOpacity={0.6}
+            />
 
-          <XAxis
-            type="number"
-            dataKey="unidadesVendidas"
-            name="Unidades Vendidas"
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => formatCompactNumber(v)}
-            label={{
-              value: "Unidades Vendidas",
-              position: "insideBottom",
-              offset: -16,
-              fontSize: 11,
-              fill: "var(--muted-foreground)",
-            }}
-          />
+            <XAxis
+              type="number"
+              dataKey="unidadesVendidas"
+              name="Unidades Vendidas"
+              tick={{ fontSize: isMobile ? 9 : 11, fill: "var(--muted-foreground)" }}
+              tickLine={false}
+              axisLine={false}
+              tickFormatter={(v) => formatCompactNumber(v)}
+              label={
+                isMobile
+                  ? undefined
+                  : {
+                      value: "Unidades Vendidas",
+                      position: "insideBottom",
+                      offset: -16,
+                      fontSize: 11,
+                      fill: "var(--muted-foreground)",
+                    }
+              }
+            />
 
-          <YAxis
-            type="number"
-            dataKey="stockFisico"
-            name="Stock Físico"
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-            tickLine={false}
-            axisLine={false}
-            width={52}
-            tickFormatter={(v) => formatCompactNumber(v)}
-            label={{
-              value: "Stock Físico (unidades)",
-              angle: -90,
-              position: "insideLeft",
-              offset: 12,
-              fontSize: 11,
-              fill: "var(--muted-foreground)",
-            }}
-          />
+            <YAxis
+              type="number"
+              dataKey="stockFisico"
+              name="Stock Físico"
+              tick={{ fontSize: 10, fill: "var(--muted-foreground)" }}
+              tickLine={false}
+              axisLine={false}
+              width={isMobile ? 45 : 70}
+              tickFormatter={(v) => formatCompactNumber(v)}
+              label={
+                !isMobile
+                  ? {
+                      value: "Stock Físico (unidades)",
+                      angle: -90,
+                      position: "insideLeft",
+                      offset: -2,
+                      style: { textAnchor: "middle", fill: "var(--muted-foreground)", fontSize: 11, fontWeight: 500 }
+                    }
+                  : undefined
+              }
+            />
 
-          <ZAxis range={[72, 72]} />
+            <ZAxis range={isMobile ? [16, 16] : [72, 72]} />
 
-          <Tooltip
-            content={<CustomTooltip />}
-            cursor={{ strokeDasharray: "4 4", stroke: "var(--border)" }}
-          />
+            <Tooltip
+              content={<CustomTooltip />}
+              cursor={{ strokeDasharray: "4 4", stroke: "var(--border)" }}
+            />
 
-          <Scatter
-            data={scatterData}
-            shape={(props: {
-              cx?: number;
-              cy?: number;
-              payload?: { idx: number };
-            }) => {
-              const { cx = 0, cy = 0, payload } = props;
-              const color = CHART_TOKENS[(payload?.idx ?? 0) % CHART_TOKENS.length];
-              return (
-                <circle
-                  cx={cx}
-                  cy={cy}
-                  r={9}
-                  fill={color}
-                  fillOpacity={0.85}
-                  stroke={color}
-                  strokeWidth={0}
-                />
-              );
-            }}
-          />
-        </ScatterChart>
-      </ResponsiveContainer>
+            <Scatter
+              data={scatterData}
+              shape={(props: {
+                cx?: number;
+                cy?: number;
+                payload?: { idx: number };
+              }) => {
+                const { cx = 0, cy = 0, payload } = props;
+                const color = CHART_TOKENS[(payload?.idx ?? 0) % CHART_TOKENS.length];
+                const radius = isMobile ? 4 : 9; // fixed radio ~4px on mobile, 9 on desktop
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={radius}
+                    fill={color}
+                    fillOpacity={0.85}
+                    stroke={color}
+                    strokeWidth={0}
+                  />
+                );
+              }}
+            />
+          </ScatterChart>
+        </ResponsiveContainer>
+      </div>
     </SafeChartContainer>
   );
 }

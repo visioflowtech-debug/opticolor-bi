@@ -192,7 +192,7 @@ export function OrdenesSucursalChart({ data, error }: Props) {
                 <BarChart
                   data={top10Data}
                   layout="vertical"
-                  margin={{ top: 25, right: 30, left: -15, bottom: 15 }}
+                  margin={{ top: 25, right: 30, left: -5, bottom: 15 }}
                 >
                   <CartesianGrid
                     strokeDasharray="3 3"

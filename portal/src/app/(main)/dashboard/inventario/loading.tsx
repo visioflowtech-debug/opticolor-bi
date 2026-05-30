@@ -17,21 +17,21 @@ function KpiSkeleton() {
 export default function Loading() {
   return (
     <div className="flex flex-col gap-6 overflow-hidden">
-      {/* Fila 1: 5 KPI Cards */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-        {Array.from({ length: 5 }).map((_, i) => (
+      {/* Fila 1: 6 KPI Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, i) => (
           <KpiSkeleton key={i} />
         ))}
       </div>
 
       {/* Fila 2: Tabla + Dispersión */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl">
+        <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col h-auto md:h-[480px] w-full min-w-0">
           <CardHeader className="pb-3">
             <Skeleton className="h-4 w-36" />
           </CardHeader>
-          <CardContent className="flex flex-col gap-2">
-            {Array.from({ length: 10 }).map((_, i) => (
+          <CardContent className="flex-1 flex flex-col gap-2 min-h-0">
+            {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="flex items-center gap-3">
                 <Skeleton className="h-3 w-32 shrink-0" />
                 <Skeleton className="h-3 flex-1" />
@@ -42,33 +42,33 @@ export default function Loading() {
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden rounded-2xl">
+        <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col h-auto md:h-[480px] w-full min-w-0">
           <CardHeader className="pb-3">
             <Skeleton className="h-4 w-52" />
           </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[500px] w-full" />
+          <CardContent className="flex-1 flex flex-col min-h-0 justify-center">
+            <Skeleton className="h-full w-full min-h-[300px] md:min-h-[380px]" />
           </CardContent>
         </Card>
       </div>
 
       {/* Fila 3: Ranking + Treemap */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Card className="overflow-hidden rounded-2xl">
+        <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col h-auto md:h-[480px] w-full min-w-0">
           <CardHeader className="pb-3">
             <Skeleton className="h-4 w-48" />
           </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[500px] w-full" />
+          <CardContent className="flex-1 flex flex-col min-h-0 justify-center">
+            <Skeleton className="h-full w-full min-h-[300px] md:min-h-[380px]" />
           </CardContent>
         </Card>
 
-        <Card className="overflow-hidden rounded-2xl">
+        <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col h-auto md:h-[480px] w-full min-w-0">
           <CardHeader className="pb-3">
             <Skeleton className="h-4 w-44" />
           </CardHeader>
-          <CardContent>
-            <Skeleton className="h-[500px] w-full" />
+          <CardContent className="flex-1 flex flex-col min-h-0 justify-center">
+            <Skeleton className="h-full w-full min-h-[300px] md:min-h-[380px]" />
           </CardContent>
         </Card>
       </div>

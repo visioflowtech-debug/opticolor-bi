@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -13,15 +14,23 @@ import {
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MarcaItem } from "../_actions/get-inventario-data";
 import { formatBsCurrency, formatCompactNumber } from "@/lib/utils";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 
 interface Props {
   data: MarcaItem[];
 }
 
-const MAX_LABEL_LEN = 18;
-
-function truncate(s: string) {
-  return s.length > MAX_LABEL_LEN ? `${s.slice(0, MAX_LABEL_LEN - 1)}…` : s;
+function truncate(s: string, limit = 18) {
+  return s.length > limit ? `${s.slice(0, limit - 1)}…` : s;
 }
 
 interface RankingTooltipProps {
@@ -41,8 +50,8 @@ function RankingTooltip({ active, payload }: RankingTooltipProps) {
   const d = payload[0]?.payload;
   if (!d) return null;
 
-  const asp = d.unidadesVendidas && d.unidadesVendidas > 0 
-    ? (d.ventaNeta ?? 0) / d.unidadesVendidas 
+  const asp = d.unidadesVendidas && d.unidadesVendidas > 0
+    ? (d.ventaNeta ?? 0) / d.unidadesVendidas
     : 0;
 
   return (
@@ -72,11 +81,15 @@ function RankingTooltip({ active, payload }: RankingTooltipProps) {
   );
 }
 
-
 export function RankingMarcasChart({ data }: Props) {
+  const isMobile = useIsMobile();
+  const [isOpen, setIsOpen] = useState(false);
+  const [modalLimit, setModalLimit] = useState(10);
+  const [visibleCount, setVisibleCount] = useState(10);
+
   if (!data.length) {
     return (
-      <SafeChartContainer height="h-[500px]">
+      <SafeChartContainer height={isMobile ? "h-[300px]" : "h-[380px]"}>
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
           Sin datos para el período seleccionado
         </div>
@@ -84,64 +97,206 @@ export function RankingMarcasChart({ data }: Props) {
     );
   }
 
-  // Tomar top 20 ordenados por ventaNeta desc para no colapsar el eje Y con demasiadas marcas
-  const chartData = [...data]
-    .sort((a, b) => b.ventaNeta - a.ventaNeta)
-    .slice(0, 20)
-    .map((m) => ({
-      ...m,
-      labelTrunc: truncate(m.marca),
-    }));
+  const limit = isMobile ? 10 : 18;
+
+  // Ordenar por ventaNeta desc para el ranking
+  const sortedData = [...data].sort((a, b) => b.ventaNeta - a.ventaNeta);
+  const maxVenta = Math.max(...sortedData.map((d) => d.ventaNeta), 1);
+
+  const incrementLimit = () => setModalLimit((prev) => prev + 10);
+  const resetLimit = () => setModalLimit(10);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) {
+      resetLimit();
+    }
+  };
+
+  if (isMobile) {
+    const showVerMas = sortedData.length > visibleCount;
+
+    return (
+      <div className="flex flex-col h-full w-full justify-between min-h-0">
+        <div className="w-full flex flex-col gap-4 py-2 min-h-0 flex-1">
+          {sortedData.slice(0, visibleCount).map((brand, index) => {
+            const pct = (brand.ventaNeta / maxVenta) * 100;
+            return (
+              <div key={brand.marca} className="flex flex-col gap-1.5 text-xs">
+                <div className="flex items-center justify-between font-medium">
+                  <div className="text-sm font-medium flex items-center truncate pr-2">
+                    <span className="text-muted-foreground/50 font-normal mr-2 w-5 inline-block text-left">
+                      {index + 1}
+                    </span>
+                    <span className="text-slate-800 dark:text-slate-200 font-normal truncate">{brand.marca}</span>
+                  </div>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatBsCurrency(brand.ventaNeta)} ({brand.unidadesVendidas.toLocaleString("en-US")} und)
+                  </span>
+                </div>
+                <div className="w-full h-3 rounded-full bg-secondary overflow-hidden">
+                  <div
+                    className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="w-full py-3 flex flex-row items-center justify-between gap-4 px-4 border-t bg-muted/30">
+          {showVerMas ? (
+            <button
+              className="text-xs font-semibold text-blue-600 hover:text-blue-700 p-2"
+              onClick={() => setVisibleCount((prev) => prev + 10)}
+            >
+              Ver más marcas (+10)
+            </button>
+          ) : (
+            <div />
+          )}
+          {visibleCount > 10 && (
+            <button
+              className="text-xs font-semibold text-slate-500 hover:text-slate-600 p-2"
+              onClick={() => setVisibleCount(10)}
+            >
+              Colapsar
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Vista Escritorio/Tablet (!isMobile): Limita rígidamente a un Top 10 estricto
+  const chartData = sortedData.slice(0, 10).map((m) => ({
+    ...m,
+    labelTrunc: truncate(m.marca, limit),
+  }));
 
   return (
-    <SafeChartContainer height="h-[500px]">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart
-          data={chartData}
-          layout="vertical"
-          margin={{ top: 4, right: 24, left: 0, bottom: 4 }}
-        >
-          <CartesianGrid
-            horizontal={false}
-            strokeDasharray="3 3"
-            stroke="var(--border)"
-            strokeOpacity={0.6}
-          />
+    <div className="flex flex-col h-full w-full justify-between min-h-0">
+      <div className="flex-grow min-h-0 relative">
+        <SafeChartContainer height="h-[330px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              layout="vertical"
+              margin={{ top: 4, right: 24, left: 0, bottom: 4 }}
+            >
+              <CartesianGrid
+                horizontal={false}
+                strokeDasharray="3 3"
+                stroke="var(--border)"
+                strokeOpacity={0.6}
+              />
 
-          {/* Eje Y: nombres de marca (truncados) con 120 px de ancho reservado */}
-          <YAxis
-            type="category"
-            dataKey="labelTrunc"
-            width={120}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-            tickLine={false}
-            axisLine={false}
-          />
+              <YAxis
+                type="category"
+                dataKey="labelTrunc"
+                width={60}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+              />
 
-          <XAxis
-            type="number"
-            dataKey="ventaNeta"
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(v) => formatCompactNumber(v)}
-          />
+              <XAxis
+                type="number"
+                dataKey="ventaNeta"
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                tickLine={false}
+                axisLine={false}
+                tickFormatter={(v) => formatCompactNumber(v)}
+              />
 
-          {/* Tooltip muestra el nombre completo (desde el campo marca) */}
-          <Tooltip
-            content={<RankingTooltip />}
-            cursor={{ fill: "var(--muted)", opacity: 0.4 }}
-          />
+              <Tooltip
+                content={<RankingTooltip />}
+                cursor={{ fill: "var(--muted)", opacity: 0.4 }}
+              />
 
-          <Bar
-            dataKey="ventaNeta"
-            fill="var(--chart-1)"
-            radius={[0, 4, 4, 0]}
-            maxBarSize={22}
-            opacity={0.9}
-          />
-        </BarChart>
-      </ResponsiveContainer>
-    </SafeChartContainer>
+              <Bar
+                dataKey="ventaNeta"
+                fill="var(--chart-1)"
+                radius={[0, 4, 4, 0]}
+                maxBarSize={22}
+                opacity={0.9}
+              />
+            </BarChart>
+          </ResponsiveContainer>
+        </SafeChartContainer>
+      </div>
+
+      {sortedData.length > 10 && (
+        <div className="w-full py-2.5 flex justify-center mt-auto border-t bg-muted/30 hover:bg-muted/50 transition-colors">
+          <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+            <DialogTrigger asChild>
+              <Button
+                variant="ghost"
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 w-full h-full py-1.5"
+              >
+                Ver todas las marcas (+{data.length - 10})
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="w-[95%] md:max-w-3xl lg:max-w-4xl max-h-[85vh] flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="text-base font-semibold">
+                  Ranking de Marcas · Todas las marcas
+                </DialogTitle>
+                <DialogDescription className="sr-only">
+                  Listado progresivo de todas las marcas ordenadas por venta neta.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4 py-4 min-h-0">
+                {sortedData.slice(0, modalLimit).map((brand, index) => {
+                  const pct = (brand.ventaNeta / maxVenta) * 100;
+                  return (
+                    <div key={brand.marca} className="flex flex-col gap-1.5 text-xs">
+                      <div className="flex items-center justify-between w-full text-sm py-1">
+                        {/* Bloque Izquierdo: Índice + Nombre de Marca */}
+                        <div className="flex items-center font-medium truncate pr-2">
+                          <span className="text-muted-foreground/50 font-normal mr-3 w-6 inline-block text-left shrink-0">
+                            {index + 1}
+                          </span>
+                          <span className="text-slate-800 dark:text-slate-200 font-normal truncate">{brand.marca}</span>
+                        </div>
+
+                        {/* Bloque Derecho: Métricas Financieras (Bs. y Unidades uniformes) */}
+                        <div className="text-right font-medium text-slate-600 dark:text-slate-300 shrink-0">
+                          {formatBsCurrency(brand.ventaNeta)}{" "}
+                          <span className="text-muted-foreground font-normal text-xs ml-1">
+                            ({brand.unidadesVendidas.toLocaleString("en-US")} und)
+                          </span>
+                        </div>
+                      </div>
+                      <div className="w-full h-3 rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="bg-blue-600 h-full rounded-full transition-all duration-300"
+                          style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="w-full pt-4 flex items-center justify-center gap-6 border-t mt-4">
+                {sortedData.length > modalLimit && (
+                  <Button variant="ghost" className="text-xs text-blue-600 font-medium" onClick={incrementLimit}>
+                    Ver más marcas (+10)
+                  </Button>
+                )}
+                {modalLimit > 10 && (
+                  <Button variant="ghost" className="text-xs text-slate-500 font-medium" onClick={resetLimit}>
+                    Ver menos (Colapsar)
+                  </Button>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+      )}
+    </div>
   );
 }

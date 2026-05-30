@@ -61,8 +61,6 @@ type VentaFusedRow = {
   ventaNeta: number;
 };
 
-const EXCLUSION = `AND dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS')`;
-
 // Helper: Blindaje de Filtros Vacíos/Globales ("TODOS", "%")
 const isAll = (val: string | null | undefined) => !val || val.toUpperCase() === 'TODOS' || val === '%';
 

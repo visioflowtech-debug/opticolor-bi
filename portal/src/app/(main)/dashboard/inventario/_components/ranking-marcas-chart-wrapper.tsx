@@ -15,17 +15,17 @@ export async function RankingMarcasChartWrapper({ startDate, endDate, sucursales
   const data = result.data ?? [];
 
   return (
-    <Card className="overflow-hidden rounded-2xl shadow-md">
-      <CardHeader className="pb-3">
+    <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col h-auto md:h-[480px] w-full min-w-0 justify-between">
+      <CardHeader className="shrink-0 pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
           Ranking de Marcas · Venta Neta
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex-1 flex flex-col min-h-0 pb-4">
         {result.error && (
           <div className="text-sm text-destructive pb-2">{result.error}</div>
         )}
-        <div className="w-full h-[400px] md:h-[500px] min-w-0">
+        <div className="w-full h-full min-h-0 flex-grow relative">
           <RankingMarcasChart data={data} />
         </div>
       </CardContent>
