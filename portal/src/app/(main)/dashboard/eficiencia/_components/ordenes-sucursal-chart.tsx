@@ -270,19 +270,22 @@ export function OrdenesSucursalChart({ data, error }: Props) {
               </DialogTitle>
             </DialogHeader>
             <div className="mt-4 max-h-[60vh] overflow-y-auto space-y-3 p-1">
-              {data.slice(0, modalCount).map((item, index) => (
-                <div key={index} className="flex items-center gap-3 w-full">
-                  <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-slate-500 dark:text-slate-400">
-                    {item.nombre_sucursal}
-                  </span>
+              {data.slice(0, modalCount).map((sucursal, index) => (
+                <div key={index} className="flex items-center justify-between w-full py-1 gap-3">
+                  <div className="flex items-center font-medium text-sm w-40 shrink-0 pr-2">
+                    <span className="text-muted-foreground/50 font-normal mr-3 w-6 inline-block text-left shrink-0">
+                      {index + 1}
+                    </span>
+                    <span className="text-slate-800 dark:text-slate-200 font-normal truncate">{sucursal.nombre_sucursal}</span>
+                  </div>
                   <div className="min-w-0 flex-1 h-3 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                     <div
                       className="h-full bg-emerald-600 rounded-full transition-all duration-300"
-                      style={{ width: `${(item.volumen_ordenes / maxVolumen) * 100}%` }}
+                      style={{ width: `${(sucursal.volumen_ordenes / maxVolumen) * 100}%` }}
                     />
                   </div>
-                  <span className="w-20 shrink-0 text-right text-xs font-bold text-slate-900 dark:text-slate-100 whitespace-nowrap">
-                    {item.volumen_ordenes} órds.
+                  <span className="w-20 shrink-0 text-right text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap">
+                    {sucursal.volumen_ordenes} órds.
                   </span>
                 </div>
               ))}
