@@ -8,6 +8,7 @@ import pyodbc
 import time
 import numpy as np
 import json
+import traceback
 
 app = func.FunctionApp()
 
@@ -24,10 +25,13 @@ app = func.FunctionApp()
 # --- NUEVO MODELO: CASCADA SECUENCIAL (Trigger-to-Trigger) ---
 # Solo la primera función tiene TimerTrigger. Las demás se ejecutan en cadena.
 
-# Horarios Venezuela (UTC-4): 8:30 AM, 10:30 AM, 12:30 PM, 2:30 PM, 4:30 PM, 6:30 PM, 8:30 PM, 10:30 PM
-# Equivalente UTC (suma 4h):   12:30 UTC, 14:30 UTC, 16:30 UTC, 18:30 UTC, 20:30 UTC, 22:30 UTC, 0:30 UTC, 2:30 UTC
-# [24 ABRIL 2026] CRON CORREGIDO A HORA VENEZUELA (UTC-4)
-@app.timer_trigger(schedule="0 30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
+# CRON: "0 0,2,12,14,16,18,20,22 * * *" = Cada 2 horas de 8 AM a 10 PM Venezuela (12 PM-2 AM UTC)
+# Horarios UTC:      12:00, 14:00, 16:00, 18:00, 20:00, 22:00, 00:00, 02:00 UTC
+# Horarios Venezuela (UTC-4): 08:00, 10:00, 12:00, 14:00, 16:00, 18:00, 20:00, 22:00 Venezuela
+# Total: 8 ejecuciones/día (8 AM - 10 PM Venezuela)
+# Beneficio: Ejecuciones menos frecuentes pero con suficiente cobertura horaria
+# [8 MAYO 2026] CRON ACTUALIZADO: CADA 2 HORAS (8 AM-10 PM Venezuela) PARA MEJOR EFICIENCIA
+# @app.timer_trigger(schedule="0 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
 def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     """Función Maestra que inicia la cascada de ejecución."""
     etl = None
@@ -35,6 +39,38 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
     try:
         logging.info("--- [INICIO] CICLO ETL OPTICOLOR (CASCADA) ---")
         etl = GesvisionEtl()
+
+        # === DETECTAR EJECUCIONES DUPLICADAS (Sin bloqueo permanente) ===
+        try:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                # Crear tabla de control si no existe
+                cursor.execute("""
+                    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Etl_Running_Lock' AND xtype='U')
+                    CREATE TABLE Etl_Running_Lock (
+                        is_running INT,
+                        last_start DATETIME
+                    )
+                """)
+
+                # Limpiar locks antiguos (>60 minutos automáticamente)
+                cursor.execute("DELETE FROM Etl_Running_Lock WHERE DATEDIFF(minute, last_start, GETUTCDATE()) > 60")
+
+                # Verificar si hay un ciclo YA corriendo
+                cursor.execute("SELECT COUNT(*) FROM Etl_Running_Lock WHERE is_running = 1 AND DATEDIFF(minute, last_start, GETUTCDATE()) < 60")
+                result = cursor.fetchone()
+
+                if result and result[0] > 0:
+                    logging.info("⚠️ Otro ciclo ETL ya está en ejecución. Esta ejecución será ignorada.")
+                    return  # Salir sin hacer nada
+
+                # Marcar que ESTE ciclo está corriendo AHORA
+                cursor.execute("DELETE FROM Etl_Running_Lock")
+                cursor.execute("INSERT INTO Etl_Running_Lock (is_running, last_start) VALUES (1, GETUTCDATE())")
+                conn.commit()
+        except Exception as lock_error:
+            logging.warning(f"⚠️ Error verificando lock (continuando igual): {lock_error}")
+
         reporte = []
         start_global = time.time()
         inicio_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -74,13 +110,22 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
             ('TESORERIA', etl.sync_treasury),
             ('PEDIDOS_LAB', etl.sync_laboratory_orders),
             ('RECEPCIONES_LAB', etl.sync_received_delivery_notes),
-            ('INVENTARIO', etl.sync_inventory),
-            # ✅ 18/18 MÓDULOS EN CASCADA (Todas las temporales desactivadas)
+            # ✅ 17/17 MÓDULOS EN CASCADA (INVENTARIO SEPARADO EN FUNCIÓN INDEPENDIENTE)
         ]
 
         for mod_name, mod_func in remaining_modules:
             if check_time_limit(): break
-            reporte.append(etl.ejecutar_modulo(mod_name, mod_func))
+            resultado_modulo = etl.ejecutar_modulo(mod_name, mod_func)
+            reporte.append(resultado_modulo)
+
+            # Enviar notificación por cada módulo completado
+            if resultado_modulo and resultado_modulo.get('status'):
+                status = resultado_modulo.get('status', '⚠️')
+                resultado_info = resultado_modulo.get('resultado', '')
+                msg = f"{status} {mod_name}"
+                if resultado_info:
+                    msg += f" → {resultado_info}"
+                etl.notificar_telegram(msg, silencioso=False)
 
         # --- REPORTE FINAL ---
         duration = (time.time() - start_global) / 60
@@ -98,6 +143,29 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
         else:
             logging.error(f"Error fatal en cascada (etl no inicializado): {e}")
     finally:
+        # Liberar lock cuando termina (éxito o error)
+        try:
+            if etl and hasattr(etl, 'conn_str') and etl.conn_str:
+                # Verificar si estamos en LOCAL o en AZURE
+                # En LOCAL, la BD no es accesible, así que saltamos silenciosamente
+                try:
+                    with pyodbc.connect(etl.conn_str) as conn:
+                        cursor = conn.cursor()
+                        cursor.execute("UPDATE Etl_Running_Lock SET is_running = 0")
+                        conn.commit()
+                        logging.info("✅ Lock liberado correctamente")
+                except Exception as db_error:
+                    # Si hay error de conexión (IM002 = BD no accesible), log silencioso
+                    # Esto ocurre en LOCAL cuando no hay acceso a Azure SQL
+                    if 'IM002' in str(db_error) or 'No se encuentra' in str(db_error):
+                        logging.debug(f"[LOCAL] BD no accesible para liberar lock (esperado en LOCAL): {db_error}")
+                    else:
+                        logging.warning(f"⚠️ Error al liberar lock: {db_error}")
+            else:
+                logging.debug("⚠️ No se pudo liberar lock (etl.conn_str no disponible)")
+        except Exception as lock_error:
+            logging.warning(f"⚠️ Error crítico en finally: {lock_error}")
+
         if etl and etl.session:
             try:
                 etl.session.close()
@@ -343,49 +411,639 @@ def EtlOrquestadorPrincipal(myTimer: func.TimerRequest) -> None:
 # #         if etl.session: etl.session.close()
 
 
+# --- FUNCIÓN SEPARADA: EtlInventarioSeparado - Ejecuta PRODUCTOS+INVENTARIO cada 2 horas ---
+# [08 MAYO 2026] NUEVA ESTRATEGIA: INVENTARIO se ejecuta independientemente cada 2 horas
+# para evitar timeout en Azure (30 min) cuando el ETL principal corre en paralelo
+
+# @app.timer_trigger(schedule="30 12,14,16,18,20,22,0,2 * * *", arg_name="myTimer", run_on_startup=False)
+def EtlInventarioSeparado(myTimer: func.TimerRequest) -> None:
+    """
+    Ejecuta PRODUCTOS (2da corrida) + INVENTARIO cada 2 horas.
+    Schedule: 0 */2 * * * = Cada 2 horas (00:00, 02:00, 04:00, 06:00, etc UTC)
+    En Venezuela (UTC-4): 20:00, 22:00, 00:00, 02:00, 04:00, 06:00, 08:00, 10:00, 12:00, 14:00, 16:00, 18:00
+
+    Razón: Inventario tarda ~25-30 min. El ETL principal tarda ~2 min.
+    Si ambos corren juntos, se excede el timeout de Azure (30 min).
+    Separándolos, cada uno tiene tiempo suficiente sin presión.
+    """
+
+    etl = None
+    try:
+        logging.info("--- [INICIO] CICLO INVENTARIO SEPARADO (cada 2 horas) ---")
+        etl = GesvisionEtl()
+
+        # ===== CONTROL: Verificar si ya hay ciclo de Inventario corriendo =====
+        try:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+
+                # Crear tabla si no existe
+                cursor.execute("""
+                    IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Etl_Inventory_Lock' AND xtype='U')
+                    CREATE TABLE Etl_Inventory_Lock (
+                        is_running INT,
+                        last_start DATETIME,
+                        expires_at DATETIME
+                    )
+                """)
+
+                # Limpiar locks viejos (>120 minutos)
+                cursor.execute("DELETE FROM Etl_Inventory_Lock WHERE DATEDIFF(minute, last_start, GETUTCDATE()) > 120")
+
+                # Verificar si hay ciclo activo
+                cursor.execute("SELECT COUNT(*) FROM Etl_Inventory_Lock WHERE is_running = 1 AND expires_at > GETUTCDATE()")
+                result = cursor.fetchone()
+
+                if result and result[0] > 0:
+                    logging.warning("⚠️ Ciclo Inventario anterior aún está corriendo. Abortando.")
+                    etl.notificar_telegram("⚠️ Inventario anterior aún corre. Ciclo actual abortado.")
+                    return
+
+                # Crear nuevo lock (válido 120 minutos)
+                cursor.execute("DELETE FROM Etl_Inventory_Lock")
+                cursor.execute(
+                    "INSERT INTO Etl_Inventory_Lock (is_running, last_start, expires_at) VALUES (1, GETUTCDATE(), DATEADD(minute, 120, GETUTCDATE()))"
+                )
+                conn.commit()
+        except Exception as lock_error:
+            logging.warning(f"⚠️ Error verificando lock inventario: {lock_error}")
+
+        # Notificación de inicio
+        etl.notificar_telegram(f"✅ Ciclo INVENTARIO iniciado — {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        start_time = time.time()
+
+        # ===== PRODUCTOS (2da corrida - asegura datos frescos antes de Inventario) =====
+        logging.info("--- [INVENTARIO] Ejecutando PRODUCTOS (2da corrida) ---")
+        try:
+            resultado_productos = etl.ejecutar_modulo("PRODUCTOS", etl.sync_products)
+            if resultado_productos and resultado_productos.get('status') == '✅':
+                logging.info("✅ PRODUCTOS (2da corrida) completado")
+            else:
+                logging.warning("⚠️ PRODUCTOS (2da corrida) completó con estado incierto")
+        except Exception as e:
+            logging.error(f"❌ PRODUCTOS (2da corrida) ERROR: {e}")
+
+        # ===== INVENTARIO =====
+        logging.info("--- [INVENTARIO] Ejecutando INVENTARIO ---")
+        try:
+            resultado_inventario = etl.ejecutar_modulo("INVENTARIO", etl.sync_inventory)
+            if resultado_inventario and resultado_inventario.get('status') == '✅':
+                logging.info("✅ INVENTARIO completado")
+            else:
+                logging.warning("⚠️ INVENTARIO completó con estado incierto")
+        except Exception as e:
+            logging.error(f"❌ INVENTARIO ERROR: {e}")
+
+        # ===== FINALIZACIÓN =====
+        duration = time.time() - start_time
+        logging.info(f"--- [FIN] CICLO INVENTARIO SEPARADO COMPLETADO EN {duration/60:.2f} MIN ---")
+        etl.notificar_telegram(f"✅ Ciclo INVENTARIO completado — {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')} — {duration/60:.1f} min")
+
+    except Exception as e:
+        logging.error(f"❌ ERROR CRÍTICO EN INVENTARIO SEPARADO: {e}")
+        if etl:
+            etl.notificar_telegram(f"❌ ERROR INVENTARIO SEPARADO: {str(e)[:100]}")
+
+    finally:
+        # Liberar lock
+        try:
+            if etl and hasattr(etl, 'conn_str') and etl.conn_str:
+                with pyodbc.connect(etl.conn_str) as conn:
+                    cursor = conn.cursor()
+                    cursor.execute("UPDATE Etl_Inventory_Lock SET is_running = 0")
+                    conn.commit()
+                    logging.info("✅ Lock inventario liberado")
+        except Exception as lock_error:
+            logging.warning(f"⚠️ Error liberando lock inventario: {lock_error}")
+
+        if etl and etl.session:
+            try:
+                etl.session.close()
+            except:
+                pass
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PATRÓN A: CONTROLADOR DE PENDIENTES
+# Sistema robusto de orquestación con auto-recuperación
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Configuración de módulos con dependencias
+MODULOS_CONFIG = [
+    # (orden, nombre, funcion, dependencias)
+    (1, 'SUCURSALES', 'sync_dimensions', []),
+    (2, 'EMPLEADOS', 'sync_employees', []),
+    (3, 'CATEGORIAS', 'sync_categories', []),
+    (4, 'METODOS_PAGO', 'sync_payment_methods', []),
+    (5, 'PROVEEDORES', 'sync_suppliers', []),
+    (6, 'MARCAS_FULL', 'sync_brands_full', []),
+    (7, 'CLIENTES', 'sync_customers', []),
+    (8, 'CITAS', 'sync_appointments', []),
+    (9, 'PRODUCTOS', 'sync_products', ['CATEGORIAS', 'MARCAS_FULL', 'PROVEEDORES']),
+    (10, 'EXAMENES', 'sync_exams', ['CLIENTES', 'EMPLEADOS', 'SUCURSALES']),
+    (11, 'PEDIDOS', 'sync_orders', ['CLIENTES', 'SUCURSALES']),
+    (12, 'ORDENES_CRISTALES', 'sync_glasses_orders', ['PEDIDOS']),
+    (13, 'VENTAS', 'sync_invoices_incremental', ['CLIENTES', 'PRODUCTOS', 'EMPLEADOS', 'METODOS_PAGO']),
+    (14, 'COBROS', 'sync_collections', ['VENTAS', 'METODOS_PAGO']),
+    (15, 'TESORERIA', 'sync_treasury', ['SUCURSALES']),
+    (16, 'PEDIDOS_LAB', 'sync_laboratory_orders', ['ORDENES_CRISTALES']),
+    (17, 'RECEPCIONES_LAB', 'sync_received_delivery_notes', ['PEDIDOS_LAB']),
+    (18, 'INVENTARIO', 'sync_inventory', ['PRODUCTOS', 'SUCURSALES']),
+    (19, 'DOLAR_VENTAS', 'sync_dolar_ventas', ['VENTAS']),
+    (20, 'DOLAR_TASAS', 'sync_dolar_tasas', ['DOLAR_VENTAS']),
+    (21, 'DOLAR_PEDIDOS', 'sync_dolar_pedidos', ['PEDIDOS', 'DOLAR_TASAS']),
+]
+
+HORAS_INICIO_CICLO_UTC = [12, 14, 16, 18, 20, 22, 0, 2]
+MAX_DURACION_EJECUCION = 25 * 60  # 25 minutos máximo por ejecución
+
+def detectar_y_marcar_colgados(etl):
+    """
+    WATCHDOG: Detecta módulos en EJECUTANDO >15 min y los marca FAILED.
+    Permite que el ciclo continúe sin quedar bloqueado por Azure Flex scale-in.
+    """
+    try:
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+
+            # Buscar módulos colgados
+            cursor.execute("""
+                SELECT id, modulo_nombre, ciclo_id,
+                       DATEDIFF(minute, fecha_inicio, GETUTCDATE()) as minutos
+                FROM Etl_Pendientes_Modulo
+                WHERE estado = 'EJECUTANDO'
+                  AND DATEDIFF(minute, fecha_inicio, GETUTCDATE()) > 15
+            """)
+
+            colgados = cursor.fetchall()
+
+            if not colgados:
+                return
+
+            for row in colgados:
+                modulo_id, nombre, ciclo_id, minutos = row
+
+                logging.warning(f"⚠️ WATCHDOG: {nombre} colgado {minutos} min. Marcando FAILED.")
+
+                cursor.execute("""
+                    UPDATE Etl_Pendientes_Modulo
+                    SET estado = 'FAILED',
+                        fecha_fin = GETUTCDATE(),
+                        duracion_segundos = DATEDIFF(second, fecha_inicio, GETUTCDATE()),
+                        mensaje_error = ?,
+                        proximo_intento = DATEADD(minute, 5, GETUTCDATE())
+                    WHERE id = ?
+                """, f'WATCHDOG: Azure Flex scale-in mato la funcion ({minutos}min sin actualizar)', modulo_id)
+
+                # Notificar Telegram
+                try:
+                    etl.notificar_telegram(
+                        f"WATCHDOG: {nombre} colgado\n"
+                        f"{minutos} min sin progreso\n"
+                        f"Marcado FAILED - se reintentara"
+                    )
+                except:
+                    pass
+
+            conn.commit()
+            logging.info(f"WATCHDOG: {len(colgados)} modulos colgados cerrados")
+
+    except Exception as e:
+        logging.error(f"Error en watchdog: {e}")
+
+
+@app.timer_trigger(schedule="*/30 * * * *", arg_name="myTimer", run_on_startup=False)
+def EtlControladorPendientes(myTimer: func.TimerRequest) -> None:
+    """
+    Controlador de Pendientes - Patrón A
+
+    Se ejecuta cada 30 minutos:
+    1. Verifica si hay un ciclo activo o crea uno nuevo
+    2. Identifica módulos pendientes considerando dependencias
+    3. Ejecuta los pendientes uno por uno con timeout
+    4. Marca cada módulo como COMPLETADO o FAILED
+    5. Si todos completaron, cierra el ciclo
+    """
+
+    etl = None
+    start_time = time.time()
+
+    try:
+        logging.info("═══════════════════════════════════════════════════════")
+        logging.info("[CONTROLADOR] Iniciando ciclo de control de pendientes")
+        logging.info("═══════════════════════════════════════════════════════")
+
+        etl = GesvisionEtl()
+
+        # PASO 0: WATCHDOG - Detectar y limpiar módulos colgados de ejecuciones anteriores
+        detectar_y_marcar_colgados(etl)
+
+        # PASO 1: Obtener o crear ciclo activo
+        ciclo_id = obtener_o_crear_ciclo(etl)
+
+        if not ciclo_id:
+            logging.info("[CONTROLADOR] No hay ciclo activo y no es hora de crear uno nuevo")
+            return
+
+        logging.info(f"[CONTROLADOR] Ciclo activo: {ciclo_id}")
+
+        # PASO 2: Obtener módulos pendientes (considerando dependencias)
+        pendientes = obtener_modulos_ejecutables(etl, ciclo_id)
+
+        if not pendientes:
+            logging.info("[CONTROLADOR] No hay módulos pendientes ejecutables")
+            verificar_y_cerrar_ciclo(etl, ciclo_id)
+            return
+
+        logging.info(f"[CONTROLADOR] {len(pendientes)} módulos pendientes ejecutables")
+
+        # PASO 3: Ejecutar pendientes
+        for modulo_info in pendientes:
+            elapsed = time.time() - start_time
+            if elapsed > MAX_DURACION_EJECUCION:
+                logging.warning(f"⏰ Tiempo límite alcanzado ({elapsed/60:.1f} min). Próximos pendientes en siguiente ejecución.")
+                break
+
+            ejecutar_modulo_pendiente(etl, ciclo_id, modulo_info)
+
+        # PASO 4: Verificar si ciclo completó
+        verificar_y_cerrar_ciclo(etl, ciclo_id)
+
+    except Exception as e:
+        logging.error(f"❌ ERROR EN CONTROLADOR: {e}")
+        if etl:
+            etl.notificar_telegram(f"❌ ERROR CONTROLADOR: {str(e)[:200]}")
+
+    finally:
+        if etl and etl.session:
+            try:
+                etl.session.close()
+            except:
+                pass
+
+
+def obtener_o_crear_ciclo(etl):
+    """Obtiene el ciclo activo o crea uno nuevo si es la hora apropiada"""
+
+    try:
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+
+            # Buscar ciclo activo
+            cursor.execute("""
+                SELECT TOP 1 ciclo_id
+                FROM Etl_Ciclos
+                WHERE estado = 'ACTIVO'
+                ORDER BY fecha_inicio DESC
+            """)
+
+            row = cursor.fetchone()
+            if row:
+                return row[0]
+
+            # No hay ciclo activo, verificar si es hora de crear uno
+            hora_utc = datetime.datetime.utcnow().hour
+
+            if hora_utc not in HORAS_INICIO_CICLO_UTC:
+                return None
+
+            # Verificar que no se haya creado ya un ciclo en esta hora
+            cursor.execute("""
+                SELECT COUNT(*)
+                FROM Etl_Ciclos
+                WHERE DATEDIFF(minute, fecha_inicio, GETUTCDATE()) < 30
+            """)
+
+            if cursor.fetchone()[0] > 0:
+                logging.info("[CONTROLADOR] Ya se creó un ciclo en los últimos 30 min")
+                return None
+
+            # Crear nuevo ciclo
+            ciclo_id = f"CICLO_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
+
+            cursor.execute("""
+                INSERT INTO Etl_Ciclos (ciclo_id, modulos_total)
+                VALUES (?, ?)
+            """, ciclo_id, len(MODULOS_CONFIG))
+
+            # Insertar todos los módulos como PENDIENTE
+            for orden, nombre, funcion, dependencias in MODULOS_CONFIG:
+                deps_str = ','.join(dependencias) if dependencias else None
+                cursor.execute("""
+                    INSERT INTO Etl_Pendientes_Modulo
+                    (ciclo_id, modulo_nombre, funcion_nombre, orden_ejecucion, dependencias, estado)
+                    VALUES (?, ?, ?, ?, ?, 'PENDIENTE')
+                """, ciclo_id, nombre, funcion, orden, deps_str)
+
+            conn.commit()
+
+            logging.info(f"✅ Nuevo ciclo creado: {ciclo_id} con {len(MODULOS_CONFIG)} módulos")
+            etl.notificar_telegram(f"🚀 Nuevo ciclo ETL iniciado: {ciclo_id}")
+
+            return ciclo_id
+
+    except Exception as e:
+        logging.error(f"❌ Error obtener/crear ciclo: {e}")
+        return None
+
+
+def obtener_modulos_ejecutables(etl, ciclo_id):
+    """
+    Retorna lista de módulos pendientes cuyas dependencias YA están COMPLETADAS.
+    """
+
+    try:
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+
+            # Obtener módulos completados del ciclo
+            cursor.execute("""
+                SELECT modulo_nombre
+                FROM Etl_Pendientes_Modulo
+                WHERE ciclo_id = ? AND estado = 'COMPLETADO'
+            """, ciclo_id)
+
+            completados = set([row[0] for row in cursor.fetchall()])
+
+            # Obtener módulos pendientes o failed con intentos disponibles
+            cursor.execute("""
+                SELECT id, modulo_nombre, funcion_nombre, orden_ejecucion, dependencias, intentos, max_intentos
+                FROM Etl_Pendientes_Modulo
+                WHERE ciclo_id = ?
+                  AND estado IN ('PENDIENTE', 'FAILED')
+                  AND intentos < max_intentos
+                ORDER BY orden_ejecucion
+            """, ciclo_id)
+
+            ejecutables = []
+            for row in cursor.fetchall():
+                modulo_id, nombre, funcion, orden, deps_str, intentos, max_intentos = row
+
+                # Verificar dependencias
+                if deps_str:
+                    dependencias = deps_str.split(',')
+                    deps_completadas = all(dep in completados for dep in dependencias)
+                    if not deps_completadas:
+                        continue
+
+                ejecutables.append({
+                    'id': modulo_id,
+                    'nombre': nombre,
+                    'funcion': funcion,
+                    'orden': orden,
+                    'intentos': intentos
+                })
+
+            return ejecutables
+
+    except Exception as e:
+        logging.error(f"❌ Error obtener ejecutables: {e}")
+        return []
+
+
+def ejecutar_modulo_pendiente(etl, ciclo_id, modulo_info):
+    """Ejecuta un módulo individual y actualiza su estado"""
+
+    nombre = modulo_info['nombre']
+    funcion_nombre = modulo_info['funcion']
+
+    try:
+        # Marcar como EJECUTANDO
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Etl_Pendientes_Modulo
+                SET estado = 'EJECUTANDO',
+                    fecha_inicio = GETUTCDATE(),
+                    intentos = intentos + 1
+                WHERE id = ?
+            """, modulo_info['id'])
+            conn.commit()
+
+        logging.info(f"▶️ Ejecutando: {nombre} (intento {modulo_info['intentos'] + 1})")
+
+        # Obtener la función del módulo
+        funcion_modulo = getattr(etl, funcion_nombre, None)
+        if not funcion_modulo:
+            raise Exception(f"Función {funcion_nombre} no encontrada")
+
+        # Ejecutar el módulo
+        start = time.time()
+        resultado = etl.ejecutar_modulo(nombre, funcion_modulo)
+        duracion = time.time() - start
+
+        # Marcar como COMPLETADO (verificar si status comienza con ✅)
+        status = resultado.get('status', '') if resultado else ''
+        if resultado and status and '✅' in status:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE Etl_Pendientes_Modulo
+                    SET estado = 'COMPLETADO',
+                        fecha_fin = GETUTCDATE(),
+                        duracion_segundos = ?,
+                        registros_procesados = ?
+                    WHERE id = ?
+                """, int(duracion), 0, modulo_info['id'])
+                conn.commit()
+
+            logging.info(f"✅ {nombre} completado en {duracion:.1f}s")
+        else:
+            raise Exception(f"Estado incierto: {resultado}")
+
+    except Exception as e:
+        # Marcar como FAILED
+        try:
+            with pyodbc.connect(etl.conn_str) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    UPDATE Etl_Pendientes_Modulo
+                    SET estado = 'FAILED',
+                        fecha_fin = GETUTCDATE(),
+                        mensaje_error = ?,
+                        proximo_intento = DATEADD(minute, 30, GETUTCDATE())
+                    WHERE id = ?
+                """, str(e)[:500], modulo_info['id'])
+                conn.commit()
+
+            logging.error(f"❌ {nombre} FAILED: {e}")
+        except Exception as db_error:
+            logging.error(f"❌ Error guardar FAILED: {db_error}")
+
+
+def ejecutar_sps_portal(conn, cursor, ciclo_id, etl):
+    """Ejecuta los 5 SPs del portal post-ciclo ETL con manejo individual de errores."""
+    sps = [
+        "EXEC dbo.sp_Actualizar_Resumen_Ventas",
+        "EXEC dbo.sp_Actualizar_Resumen_Inventario",
+        "EXEC dbo.sp_Actualizar_Resumen_Clinico",
+        "EXEC dbo.sp_Actualizar_Resumen_Recaudo",
+        "EXEC dbo.sp_Actualizar_Resumen_Eficiencia"
+    ]
+
+    sp_resultados = []
+
+    for sp in sps:
+        sp_nombre = sp.split('.')[-1]
+        try:
+            logging.info(f"[SPs-PORTAL] Ejecutando: {sp_nombre}")
+            cursor.execute(sp)
+            conn.commit()
+            logging.info(f"[SPs-PORTAL] ✅ {sp_nombre} completado")
+            sp_resultados.append((sp_nombre, True))
+        except Exception as e:
+            logging.error(f"[SPs-PORTAL] ❌ {sp_nombre} ERROR: {e}")
+            sp_resultados.append((sp_nombre, False))
+
+    # Verificar si todos fallaron
+    todos_fallaron = all(not success for _, success in sp_resultados)
+
+    if todos_fallaron:
+        msg = f"⚠️ SPs portal fallaron post-ciclo {ciclo_id}"
+        logging.error(msg)
+        try:
+            etl.notificar_telegram(msg)
+        except Exception as notify_err:
+            logging.error(f"Error notificando fallo de SPs: {notify_err}")
+    else:
+        exitosos = sum(1 for _, success in sp_resultados if success)
+        logging.info(f"[SPs-PORTAL] {exitosos}/{len(sps)} SPs completados exitosamente")
+
+
+def trigger_sitio_web(ciclo_id):
+    """Notifica al portal Next.js que los resúmenes ya se actualizaron, para revalidar su caché.
+    Fail-safe: cualquier fallo aquí se registra pero NUNCA interrumpe ni revierte el ETL.
+    NOTA: NO ejecuta los SPs de resumen; eso ya lo hace ejecutar_sps_portal() antes de esta llamada.
+    """
+    token_secreto = os.getenv("REVALIDATE_SECRET_TOKEN")
+    if not token_secreto:
+        logging.warning("[REVALIDATE] REVALIDATE_SECRET_TOKEN no configurado. Se omite revalidación.")
+        return
+
+    url_api = f"https://opticolorkpi.com/api/revalidate?secret={token_secreto}"
+
+    try:
+        logging.info(f"[REVALIDATE] Notificando al portal tras ciclo {ciclo_id}...")
+        response = requests.post(url_api, timeout=(5, 15))
+        if response.status_code == 200:
+            logging.info(f"[REVALIDATE] ✅ Portal revalidado OK (ciclo {ciclo_id})")
+        elif response.status_code == 401:
+            logging.warning("[REVALIDATE] ⚠️ 401: el token del ETL no coincide con el del portal.")
+        else:
+            logging.warning(f"[REVALIDATE] ⚠️ Respuesta {response.status_code}: {response.text[:200]}")
+    except requests.exceptions.Timeout:
+        logging.warning("[REVALIDATE] ⚠️ Timeout (no crítico; la petición pudo haberse enviado igual).")
+    except Exception as e:
+        logging.warning(f"[REVALIDATE] ⚠️ No se pudo conectar con el portal (no crítico): {e}")
+
+
+def verificar_y_cerrar_ciclo(etl, ciclo_id):
+    """Verifica si todos los módulos completaron y cierra el ciclo"""
+
+    try:
+        with pyodbc.connect(etl.conn_str) as conn:
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                SELECT
+                    COUNT(*) as total,
+                    SUM(CASE WHEN estado = 'COMPLETADO' THEN 1 ELSE 0 END) as completados,
+                    SUM(CASE WHEN estado = 'FAILED' AND intentos >= max_intentos THEN 1 ELSE 0 END) as failed_max
+                FROM Etl_Pendientes_Modulo
+                WHERE ciclo_id = ?
+            """, ciclo_id)
+
+            total, completados, failed_max = cursor.fetchone()
+
+            # Si todos están en estado final (completado o failed con max intentos)
+            if (completados + failed_max) >= total:
+                estado_final = 'COMPLETADO' if failed_max == 0 else 'INCOMPLETO'
+
+                cursor.execute("""
+                    UPDATE Etl_Ciclos
+                    SET estado = ?,
+                        fecha_fin = GETUTCDATE(),
+                        modulos_completados = ?,
+                        modulos_failed = ?,
+                        duracion_minutos = DATEDIFF(minute, fecha_inicio, GETUTCDATE())
+                    WHERE ciclo_id = ?
+                """, estado_final, completados, failed_max, ciclo_id)
+                conn.commit()
+
+                logging.info(f"🎯 Ciclo {ciclo_id} cerrado: {estado_final}")
+                logging.info(f"   ✅ Completados: {completados}/{total}")
+                logging.info(f"   ❌ Failed: {failed_max}")
+
+                if estado_final == 'COMPLETADO':
+                    ejecutar_sps_portal(conn, cursor, ciclo_id, etl)
+                    trigger_sitio_web(ciclo_id)
+                    etl.notificar_telegram(f"✅ Ciclo {ciclo_id} COMPLETADO\n{completados}/{total} módulos OK")
+                else:
+                    etl.notificar_telegram(f"⚠️ Ciclo {ciclo_id} INCOMPLETO\n✅ {completados}/{total} OK\n❌ {failed_max} failed")
+            else:
+                logging.info(f"⏳ Ciclo {ciclo_id} en progreso: {completados}/{total} completados")
+
+    except Exception as e:
+        logging.error(f"❌ Error verificar/cerrar ciclo: {e}")
+
+
 # --- SECCIÓN 2: CLASE DE LÓGICA GesvisionEtl ---
 
 class GesvisionEtl:
-        # --- TABLERO DE CONTROL DE CARGA (GRANULAR) ---
-        # 'HISTORICAL': Carga masiva/backfill (Fecha fija 2024, Auto-Resume con Count).
-        # 'INCREMENTAL': Mantenimiento diario (Últimos 3 días, Skip 0).
-        # 'FULL': Barrido completo (Para dimensiones pequeñas).
+    # --- TABLERO DE CONTROL DE CARGA (GRANULAR) ---
+    # 'HISTORICAL': Carga masiva/backfill (Fecha fija 2024, Auto-Resume con Count).
+    # 'INCREMENTAL': Mantenimiento diario (Últimos 3 días, Skip 0).
+    # 'FULL': Barrido completo (Para dimensiones pequeñas).
 
-        LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
-        LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
-        LOAD_MODE_INVOICES  = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (2,573 facturas). Ahora INCREMENTAL (últimos 10 días).
-        LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock — Mantenimiento diario post-backfill (146,707 items completados).
-        LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
-        LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
-        LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
-        LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
-        LOAD_MODE_COBROS    = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (4,608 cobros). Ahora INCREMENTAL (últimas 2 horas).
-        LOAD_MODE_TREASURY  = 'INCREMENTAL'  # Movimientos de caja/banco.
-        LOAD_MODE_LAB       = 'INCREMENTAL'  # Pedidos de laboratorio.
-        LOAD_MODE_RECEPCIONES = 'INCREMENTAL' # Carga inicial de recepciones.
-        LOAD_MODE_GLASSES_ORDERS = 'INCREMENTAL' # Carga de órdenes de cristales (Historical/Incremental).
+    LOAD_MODE_CUSTOMERS = 'INCREMENTAL'  # Últimos 10 días (cambios recientes).
+    LOAD_MODE_ORDERS    = 'INCREMENTAL'  # Mantenimiento diario post-backfill (2,161 pedidos históricos completados).
+    LOAD_MODE_INVOICES  = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (2,573 facturas). Ahora INCREMENTAL (últimos 10 días).
+    LOAD_MODE_INVENTORY = 'INCREMENTAL'  # Control de stock — Mantenimiento diario post-backfill (146,707 items completados).
+    LOAD_MODE_EXAMS     = 'INCREMENTAL'  # Mantenimiento diario (últimos 10 días post-backfill).
+    LOAD_MODE_PRODUCTS  = 'INCREMENTAL'  # Mantenimiento diario post-backfill (143,854 productos cargados).
+    LOAD_MODE_CITAS     = 'INCREMENTAL'  # Agenda.
+    LOAD_MODE_METODOS_PAGO = 'INCREMENTAL'     # Catálogo pequeño.
+    LOAD_MODE_COBROS    = 'INCREMENTAL'  # ✅ Backfill COMPLETADO (4,608 cobros). Ahora INCREMENTAL (últimas 2 horas).
+    LOAD_MODE_TREASURY  = 'INCREMENTAL'  # Movimientos de caja/banco.
+    LOAD_MODE_LAB       = 'INCREMENTAL'  # Pedidos de laboratorio.
+    LOAD_MODE_RECEPCIONES = 'INCREMENTAL' # Carga inicial de recepciones.
+    LOAD_MODE_GLASSES_ORDERS = 'INCREMENTAL' # Carga de órdenes de cristales (Historical/Incremental).
 
-        # --- CONSTANTES DE MAPEO CENTRALIZADO PARA MANTENIBILIDAD ---
-        # --- CONSTANTES DE MAPEO ACTUALIZADAS ---
-        MAP_SUCURSAL = { 'id': 'id_sucursal', 'name': 'nombre_sucursal', 'alias': 'alias_sucursal', 'municipality': 'municipio_raw', 'locality': 'localidad_raw', 'street': 'direccion_raw' }
-        MAP_CLIENTE = {
-        'id': 'id_cliente', 
-        'name': 'nombre', 
-        'lastName': 'apellido',
-        'birthDate': 'fecha_nacimiento', 
-        'genre': 'genero',                # <--- Nuevo campo para segmentación del KPI 1
-        'creationDate': 'fecha_creacion_cliente',
-        'telefono_principal': 'telefono_principal', 
-        'email': 'email',
-        'codigo_postal': 'codigo_postal', 
-        'ciudad': 'ciudad',
-        'idCard': 'cedula'                # <--- Documento de identidad para cruce GHL-Gesvision
-        }
-        MAP_EMPLEADO = {
+    # --- TABLERO DE VERSIÓN DE API POR MÓDULO (Fase 2) ---
+    # 'V1'                : solo API v1 (estado actual)
+    # 'V1+V2_ENRIQUECE'   : v1 es dueño; v2 solo UPDATE de columnas USD
+    # 'V2'                : v2 dueño total (post-validación de paridad)
+    API_VERSION_VENTAS = 'V1+V2_ENRIQUECE'
+
+    # Base de la API v2
+    BASE_URL_V2 = "https://app.gesvision.com/api/v2"
+    LOAD_MODE_DOLAR_VENTAS = 'HISTORICAL'   # 'HISTORICAL' para el backfill
+
+    API_VERSION_PEDIDOS = 'V1+V2_ENRIQUECE'
+    LOAD_MODE_DOLAR_PEDIDOS = 'HISTORICAL'   # backfill primero; luego 'INCREMENTAL'
+
+    # --- CONSTANTES DE MAPEO CENTRALIZADO PARA MANTENIBILIDAD ---
+    # --- CONSTANTES DE MAPEO ACTUALIZADAS ---
+    MAP_SUCURSAL = { 'id': 'id_sucursal', 'name': 'nombre_sucursal', 'alias': 'alias_sucursal', 'municipality': 'municipio_raw', 'locality': 'localidad_raw', 'street': 'direccion_raw' }
+    MAP_CLIENTE = {
+    'id': 'id_cliente', 
+    'name': 'nombre', 
+    'lastName': 'apellido',
+    'birthDate': 'fecha_nacimiento', 
+    'genre': 'genero',                # <--- Nuevo campo para segmentación del KPI 1
+    'creationDate': 'fecha_creacion_cliente',
+    'telefono_principal': 'telefono_principal', 
+    'email': 'email',
+    'codigo_postal': 'codigo_postal', 
+    'ciudad': 'ciudad',
+    'idCard': 'cedula'                # <--- Documento de identidad para cruce GHL-Gesvision
+    }
+    MAP_EMPLEADO = {
             'id': 'id_empleado', 'warehouse': 'id_sucursal', 'type': 'tipo_empleado',
             'nombre_empleado': 'nombre_empleado' # Campo transformado
-        }
-        MAP_PRODUCTO = {
+    }
+    MAP_PRODUCTO = {
             'id': 'id_producto', 'description': 'nombre_producto', 'reference': 'referencia',
             'barCode': 'codigo_barras', 'pricePurchase': 'costo_compra', 'priceWithVAT': 'precio_venta',
             'brand': 'id_marca', 'category': 'id_categoria', 'inventoriable': 'es_inventariable',
@@ -396,16 +1054,16 @@ class GesvisionEtl:
             'color_comercial': 'color_comercial',
             'tipo_montura': 'tipo_montura',
             'group': 'id_grupo'
-        }
-        MAP_MARCA = {'id': 'id_marca', 'name': 'nombre_marca', 'code': 'codigo_marca'}
-        MAP_CATEGORIA = {
+    }
+    MAP_MARCA = {'id': 'id_marca', 'name': 'nombre_marca', 'code': 'codigo_marca'}
+    MAP_CATEGORIA = {
             'id': 'id_categoria',
             'name': 'nombre_categoria',
             'parent': 'id_categoria_padre',
             'enable': 'esta_activo',
             'lastUpdateDate': 'fecha_actualizacion'
-        }
-        MAP_METODO_PAGO = {
+    }
+    MAP_METODO_PAGO = {
             'id': 'id_metodo_pago',
             'name': 'nombre_metodo',
             'description': 'descripcion',
@@ -414,8 +1072,8 @@ class GesvisionEtl:
             'useInExpenses': 'usa_en_gastos',
             'enabled': 'es_activo',
             'payType': 'tipo_pago_codigo'
-        }
-        MAP_PROVEEDOR = {
+    }
+    MAP_PROVEEDOR = {
             'id': 'id_proveedor',
             'name': 'nombre_proveedor',
             'idCard': 'ruc_proveedor',
@@ -424,29 +1082,29 @@ class GesvisionEtl:
             'mobile': 'telefono_contacto',
             'countryCode': 'pais',
             'creationDate': 'fecha_creacion_origen'
-        }
-        MAP_EXAMEN = {
+    }
+    MAP_EXAMEN = {
             'id': 'id_examen', 'customer': 'id_cliente', 'warehouse': 'id_sucursal',
             'optometrist': 'id_empleado', 'date': 'fecha_examen', 'observations': 'observaciones',
             'examType': 'tipo_examen'
-        }
-        MAP_VENTA = {
-        'id': 'id_factura', 
-        'customer': 'id_cliente', 
-        'warehouse': 'id_sucursal',
-        'invoiceDate': 'fecha_factura', 
-        'totalPay': 'monto_total', 
-        'employee': 'id_empleado',      # CAMBIADO: Antes decía 'seller'
-        'optometrist': 'id_optometrista' # AGREGADO: Para medir productividad clínica
-        }
-        MAP_PEDIDO = {
+    }
+    MAP_VENTA = {
+    'id': 'id_factura', 
+    'customer': 'id_cliente', 
+    'warehouse': 'id_sucursal',
+    'invoiceDate': 'fecha_factura', 
+    'totalPay': 'monto_total', 
+    'employee': 'id_empleado',      # CAMBIADO: Antes decía 'seller'
+    'optometrist': 'id_optometrista' # AGREGADO: Para medir productividad clínica
+    }
+    MAP_PEDIDO = {
             'id': 'id_pedido', 'number': 'numero_pedido', 'date': 'fecha_pedido',
             'warehouse': 'id_sucursal', 'employee': 'id_empleado', 'customer': 'id_cliente',
             'monto_total': 'monto_total', 'monto_pagado': 'monto_pagado',
             'saldo_pendiente': 'saldo_pendiente', 'estado_pedido': 'estado_pedido',
             'documentStatus': 'id_estado_orden'
-        }
-        MAP_INVENTARIO = {
+    }
+    MAP_INVENTARIO = {
             'product': 'id_producto',
             'warehouse': 'id_sucursal',
             'quantity': 'cantidad_disponible',
@@ -454,8 +1112,8 @@ class GesvisionEtl:
             'minStock': 'stock_minimo',
             'lastPurchasePrice': 'costo_promedio',
             'lastUpdated': 'fecha_actualizacion'
-        }
-        MAP_CITAS = {
+    }
+    MAP_CITAS = {
             'cliente_id': 'id_cliente',
             'startDate': 'fecha_cita_inicio',
             'endDate': 'fecha_cita_fin',
@@ -465,28 +1123,28 @@ class GesvisionEtl:
             'creationDate': 'fecha_creacion_cita',
             'lastUpdateDate': 'fecha_actualizacion_api',
             'nombre_cliente': 'nombre_cliente'
-        }
-        MAP_COBROS = {
+    }
+    MAP_COBROS = {
             'id': 'id_cobro', 'customer': 'id_cliente', 'invoice_id': 'id_factura',
             'order': 'id_pedido', 'warehouse': 'id_sucursal', 'amount': 'monto_cobrado',
             'payType': 'metodo_pago_nombre', 'delivery': 'monto_entrega',
             'moneyExchange': 'monto_cambio', 'date': 'fecha_cobro',
             'createdBy': 'usuario_creacion'
-        }
-        MAP_TREASURY = {
+    }
+    MAP_TREASURY = {
             'id': 'id_pago_tesoreria', 'warehouse': 'id_sucursal', 'date': 'fecha_movimiento',
             'amount': 'monto', 'description': 'descripcion', 'type': 'tipo_movimiento',
             'payType': 'metodo_pago_nombre', 'paymentAccount': 'id_cuenta_contable',
             'createdBy': 'usuario_creacion'
-        }
-        MAP_LAB = {
+    }
+    MAP_LAB = {
             'id': 'id_pedido_lab', 'glassesOrderId': 'id_pedido_origen',
             'reasonSocialThird': 'proveedor_nombre', 'warehouse': 'id_sucursal',
             'date': 'fecha_solicitud', 'total': 'monto_costo',
             'dateLastChangeFabricationState': 'estatus_proceso',
             'manufacturingDate': 'fecha_fabricacion', 'createdBy': 'usuario_creacion'
-        }
-        MAP_RECEPCION_LAB = {
+    }
+    MAP_RECEPCION_LAB = {
             'id_recepcion_linea': 'id_recepcion_linea',
             'id_albaran': 'id_albaran',
             'numero_albaran': 'numero_albaran',
@@ -495,8 +1153,8 @@ class GesvisionEtl:
             'fecha_recepcion': 'fecha_recepcion',
             'fecha_recepcion_exacta': 'fecha_recepcion_exacta',
             'costo_linea_recepcion': 'costo_linea_recepcion'
-        }
-        MAP_ORDENES_CRISTALES = {
+    }
+    MAP_ORDENES_CRISTALES = {
             'id': 'id_orden_cristal', 'code': 'codigo_orden', 'number': 'numero_orden',
             'customerId': 'id_cliente', 'warehouseId': 'id_sucursal',
             'issuedOrderId': 'id_pedido_venta', 'receivedOrderId': 'id_pedido_compra',
@@ -505,9 +1163,9 @@ class GesvisionEtl:
             'od_esfera': 'od_esfera', 'od_cilindro': 'od_cilindro', 'od_eje': 'od_eje', 'od_adicion': 'od_adicion', 'od_altura': 'od_altura',
             'oi_tipo_lente': 'oi_tipo_lente', 'oi_material': 'oi_material',
             'oi_esfera': 'oi_esfera', 'oi_cilindro': 'oi_cilindro', 'oi_eje': 'oi_eje', 'oi_adicion': 'oi_adicion', 'oi_altura': 'oi_altura'
-        }
+    }
 
-        def __init__(self):
+    def __init__(self):
             # --- Gesvision API ---
             self.base_url = os.getenv("GESVISION_BASE_URL", "https://app.gesvision.com/gesmo/rest/api")
             self.user = os.getenv("GESVISION_USER")
@@ -523,14 +1181,14 @@ class GesvisionEtl:
             self.modulos_con_fallo_api = {}  # {modulo: "tipo de error"}
             self.current_module = None
 
-        def get_token(self):
+    def get_token(self):
             """Gestiona la autenticación con la API de Gesvision."""
             url = f"{self.base_url}/auth/signin"
             resp = self.session.post(url, json={"username": self.user, "password": self.password}, timeout=(15, 90))
             content = resp.text.strip()
             self.token = content.replace("Bearer ", "").strip() if content.startswith("Bearer ") else content
 
-        def _safe_parse_json(self, resp, endpoint_name="unknown"):
+    def _safe_parse_json(self, resp, endpoint_name="unknown"):
             """Parseo defensivo (Fail-Safe) de respuestas JSON de la API.
             
             Valida que el cuerpo no esté vacío antes de llamar a .json().
@@ -562,107 +1220,103 @@ class GesvisionEtl:
                     self.modulos_con_fallo_api[self.current_module] = error_msg
                 return []
 
-        def notificar_telegram(self, mensaje, silencioso=False):
-            """Envía notificaciones a Telegram sin interrumpir el flujo principal."""
-            try:
-                token = os.getenv("TELEGRAM_BOT_TOKEN")
-                chat_id = os.getenv("TELEGRAM_CHAT_ID")
-                if not token or not chat_id: return
+    def notificar_telegram(self, mensaje, silencioso=False):
+            """Envía notificaciones a Telegram con reintentos exponenciales."""
+            token = os.getenv("TELEGRAM_BOT_TOKEN")
+            chat_id = os.getenv("TELEGRAM_CHAT_ID")
+            if not token or not chat_id:
+                logging.warning("Credenciales Telegram no configuradas")
+                return
 
-                url = f"https://api.telegram.org/bot{token}/sendMessage"
-                payload = {
-                    "chat_id": chat_id,
-                    "text": mensaje,
-                    "disable_notification": silencioso
-                }
-                requests.post(url, json=payload, timeout=(10, 30))
-            except Exception as e:
-                logging.warning(f"Fallo envío Telegram: {e}")
+            url = f"https://api.telegram.org/bot{token}/sendMessage"
+            payload = {
+                "chat_id": chat_id,
+                "text": mensaje,
+                "disable_notification": silencioso
+            }
 
-        def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
-            """Envía un reporte consolidado al final del ciclo."""
+            # Reintentos exponenciales: 1s, 2s, 4s (máximo 3 intentos)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logging.info(f"[TELEGRAM] Intento {attempt+1}/{max_retries} — enviando a {chat_id}...")
+                    response = requests.post(url, json=payload, timeout=(5, 10))
+
+                    if response.status_code == 200:
+                        logging.info(f"[TELEGRAM] ✅ OK — Mensaje enviado en intento {attempt+1}")
+                        return  # ÉXITO, salir
+                    else:
+                        logging.warning(f"[TELEGRAM] Error {response.status_code}: {response.text}")
+
+                except requests.exceptions.Timeout:
+                    logging.warning(f"[TELEGRAM] Timeout en intento {attempt+1}")
+                except Exception as e:
+                    logging.warning(f"[TELEGRAM] Excepción en intento {attempt+1}: {e}")
+
+                # Reintentar con espera exponencial (1s, 2s, 4s)
+                if attempt < max_retries - 1:
+                    wait_time = 2 ** attempt
+                    logging.info(f"[TELEGRAM] Esperando {wait_time}s antes de reintentar...")
+                    time.sleep(wait_time)
+
+            # Si llegamos aquí, todos los intentos fallaron
+            logging.error(f"[TELEGRAM] ❌ Falló después de {max_retries} intentos. Mensaje NO enviado.")
+
+    def enviar_resumen_ciclo_telegram(self, reporte, duracion_min, error_critico=None):
+            """Envía reporte final minimalista al fin del ciclo."""
             try:
                 fin_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 if error_critico:
-                    # Formato de error
                     msg = f"❌ ETL Opticolor error — {fin_ts} — {error_critico}"
                 else:
-                    # Contar registros procesados
-                    total_registros = 0
-                    for item in reporte:
-                        if isinstance(item.get('resultado'), int):
-                            total_registros += item['resultado']
+                    modulos_ok = [i for i in reporte if i and i.get('status', '').startswith('✅')]
+                    modulos_err = [i for i in reporte if i and i.get('status', '').startswith('❌')]
+                    total_registros = sum(i['resultado'] for i in modulos_ok if isinstance(i.get('resultado'), int))
 
-                    # Formato de éxito con conteo
-                    msg = f"✅ ETL Opticolor completado — {fin_ts} — {total_registros} registros procesados\n\n"
-                    msg += f"📊 REPORTE DETALLADO:\n"
-
-                    # Iconos por módulo
-                    iconos = {
-                        'SUCURSALES': '🏢', 'EMPLEADOS': '👔', 'CATEGORIAS': '🏷️', 'METODOS_PAGO': '💳',
-                        'PROVEEDORES': '🚚', 'MARCAS_FULL': '🏷️', 'PRODUCTOS': '📦', 'CLIENTES': '👥',
-                        'CITAS': '📅', 'EXAMENES': '👁️',
-                        'PEDIDOS': '📝', 'ORDENES_CRISTALES': '眼镜', 'VENTAS': '🛒', 'COBROS': '💰', 'TESORERIA': '🏦',
-                        'PEDIDOS_LAB': '🧪', 'INVENTARIO': '📊',
-                        'RECEPCIONES_LAB': '📥'
-                    }
-
-                    for item in reporte:
-                        mod = item['modulo']
-                        ico = iconos.get(mod, '🔹')
-                        status = item['status']
-
-                        # Lógica de Anomalías API
-                        if mod in self.modulos_con_fallo_api:
-                            ico = '🟠'
-                            desc_error = self.modulos_con_fallo_api[mod]
-                            linea = f"{ico} {mod}: {desc_error}"
-                        else:
-                            # Formato compacto estándar
-                            linea = f"{ico} {mod}: {status}"
-
-                        msg += linea + "\n"
-
-                    msg += f"\n⏱️ *Tiempo Total Ciclo:* {duracion_min:.1f} min."
-
-                    # Verificar sucursales pendientes de clasificación (solo en ciclos exitosos)
-                    pendientes = self._verificar_sucursales_pendientes()
-                    if pendientes and pendientes.get('total', 0) > 0:
-                        self._notificar_sucursales_pendientes(pendientes.get('registros', []), pendientes.get('total', 0))
+                    if modulos_err:
+                        fallas = "\n".join(f"  ❌ {i['modulo']}: {i['resultado']}" for i in modulos_err)
+                        msg = f"⚠️ ETL Opticolor — {fin_ts} — {len(modulos_ok)}/{len(reporte)} módulos OK — {duracion_min:.1f} min\nFALLOS:\n{fallas}"
+                    else:
+                        msg = f"✅ ETL completado — {fin_ts} — {total_registros} registros totales — {duracion_min:.1f} min"
 
                 self.notificar_telegram(msg)
             except Exception as e:
                 logging.error(f"Error generando reporte Telegram: {e}")
 
-        def ejecutar_modulo(self, nombre_modulo, funcion_sync):
+    def ejecutar_modulo(self, nombre_modulo, funcion_sync):
             """Wrapper para ejecutar un módulo, registrar estado y manejar errores."""
-            logging.info(f"--- [INICIO] MÓDULO: {nombre_modulo} ---")
+            start_mod = time.time()
+            logging.info(f"[MÓDULO {nombre_modulo}] Iniciando...")
             self.registrar_inicio(nombre_modulo)
             self.current_module = nombre_modulo
-            
+
             try:
                 resultado = funcion_sync()
+                elapsed_mod = (time.time() - start_mod)
                 self.registrar_fin(nombre_modulo, 'COMPLETADO')
-                logging.info(f"--- [FIN] MÓDULO: {nombre_modulo} ---")
-                
+
                 # Enriquecer estatus con resultado si es posible (ej: recuento de registros)
                 status_final = '✅'
                 if isinstance(resultado, int):
                     status_final = f"✅ ({resultado} registros)"
                 elif isinstance(resultado, str) and 'Total:' in resultado:
                     status_final = f"✅ {resultado}"
-                
+
+                logging.info(f"[MÓDULO {nombre_modulo}] Completado en {elapsed_mod:.2f}s — {status_final}")
                 return {'modulo': nombre_modulo, 'status': status_final, 'resultado': resultado}
             except Exception as e:
-                logging.error(f"Error en {nombre_modulo}: {e}")
+                elapsed_mod = (time.time() - start_mod)
+                tb = traceback.extract_tb(e.__traceback__)
+                origen = f"{tb[-1].name}:{tb[-1].lineno}" if tb else "?"
+                logging.error(f"[MÓDULO {nombre_modulo}] Error después de {elapsed_mod:.2f}s en {origen}: {e}\n{traceback.format_exc()}")
                 self.registrar_fin(nombre_modulo, 'ERROR', e)
-                # Re-lanzar excepción para detener la cascada
-                raise Exception(f"Fallo en {nombre_modulo}: {str(e)}")
+                self.notificar_telegram(f"❌ ETL [{nombre_modulo}] FALLÓ en {elapsed_mod:.1f}s\n📍 {origen}\n{str(e)[:300]}")
+                return {'modulo': nombre_modulo, 'status': '❌', 'resultado': f"ERROR: {str(e)[:200]}"}
             finally:
                 self.current_module = None
 
-        def registrar_inicio(self, modulo):
+    def registrar_inicio(self, modulo):
             """Marca el inicio de ejecución en la tabla de control."""
             try:
                 with pyodbc.connect(self.conn_str) as conn:
@@ -691,7 +1345,7 @@ class GesvisionEtl:
             except Exception as e:
                 logging.error(f"Error registrando inicio de {modulo}: {e}")
 
-        def registrar_fin(self, modulo, estatus, error=None):
+    def registrar_fin(self, modulo, estatus, error=None):
             """Marca el fin de ejecución."""
             try:
                 with pyodbc.connect(self.conn_str) as conn:
@@ -705,7 +1359,7 @@ class GesvisionEtl:
             except Exception as e:
                 logging.error(f"Error registrando fin de {modulo}: {e}")
 
-        def _verificar_sucursales_pendientes(self):
+    def _verificar_sucursales_pendientes(self):
             """Consulta sucursales sin clasificar y retorna count + top 5."""
             try:
                 with pyodbc.connect(self.conn_str) as conn:
@@ -739,7 +1393,7 @@ class GesvisionEtl:
                 logging.warning(f"⚠️ Error verificando sucursales pendientes: {e}")
                 return None
 
-        def _notificar_sucursales_pendientes(self, registros, total):
+    def _notificar_sucursales_pendientes(self, registros, total):
             """Envía notificación Telegram sobre sucursales pendientes de clasificación."""
             try:
                 # Seleccionar emoji según criticidad del total
@@ -775,7 +1429,7 @@ class GesvisionEtl:
                 logging.warning(f"⚠️ Error notificando sucursales pendientes: {e}")
 
 
-        def predecesor_listo(self, modulo_padre):
+    def predecesor_listo(self, modulo_padre):
             """Verifica si el módulo padre completó exitosamente."""
             if not modulo_padre: return True
             try:
@@ -790,7 +1444,7 @@ class GesvisionEtl:
                 logging.error(f"Error verificando predecesor {modulo_padre}: {e}")
                 return False
 
-        def get_last_date(self, conn, table_name, date_column):
+    def get_last_date(self, conn, table_name, date_column):
             """Consulta fecha máxima. Lanza error si falla para proteger la integridad."""
             try:
                 with conn.cursor() as cursor:
@@ -818,7 +1472,7 @@ class GesvisionEtl:
                 logging.error(f"Fallo de acceso a tabla {table_name} para fecha: {e}")
                 raise
 
-        def get_last_id(self, conn, table_name, id_column):
+    def get_last_id(self, conn, table_name, id_column):
             """Obtiene el ID máximo actual en SQL para carga incremental."""
             try:
                 with conn.cursor() as cursor:
@@ -829,7 +1483,7 @@ class GesvisionEtl:
                 logging.warning(f"No se pudo determinar último ID en {table_name}: {e}")
                 return 0
 
-        def _sanitize_sucursal(self, item):
+    def _sanitize_sucursal(self, item):
             """Limpia datos de sucursales: mayúsculas, sin caracteres especiales, espacios extras."""
             import unicodedata
             import re
@@ -851,7 +1505,7 @@ class GesvisionEtl:
             item['street'] = clean_text(item.get('street'))
             return item
 
-        def _sanitize_empleado(self, item):
+    def _sanitize_empleado(self, item):
             """Limpia datos de empleados: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -871,7 +1525,7 @@ class GesvisionEtl:
             item['type'] = clean_text(item.get('type'))
             return item
 
-        def _sanitize_categoria(self, item):
+    def _sanitize_categoria(self, item):
             """Limpia datos de categorías: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -889,7 +1543,7 @@ class GesvisionEtl:
             item['name'] = clean_text(item.get('name'))
             return item
 
-        def _sanitize_metodo_pago(self, item):
+    def _sanitize_metodo_pago(self, item):
             """Limpia datos de métodos de pago: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -909,7 +1563,7 @@ class GesvisionEtl:
             item['code'] = clean_text(item.get('code'))
             return item
 
-        def _sanitize_proveedor(self, item):
+    def _sanitize_proveedor(self, item):
             """Limpia datos de proveedores: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -928,7 +1582,7 @@ class GesvisionEtl:
             item['code'] = clean_text(item.get('code'))
             return item
 
-        def _sanitize_marca(self, item):
+    def _sanitize_marca(self, item):
             """Limpia datos de marcas: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -947,7 +1601,7 @@ class GesvisionEtl:
             item['code'] = clean_text(item.get('code'))
             return item
 
-        def _sanitize_producto(self, item):
+    def _sanitize_producto(self, item):
             """Limpia datos de productos: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -972,7 +1626,7 @@ class GesvisionEtl:
             item['tipo_montura'] = clean_text(item.get('tipo_montura'))
             return item
 
-        def _sanitize_cliente(self, item):
+    def _sanitize_cliente(self, item):
             """Limpia datos de clientes: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -992,7 +1646,7 @@ class GesvisionEtl:
             item['ciudad'] = clean_text(item.get('ciudad'))
             return item
 
-        def _sanitize_cita(self, item):
+    def _sanitize_cita(self, item):
             """Limpia datos de citas: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -1012,7 +1666,7 @@ class GesvisionEtl:
             item['nombre_cliente'] = clean_text(item.get('nombre_cliente'))
             return item
 
-        def _sanitize_examen(self, item):
+    def _sanitize_examen(self, item):
             """Limpia datos de exámenes: mayúsculas, sin caracteres especiales."""
             import unicodedata
             import re
@@ -1031,7 +1685,7 @@ class GesvisionEtl:
             item['observations'] = clean_text(item.get('observations'))
             return item
 
-        def sync_dimensions(self):
+    def sync_dimensions(self):
             """Sincroniza almacenes/sucursales."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1046,7 +1700,7 @@ class GesvisionEtl:
                 return len(items)
             return 0
 
-        def sync_categories(self):
+    def sync_categories(self):
             """Sincroniza categorías de productos (Full Upsert)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1077,7 +1731,7 @@ class GesvisionEtl:
                     time.sleep(wait_time)
             return 0
 
-        def sync_payment_methods(self):
+    def sync_payment_methods(self):
             """Sincroniza métodos de pago (Full Upsert)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1107,7 +1761,7 @@ class GesvisionEtl:
                     time.sleep(wait_time)
             return 0
 
-        def sync_suppliers(self):
+    def sync_suppliers(self):
             """Sincroniza proveedores (Full Paginado)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1163,7 +1817,7 @@ class GesvisionEtl:
             
             return total_processed
 
-        def sync_customers(self):
+    def sync_customers(self):
             """Sincroniza clientes con estrategia Híbrida (Smart Sync)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1172,12 +1826,12 @@ class GesvisionEtl:
             MAX_EXECUTION_TIME = 24 * 60
             total_processed = 0
 
-            # Lógica Smart Sync: Si no forzamos histórico, traemos solo los últimos 3 días
+            # Lógica Smart Sync: Si no forzamos histórico, traemos solo los últimos 1 día
             # Si LOAD_MODE_CUSTOMERS == 'HISTORICAL': Usa skip = COUNT(*) y sin filtro de fecha (carga total profunda).
-            # Si LOAD_MODE_CUSTOMERS == 'INCREMENTAL': Usa skip = 0 y fechaInicial = Hace 3 días.
+            # Si LOAD_MODE_CUSTOMERS == 'INCREMENTAL': Usa skip = 0 y fechaInicial = Hace 1 día.
             params_base = {}
             if self.LOAD_MODE_CUSTOMERS == 'INCREMENTAL':
-                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
+                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=1)
                 params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                 logging.info(f"   [Smart Sync] Clientes: Buscando cambios desde {params_base['fechaInicial']}")
             elif self.LOAD_MODE_CUSTOMERS == 'HISTORICAL':
@@ -1254,7 +1908,7 @@ class GesvisionEtl:
                     time.sleep(0.05)
                 return total_processed
 
-        def sync_employees(self):
+    def sync_employees(self):
             """Sincroniza empleados con privacidad y paginación."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1309,7 +1963,7 @@ class GesvisionEtl:
                         break
                 return total_processed
 
-        def sync_brands_full(self):
+    def sync_brands_full(self):
             """
             Descarga forzada y completa de todas las marcas (Full Load).
             Estrategia: Recorrer todo el endpoint paginado para asegurar integridad referencial.
@@ -1363,7 +2017,7 @@ class GesvisionEtl:
             logging.info(f"--- [FIN] Total Marcas Sincronizadas: {total_procesado} ---")
             return total_procesado
 
-        def sync_brands(self, brand_ids_list, conn, known_brands_cache):
+    def sync_brands(self, brand_ids_list, conn, known_brands_cache):
             """Sincroniza marcas usando Cache en Memoria para evitar Timeouts."""
             if not brand_ids_list: return
 
@@ -1410,7 +2064,7 @@ class GesvisionEtl:
                 self._process_and_save(conn, new_brands, "Maestro_Marcas", "id_marca", self.MAP_MARCA)
                 conn.commit()
 
-        def sync_products(self):
+    def sync_products(self):
             """Sincroniza productos con Checkpoint para soportar grandes volúmenes sin reiniciar."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1434,11 +2088,12 @@ class GesvisionEtl:
                     skip = self._get_checkpoint(conn, CHECKPOINT_KEY)
                     logging.info(f"   [Historical] Retomando carga masiva desde SKIP: {skip}")
                 else:
-                    last_date = self.get_last_date(conn, "Maestro_Productos", "fecha_ultima_actualizacion")
+                    exact_date = self.get_last_date(conn, "Maestro_Productos", "fecha_ultima_actualizacion")
+                    last_date = exact_date - datetime.timedelta(days=3)
                     skip = 0
                     # Limpiar checkpoint cuando se cambia a INCREMENTAL
                     self._update_checkpoint(conn, CHECKPOINT_KEY, 0)
-                    logging.info(f"   [Incremental] Buscando cambios desde: {last_date}")
+                    logging.info(f"   [Incremental] Productos: Búsqueda con buffer 3 días - desde {last_date}")
 
                 limit = 50
                 buffer = []
@@ -1550,7 +2205,7 @@ class GesvisionEtl:
                 logging.info(f"   [Fin] PRODUCTOS procesados: {total_processed} registros")
                 return total_processed
 
-        def sync_exams(self):
+    def sync_exams(self):
             """Sincroniza exámenes con un Barrido Diario Exhaustivo hacia atrás para manejar días de alta densidad."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1681,7 +2336,7 @@ class GesvisionEtl:
 
                 return total_processed
 
-        def _sync_exams_by_customer(self, conn, customer_id, headers):
+    def _sync_exams_by_customer(self, conn, customer_id, headers):
             """Descarga historial completo de exámenes para un cliente específico."""
             # Blindaje de tipo de dato para ID de cliente
             cid_clean = str(int(float(customer_id)))
@@ -1700,7 +2355,7 @@ class GesvisionEtl:
                 raise Exception(f"API Error {resp.status_code}")
             return 0
 
-        def _get_checkpoint(self, conn, key):
+    def _get_checkpoint(self, conn, key):
             """Lee valor de tabla de control Etl_Checkpoints."""
             try:
                 cursor = conn.cursor()
@@ -1717,7 +2372,7 @@ class GesvisionEtl:
                 return 0
             except: return 0
 
-        def _update_checkpoint(self, conn, key, value):
+    def _update_checkpoint(self, conn, key, value):
             """Actualiza valor en tabla de control."""
             try:
                 cursor = conn.cursor()
@@ -1735,7 +2390,7 @@ class GesvisionEtl:
 
 
 
-        def sync_orders(self):
+    def sync_orders(self):
             """Sincroniza pedidos de venta con estrategia Híbrida (Smart Sync) y Checkpoint Explícito."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1747,7 +2402,7 @@ class GesvisionEtl:
 
             params_base = {}
             if self.LOAD_MODE_ORDERS == 'INCREMENTAL':
-                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
+                fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=1)
                 params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                 logging.info(f"   [Smart Sync] Pedidos: Buscando cambios desde {params_base['fechaInicial']}")
             elif self.LOAD_MODE_ORDERS == 'HISTORICAL':
@@ -1872,7 +2527,7 @@ class GesvisionEtl:
                     break
             return total_processed
 
-        def sync_appointments(self):
+    def sync_appointments(self):
             """Sincroniza citas con estrategia de Autocuración Inversa (Optimista)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -1993,7 +2648,7 @@ class GesvisionEtl:
                     logging.info(f"✅ Citas: {total_processed} registros nuevos procesados. Total en BD: {skip}")
                 return total_processed
 
-        def sync_invoices_incremental(self):
+    def sync_invoices_incremental(self):
             """Sincronización de facturas agnóstica al orden de la API."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2027,11 +2682,11 @@ class GesvisionEtl:
                 # fechaInicial = '2024-01-01 00:00:00'.
                 # skip = (COUNT(*) // 50) * 50. (Auto-Resume para API descendente).
                 # Si LOAD_MODE_INVOICES == 'INCREMENTAL':
-                # fechaInicial = Hace 3 días.
+                # fechaInicial = Hace 1 día.
                 # skip = 0.
                 params_base = {}
                 if self.LOAD_MODE_INVOICES == 'INCREMENTAL':
-                    fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=3)
+                    fecha_inicio = datetime.datetime.now() - datetime.timedelta(days=1)
                     params_base["fechaInicial"] = fecha_inicio.strftime("%Y-%m-%d %H:%M:%S")
                     logging.info(f"   [Smart Sync] Ventas: Buscando cambios desde {params_base['fechaInicial']}")
                 elif self.LOAD_MODE_INVOICES == 'HISTORICAL':
@@ -2134,126 +2789,95 @@ class GesvisionEtl:
                         break
                 return total_processed
 
-        def sync_inventory(self):
-            """Sincroniza niveles de inventario con estrategia Híbrida. Ejecutada en función separada EtlInventarioRepetitivo."""
+    def sync_inventory(self):
+            """Sincroniza inventario con paginación global (estrategia Panamá) — sin iteración por warehouse."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
 
             start_time = time.time()
             MAX_EXECUTION_TIME = 24 * 60  # 24 min (margen Azure 30min - 6min buffer)
             total_processed = 0
+            skip = 0
+            limit = 50
+            empty_pages = 0
+            params_base = {}
 
             with pyodbc.connect(self.conn_str) as conn:
-                # Estrategia de Fechas
-                params_base = {}
-                skip = 0
-
-                if self.LOAD_MODE_INVENTORY == 'HISTORICAL':
+                # === Estrategia híbrida: INCREMENTAL (con fechaInicial) vs HISTORICAL (carga completa) ===
+                if self.LOAD_MODE_INVENTORY == 'INCREMENTAL':
                     try:
-                        with conn.cursor() as cursor:
-                            cursor.execute("SELECT COUNT(*) FROM Operaciones_Inventario")
-                            row = cursor.fetchone()
-                            total_rows = row[0] if row else 0
-                            skip = (total_rows // 50) * 50
-                            logging.info(f"   [Historical Load] Inventario: Retomando carga histórica desde skip {skip} (Total en BD: {total_rows}).")
-                    except Exception as e:
-                        logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
+                        start_date = self.get_last_date(conn, "Operaciones_Inventario", "fecha_actualizacion")
+                        params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
+                        logging.info(f"   [INVENTARIO] Buscando cambios desde {start_date.strftime('%Y-%m-%d %H:%M:%S')}")
+                    except:
+                        logging.info("   [INVENTARIO] Tabla vacía o error, iniciando carga completa.")
                 else:
-                    start_date = self.get_last_date(conn, "Operaciones_Inventario", "fecha_actualizacion")
-                    params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
-                    logging.info(f"   [Smart Sync] Inventario: Buscando cambios desde {start_date}")
+                    logging.info("   [INVENTARIO] Descarga completa forzada (HISTORICAL mode)")
 
-                limit = 50
-                empty_pages = 0
-
+                # === Paginación global con skip (sin warehouse-by-warehouse) ===
                 while True:
                     if (time.time() - start_time) > MAX_EXECUTION_TIME:
-                        logging.warning("   [TIMEOUT PREVENTIVO] Se alcanzó el límite de 24 minutos en Inventario.")
-                        return total_processed
+                        logging.warning(f"   [TIMEOUT] Límite alcanzado. Total procesado hasta ahora: {total_processed:,} items")
+                        break
 
                     params = params_base.copy()
                     params["skip"] = skip
 
-                    success_batch = False
                     items = []
+                    success_batch = False
+
                     for retry in range(3):
                         try:
                             resp = self.session.get(f"{self.base_url}/inventory", headers=headers, params=params, timeout=(15, 90))
-                            logging.info(f"   -> [REQ] skip: {skip} | URL: {resp.url}")
+                            logging.info(f"   -> [INVENTARIO] skip: {skip} | status: {resp.status_code}")
 
                             if resp.status_code == 204:
-                                # Salida inmediata
-                                logging.info(f"   -> [RES] Status: 204 | Count: 0")
-                                return total_processed
+                                success_batch = True
+                                break
 
                             items = self._safe_parse_json(resp, "inventory")
-                            logging.info(f"   -> [RES] Status: {resp.status_code} | Count: {len(items)}")
-
-                            # Lógica de detección de huecos
-                            if not items:
-                                empty_pages += 1
-                                if empty_pages <= 10:
-                                    logging.warning(f"⚠️ Hueco detectado ({empty_pages}/10). Saltando...")
-                                    skip += limit
-                                    time.sleep(0.05)
-                                    success_batch = True
-                                    break # Salir del retry, continuar loop outer con siguiente skip
-                                else:
-                                    return total_processed
-
+                            logging.info(f"   -> [INVENTARIO] skip: {skip} | status: {resp.status_code} | items: {len(items)}")
                             success_batch = True
                             break
                         except Exception as e:
-                            logging.warning(f"   [!] Reintento {retry+1} en inventario (Skip {skip}): {e}")
-                            time.sleep(5)
+                            wait = (retry + 1) * 5
+                            logging.warning(f"   [!] Reintento {retry+1} INVENTARIO skip {skip}: {e}")
+                            time.sleep(wait)
 
                     if not success_batch:
-                        logging.error(f"Fallo definitivo en inventario lote {skip}.")
+                        logging.error(f"Fallo definitivo INVENTARIO lote skip {skip}.")
                         break
-                    
+
+                    # Procesar items si existen
                     if items:
-                        empty_pages = 0
                         self._process_and_save(conn, items, "Operaciones_Inventario", ["id_producto", "id_sucursal"], self.MAP_INVENTARIO)
                         total_processed += len(items)
+                        empty_pages = 0  # Reset contador de páginas vacías
 
-                    if not items or len(items) < limit:
+                    # Manejo de páginas vacías: tolera hasta 10 huecos antes de asumir fin
+                    if not items:
+                        empty_pages += 1
+                        if empty_pages <= 10:
+                            logging.info(f"   -> [INVENTARIO] Página vacía {empty_pages}/10. Continuando...")
+                            skip += limit
+                            time.sleep(0.05)
+                            continue
+                        else:
+                            logging.info(f"   -> [INVENTARIO] Fin de datos detectado (10 páginas vacías consecutivas). Total procesado: {total_processed:,} items")
+                            break
+
+                    # Fin normal: menos items que el limit
+                    if len(items) < limit:
+                        logging.info(f"   -> [INVENTARIO] Lote final procesado (menos de {limit} items). Total procesado: {total_processed:,} items")
                         break
 
                     skip += limit
                     time.sleep(0.05)
 
-                # Guardar checkpoint después de procesar (DENTRO del contexto de conn)
-                try:
-                    cursor = conn.cursor()
-                    # Intenta UPDATE primero
-                    cursor.execute(
-                        "UPDATE Etl_Checkpoints SET LastValue = ? WHERE KeyName = ?",
-                        str(skip), 'checkpoint_inventory_skip'
-                    )
-                    rows_updated = cursor.rowcount
-                    logging.info(f"   [CHECKPOINT] UPDATE intentado: {rows_updated} filas afectadas")
+            logging.info(f"   ✅ [INVENTARIO] CARGA COMPLETADA - Total procesado: {total_processed:,} items")
+            return total_processed
 
-                    # Si no actualizó nada, inserta
-                    if rows_updated == 0:
-                        logging.info(f"   [CHECKPOINT] Insertando nuevo checkpoint...")
-                        cursor.execute(
-                            "INSERT INTO Etl_Checkpoints (KeyName, LastValue) VALUES (?, ?)",
-                            'checkpoint_inventory_skip', str(skip)
-                        )
-
-                    conn.commit()
-                    cursor.close()
-                    logging.info(f"   [CHECKPOINT] ✅ Guardado exitoso: checkpoint_inventory_skip = {skip}")
-                except Exception as e:
-                    logging.error(f"   [CHECKPOINT] ❌ ERROR al guardar: {type(e).__name__}: {e}")
-                    try:
-                        conn.rollback()
-                    except:
-                        pass
-
-                return total_processed
-
-        def sync_collections(self):
+    def sync_collections(self):
             """Sincroniza cobros con estrategia Dual (Historical/Incremental)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2382,7 +3006,7 @@ class GesvisionEtl:
 
             return total_processed, total_amount
 
-        def sync_treasury(self):
+    def sync_treasury(self):
             """Sincroniza movimientos de tesorería (Pagos/Caja) con estrategia Dual."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2470,7 +3094,7 @@ class GesvisionEtl:
 
                 return total_processed, total_amount
 
-        def sync_laboratory_orders(self):
+    def sync_laboratory_orders(self):
             """Sincroniza pedidos de laboratorio (receivedOrders)."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2594,7 +3218,7 @@ class GesvisionEtl:
 
                 return total_processed
 
-        def sync_glasses_orders(self):
+    def sync_glasses_orders(self):
             """Sincroniza órdenes de cristales (Fases: Historical vs Incremental)."""
             # Validación de Predecesor
             if not self.predecesor_listo('PEDIDOS'):
@@ -2631,10 +3255,10 @@ class GesvisionEtl:
                     except Exception as e:
                         logging.warning(f"   [Auto-Resume] No se pudo calcular skip inicial: {e}")
                 else:
-                    # Modo Incremental: Ventana de seguridad de 3 días
+                    # Modo Incremental: Ventana de seguridad de 1 día
                     try:
                         last_date = self.get_last_date(conn, "Operaciones_Ordenes_Cristales", "fecha_creacion")
-                        start_date = last_date - datetime.timedelta(days=3)
+                        start_date = last_date - datetime.timedelta(days=1)
                         params_base["fechaInicial"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
                         logging.info(f"   [Incremental] Órdenes Cristales: Buscando desde {params_base['fechaInicial']}")
                     except:
@@ -2750,7 +3374,7 @@ class GesvisionEtl:
 
             return total_processed
 
-        def sync_received_delivery_notes(self):
+    def sync_received_delivery_notes(self):
             """Sincroniza recepciones de laboratorio (Albaranes) con aplanamiento de líneas."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2812,8 +3436,20 @@ class GesvisionEtl:
 
                             if resp.status_code == 204:
                                 return total_processed
-                            
+
+                            # Guard: errores HTTP deben lanzar excepción para activar reintento con backoff
+                            if resp.status_code >= 400:
+                                raise Exception(f"HTTP {resp.status_code} de Gesvision: {resp.text[:250]}")
+
                             items = self._safe_parse_json(resp, "receivedDeliveryNotes")
+
+                            # Guard: la respuesta debe ser lista; dict (error) o string provocan crash aguas abajo
+                            if not isinstance(items, list):
+                                raise Exception(
+                                    f"Respuesta inesperada de receivedDeliveryNotes "
+                                    f"(HTTP {resp.status_code}, tipo {type(items).__name__}): {str(items)[:250]}"
+                                )
+
                             logging.info(f"   -> [RES] Status: {resp.status_code} | Count: {len(items)}")
                             success_batch = True
                             break
@@ -2823,8 +3459,7 @@ class GesvisionEtl:
                             time.sleep(wait)
 
                     if not success_batch:
-                        logging.error(f"Fallo definitivo en Recepciones Lab lote {skip}.")
-                        break
+                        raise Exception(f"Fallo definitivo en Recepciones Lab lote {skip} tras 3 reintentos.")
 
                     if items:
                         # 3. Transformación Compleja (Flattening)
@@ -2897,7 +3532,7 @@ class GesvisionEtl:
 
 
 
-        def fetch_chronological(self, conn, endpoint, table_name, pk_cols, start_date, end_date, window_minutes, rename_map):
+    def fetch_chronological(self, conn, endpoint, table_name, pk_cols, start_date, end_date, window_minutes, rename_map):
             """Barrido de ventanas temporales para exámenes clínicos."""
             if not self.token: self.get_token()
             headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
@@ -2933,7 +3568,7 @@ class GesvisionEtl:
 
                 current_start = current_end
 
-        def _process_and_save(self, conn, data_list, table_name, pk_cols, rename_map):
+    def _process_and_save(self, conn, data_list, table_name, pk_cols, rename_map):
             """Transformación: Extracción de objetos y blindaje Booleano para el producto 8204."""
             raw_list = data_list.copy() if table_name == "Ventas_Cabecera" else None
 
@@ -3344,7 +3979,7 @@ class GesvisionEtl:
             if table_name == "Ventas_Cabecera" and raw_list:
                 self._extract_sales_details(conn, raw_list)
 
-        def _extract_sales_details(self, conn, invoices_list):
+    def _extract_sales_details(self, conn, invoices_list):
             """Maneja el detalle de facturas con protección contra objetos anidados."""
             details = []
             for inv in invoices_list:
@@ -3442,7 +4077,7 @@ class GesvisionEtl:
                 df_det['fecha_carga_etl'] = datetime.datetime.now()
                 self.upsert_sql(conn, df_det, "Ventas_Detalle", ["id_factura", "id_linea"])
 
-        def upsert_sql(self, conn, df, table_name, pk_cols):
+    def upsert_sql(self, conn, df, table_name, pk_cols):
             """CARGA FINAL: Versión simplificada y robusta para SQL Azure."""
             pks = [pk_cols] if isinstance(pk_cols, str) else pk_cols
             cursor = conn.cursor()
@@ -3509,5 +4144,611 @@ class GesvisionEtl:
                 cursor.execute(merge_sql)
                 cursor.execute(f"DROP TABLE {stg}")
                 conn.commit()
+            except Exception as e:
+                logging.error(f"Error en upsert_sql para {table_name}: {e}")
+                conn.rollback()
+                raise
             finally:
                 cursor.close()
+
+    # ====================================================================================================
+    # FASE 2 — DOLARIZACIÓN VÍA API v2 (Módulo de ENRIQUECIMIENTO — solo UPDATE, jamás INSERT)
+    # ====================================================================================================
+
+    def _get_v2(self, recurso, params=None, retries=3):
+            """GET a la API v2 de Gesvision con parseo de envelope {data, totalCount, skip, limit, hasMore}.
+            Devuelve (items:list, total_count:int, has_more:bool). Reintentos con backoff 5/10/15s."""
+            url = f"{self.BASE_URL_V2}/{recurso}"
+            params = params or {}
+
+            for retry in range(retries):
+                try:
+                    # Headers DENTRO del bucle: si hubo renovación de token en un retry anterior, se usa el nuevo.
+                    headers = {"Authorization": f"Bearer {self.token}", "accept": "application/json"}
+                    resp = self.session.get(url, headers=headers, params=params, timeout=(15, 90))
+
+                    if resp.status_code == 204:
+                        return [], 0, False
+
+                    if resp.status_code == 401:
+                        logging.warning(f"   [V2 {recurso}] 401: token expirado. Renovando...")
+                        self.get_token()
+                        raise Exception("Token renovado — reintento")
+
+                    if resp.status_code >= 400:
+                        raise Exception(f"HTTP {resp.status_code} de Gesvision v2 [{recurso}]: {resp.text[:250]}")
+
+                    body = self._safe_parse_json(resp, recurso)
+
+                    if not isinstance(body, dict) or 'data' not in body:
+                        raise Exception(
+                            f"Envelope inesperado de v2 [{recurso}] "
+                            f"(HTTP {resp.status_code}, tipo {type(body).__name__}): {str(body)[:250]}"
+                        )
+
+                    items = body.get('data')
+                    if not isinstance(items, list):
+                        raise Exception(
+                            f"Campo 'data' inesperado de v2 [{recurso}] "
+                            f"(tipo {type(items).__name__}): {str(items)[:250]}"
+                        )
+
+                    total_count = body.get('totalCount', 0)
+                    has_more = bool(body.get('hasMore', False))
+                    skip_actual = params.get('skip', 0)
+
+                    logging.info(
+                        f"   -> [V2 {recurso}] skip:{skip_actual} status:{resp.status_code} "
+                        f"count:{len(items)} total:{total_count} hasMore:{has_more}"
+                    )
+                    return items, total_count, has_more
+                except Exception as e:
+                    if retry < retries - 1:
+                        wait = (retry + 1) * 5
+                        logging.warning(f"   [!] Reintento {retry+1} en API v2 [{recurso}]: {e}")
+                        time.sleep(wait)
+                    else:
+                        raise
+
+    def _enrich_sql(self, conn, df, table_name, pk_cols):
+            """ENRIQUECIMIENTO: UPDATE-only vía staging + MERGE SIN rama INSERT.
+
+            CRÍTICO: el MERGE contiene ÚNICAMENTE 'WHEN MATCHED THEN UPDATE SET ...'.
+            PROHIBIDO agregar 'WHEN NOT MATCHED THEN INSERT'. Si una fila de v2 no existe
+            en el DW, simplemente no se actualiza (comportamiento deseado).
+
+            Devuelve (filas_actualizadas, filas_no_encontradas)."""
+            pks = [pk_cols] if isinstance(pk_cols, str) else pk_cols
+            cursor = conn.cursor()
+            cursor.fast_executemany = False
+
+            try:
+                if df.empty:
+                    return 0, 0
+
+                if table_name not in self.schema_cache:
+                    cursor.execute(f"SELECT TOP 0 * FROM {table_name}")
+                    self.schema_cache[table_name] = {c[0]: c[1] for c in cursor.description}
+
+                sql_types = self.schema_cache[table_name]
+                cols_to_use = [c for c in df.columns if c in sql_types]
+
+                update_cols = [c for c in cols_to_use if c not in pks]
+                if not update_cols:
+                    return 0, len(df)
+
+                stg = f"#Enr_{table_name}"
+                cursor.execute(f"IF OBJECT_ID('tempdb..{stg}') IS NOT NULL DROP TABLE {stg}")
+                cursor.execute(f"SELECT TOP 0 * INTO {stg} FROM {table_name}")
+
+                params = []
+                for row_tuple in df[cols_to_use].itertuples(index=False):
+                    clean_row = []
+                    for col, val in zip(cols_to_use, row_tuple):
+                        try:
+                            # Conversión estricta a tipos nativos (Protocolo TDS) — idéntica a upsert_sql
+                            if val is None or pd.isna(val):
+                                clean_row.append(None)
+                            elif isinstance(val, bool):
+                                clean_row.append(1 if val else 0)
+                            elif isinstance(val, pd.Timestamp):
+                                clean_row.append(val.to_pydatetime())
+                            elif isinstance(val, (datetime.datetime, datetime.date)):
+                                clean_row.append(val)
+                            elif isinstance(val, np.datetime64):
+                                clean_row.append(pd.Timestamp(val).to_pydatetime())
+                            elif isinstance(val, (int, np.int64)):
+                                clean_row.append(int(val))
+                            elif isinstance(val, (float, np.float64)):
+                                clean_row.append(float(val))
+                            else:
+                                clean_row.append(str(val))
+                        except:
+                            clean_row.append(None)
+                    params.append(tuple(clean_row))
+
+                insert_sql = f"INSERT INTO {stg} ({','.join(cols_to_use)}) VALUES ({','.join(['?']*len(cols_to_use))})"
+                cursor.executemany(insert_sql, params)
+
+                # SOLO WHEN MATCHED — está prohibido agregar WHEN NOT MATCHED THEN INSERT (ver docstring).
+                merge_sql = (
+                    f"MERGE {table_name} AS T USING {stg} AS S "
+                    f"ON ({' AND '.join([f'T.{k}=S.{k}' for k in pks])}) "
+                    f"WHEN MATCHED THEN UPDATE SET {', '.join([f'T.{c}=S.{c}' for c in update_cols])};"
+                )
+                cursor.execute(merge_sql)
+
+                row = cursor.execute("SELECT @@ROWCOUNT AS n").fetchone()
+                filas_actualizadas = int(row[0]) if row and row[0] is not None else 0
+                filas_no_encontradas = len(df) - filas_actualizadas
+
+                cursor.execute(f"DROP TABLE {stg}")
+                conn.commit()
+                return filas_actualizadas, filas_no_encontradas
+            except Exception as e:
+                logging.error(f"Error en _enrich_sql para {table_name}: {e}")
+                conn.rollback()
+                raise
+            finally:
+                cursor.close()
+
+    def sync_dolar_ventas(self):
+            """Enriquece Ventas_Cabecera y Ventas_Detalle con montos USD desde API v2.
+            MODO ENRIQUECIMIENTO: solo UPDATE. No inserta filas. No toca columnas VES."""
+            if self.API_VERSION_VENTAS == 'V1':
+                logging.info("   [DOLAR_VENTAS] Desactivado (API_VERSION_VENTAS='V1'). Sin acción.")
+                return 0
+
+            if not self.token: self.get_token()
+
+            start_time = time.time()
+            MAX_EXECUTION_TIME = 24 * 60
+            total_actualizado = 0
+            total_no_encontrado = 0
+            paginas = 0
+            CHECKPOINT_KEY = 'checkpoint_dolar_ventas_skip'
+            LIMIT = 200
+
+            with pyodbc.connect(self.conn_str) as conn:
+                mode = getattr(self, 'LOAD_MODE_DOLAR_VENTAS', 'INCREMENTAL')
+
+                if mode == 'HISTORICAL':
+                    params_base = {"sort": "id:asc"}
+                    skip = self._get_checkpoint(conn, CHECKPOINT_KEY)
+                    skip = skip if isinstance(skip, int) else 0
+                    logging.info(f"   [Historical] Dolar Ventas: Retomando desde skip {skip} (checkpoint).")
+                else:
+                    fecha_inicio = datetime.datetime.utcnow() - datetime.timedelta(days=3)
+                    params_base = {"modifiedAfter": fecha_inicio.strftime("%Y-%m-%dT%H:%M:%S") + "-04:00"}
+                    skip = 0
+                    logging.info(f"   [Incremental] Dolar Ventas: Buscando modificados desde {params_base['modifiedAfter']}")
+
+                while True:
+                    # El checkpoint de la página anterior ya quedó guardado al final de la iteración previa
+                    # (ver bloque "skip += LIMIT / _update_checkpoint" más abajo) antes de llegar aquí.
+                    if (time.time() - start_time) > MAX_EXECUTION_TIME:
+                        if mode == 'HISTORICAL':
+                            self._update_checkpoint(conn, CHECKPOINT_KEY, skip)
+                        logging.warning(f"   [TIMEOUT] Ronda finalizada por límite de 24 min. Checkpoint guardado: skip={skip}. RELANZAR para continuar.")
+                        logging.info(
+                            f"   [DOLAR_VENTAS] Resumen parcial: {total_actualizado} actualizadas, "
+                            f"{total_no_encontrado} no encontradas, {paginas} páginas."
+                        )
+                        return total_actualizado
+
+                    params = params_base.copy()
+                    params["skip"] = skip
+                    params["limit"] = LIMIT
+
+                    items, total_count, has_more = self._get_v2("sales-invoices", params)
+                    paginas += 1
+
+                    filas = []
+                    for item in items:
+                        if item.get('id') is None:
+                            logging.warning(f"   [!] Item de sales-invoices sin 'id'. Omitido: {str(item)[:150]}")
+                            continue
+
+                        exchange_rate = item.get('exchangeRate')
+                        total_paid = item.get('totalPaid')
+                        outstanding = item.get('outstandingAmount')
+
+                        monto_pagado_usd = None
+                        if exchange_rate not in (None, 0) and total_paid is not None:
+                            try:
+                                if float(exchange_rate) > 0:
+                                    monto_pagado_usd = round(float(total_paid) / float(exchange_rate), 2)
+                            except (TypeError, ValueError):
+                                monto_pagado_usd = None
+
+                        saldo_pendiente_usd = None
+                        if exchange_rate not in (None, 0) and outstanding is not None:
+                            try:
+                                if float(exchange_rate) > 0:
+                                    saldo_pendiente_usd = round(float(outstanding) / float(exchange_rate), 2)
+                            except (TypeError, ValueError):
+                                saldo_pendiente_usd = None
+
+                        fecha_factura_v2 = None
+                        doc_date = item.get('documentDate')
+                        if doc_date:
+                            try:
+                                dt_parsed = datetime.datetime.fromisoformat(doc_date)
+                                tz_gmt4 = datetime.timezone(datetime.timedelta(hours=-4))
+                                fecha_factura_v2 = dt_parsed.astimezone(tz_gmt4).replace(tzinfo=None)
+                            except ValueError:
+                                logging.warning(f"   [!] documentDate inválido para id {item.get('id')}: {doc_date}")
+
+                        codigo_doc = item.get('code')
+                        if codigo_doc:
+                            base, sep, num = codigo_doc.rpartition('-')
+                            if sep and num.isdigit():
+                                codigo_doc = f"{base}/{num}"
+
+                        filas.append({
+                            'id_factura': item['id'],
+                            'moneda_documento': item.get('currencyCode'),
+                            'tasa_cambio': exchange_rate,
+                            'monto_total_usd': item.get('totalSystem'),
+                            'monto_neto_usd': item.get('netAmountSystem'),
+                            'iva_usd': item.get('vatAmountSystem'),
+                            'monto_pagado_usd': monto_pagado_usd,
+                            'saldo_pendiente_usd': saldo_pendiente_usd,
+                            'estado_pago_api': item.get('paymentStatus'),
+                            'fecha_factura_v2': fecha_factura_v2,
+                            'fecha_sync_v2': datetime.datetime.utcnow(),
+                            'codigo_documento_api': codigo_doc,
+                            'numero_doc_fiscal_api': item.get('fiscalDocumentNumber'),
+                            'estado_entrega_api': item.get('deliveryStatus'),
+                            'igtf_ves': item.get('paymentMethodTaxAmount')
+                        })
+
+                    if filas:
+                        df = pd.DataFrame(filas)
+                        df = df.where(pd.notnull(df), None)
+
+                        actualizados, no_encontrados = self._enrich_sql(conn, df, "Ventas_Cabecera", "id_factura")
+                        total_actualizado += actualizados
+                        total_no_encontrado += no_encontrados
+
+                        ids_pagina = [f['id_factura'] for f in filas]
+
+                        if no_encontrados > 0:
+                            logging.warning(f"   [BRECHA] {no_encontrados} facturas de v2 no existen en Ventas_Cabecera (página skip {skip})")
+                            with conn.cursor() as cur:
+                                placeholders_brecha = ','.join(['?'] * len(ids_pagina))
+                                cur.execute(f"SELECT id_factura FROM Ventas_Cabecera WHERE id_factura IN ({placeholders_brecha})", ids_pagina)
+                                existentes = {row[0] for row in cur.fetchall()}
+                            faltantes = sorted(set(ids_pagina) - existentes)
+                            logging.warning(f"   [BRECHA-IDS] {len(faltantes)} ids | Muestra: {faltantes[:10]}")
+
+                        # Derivar detalle SOLO de las facturas de esta página (SQL puro, ids parametrizados)
+                        try:
+                            with conn.cursor() as cursor:
+                                placeholders = ','.join(['?'] * len(ids_pagina))
+                                cursor.execute(
+                                    f"""
+                                    UPDATE d
+                                        SET d.total_linea_usd = ROUND(d.total_linea * c.monto_total_usd / c.monto_total, 2)
+                                    FROM dbo.Ventas_Detalle d
+                                    INNER JOIN dbo.Ventas_Cabecera c ON c.id_factura = d.id_factura
+                                    WHERE d.id_factura IN ({placeholders})
+                                        AND c.monto_total_usd > 0 AND c.monto_total > 0
+                                    """,
+                                    ids_pagina
+                                )
+                                filas_detalle = cursor.rowcount
+                            conn.commit()
+                            logging.info(f"   -> [DOLAR_VENTAS] Detalle actualizado: {filas_detalle} líneas (skip {skip})")
+                        except Exception:
+                            conn.rollback()
+                            raise
+
+                    if mode == 'HISTORICAL':
+                        skip += LIMIT
+                        self._update_checkpoint(conn, CHECKPOINT_KEY, skip)
+                    else:
+                        skip += LIMIT
+
+                    if not has_more:
+                        if mode == 'HISTORICAL':
+                            self._update_checkpoint(conn, CHECKPOINT_KEY, 0)
+                        break
+
+                logging.info(
+                    f"   ✅ [DOLAR_VENTAS] Resumen: {total_actualizado} actualizadas, "
+                    f"{total_no_encontrado} no encontradas, {paginas} páginas."
+                )
+                return total_actualizado
+
+    def sync_dolar_tasas(self):
+            """Registra la tasa de cambio oficial diaria de Gesvision a partir del campo exchangeRate que el ERP
+            estampa en cada factura. Usa la tasa DOMINANTE del día: robusta frente a overrides manuales por
+            documento, tasas rezagadas y exchangeRate defectuoso. Idempotente."""
+            with pyodbc.connect(self.conn_str) as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("""
+                        MERGE dbo.Param_Tasas_Cambio AS T
+                        USING (
+                            SELECT fecha, tasa, documentos_base, documentos_dia
+                            FROM (
+                                SELECT CAST(fecha_factura_v2 AS DATE) AS fecha,
+                                       tasa_cambio                    AS tasa,
+                                       COUNT(*)                       AS documentos_base,
+                                       SUM(COUNT(*)) OVER (PARTITION BY CAST(fecha_factura_v2 AS DATE)) AS documentos_dia,
+                                       ROW_NUMBER() OVER (PARTITION BY CAST(fecha_factura_v2 AS DATE)
+                                                          ORDER BY COUNT(*) DESC, tasa_cambio DESC)     AS rn
+                                FROM dbo.Ventas_Cabecera
+                                WHERE monto_total > 0 AND monto_total_usd > 0
+                                  AND fecha_factura_v2 IS NOT NULL
+                                  AND ABS(monto_total/monto_total_usd - tasa_cambio) <= 1
+                                GROUP BY CAST(fecha_factura_v2 AS DATE), tasa_cambio
+                            ) x
+                            WHERE rn = 1
+                        ) AS S ON (T.fecha = S.fecha)
+                        WHEN MATCHED THEN UPDATE SET T.tasa = S.tasa, T.documentos_base = S.documentos_base,
+                                                     T.documentos_dia = S.documentos_dia,
+                                                     T.fecha_carga_etl = SYSUTCDATETIME()
+                        WHEN NOT MATCHED THEN INSERT (fecha, tasa, origen, documentos_base, documentos_dia)
+                             VALUES (S.fecha, S.tasa, 'GESVISION_FACTURAS_V2', S.documentos_base, S.documentos_dia);
+                    """)
+                    conn.commit()
+
+                    row = cursor.execute("SELECT COUNT(*), MIN(fecha), MAX(fecha) FROM dbo.Param_Tasas_Cambio").fetchone()
+                    n = row[0] if row else 0
+                    fecha_min = row[1] if row else None
+                    fecha_max = row[2] if row else None
+                    logging.info(f"   -> [DOLAR_TASAS] {n} días con tasa | rango {fecha_min} .. {fecha_max}")
+
+                    baja_confianza = cursor.execute("""
+                        SELECT fecha, tasa, documentos_base, documentos_dia FROM dbo.Param_Tasas_Cambio
+                        WHERE documentos_dia > 0 AND (documentos_base * 1.0 / documentos_dia) < 0.6
+                    """).fetchall()
+                    for fecha, tasa, base, dia in baja_confianza:
+                        logging.warning(f"   [TASA-BAJA-CONFIANZA] {fecha}: tasa {tasa} respaldada por {base}/{dia} facturas")
+
+                    return n
+                except Exception as e:
+                    logging.error(f"Error en sync_dolar_tasas: {e}")
+                    conn.rollback()
+                    raise
+                finally:
+                    cursor.close()
+
+    def sync_dolar_pedidos(self):
+            """Enriquece Ventas_Pedidos con campos nativos de la API v2 (code, total, totalPaid, deliveryStatus,
+            fecha con zona horaria) y montos USD derivados de la tasa oficial diaria (Param_Tasas_Cambio).
+            MODO ENRIQUECIMIENTO: solo UPDATE."""
+            if self.API_VERSION_PEDIDOS == 'V1':
+                logging.info("   [DOLAR_PEDIDOS] Desactivado (API_VERSION_PEDIDOS='V1'). Sin acción.")
+                return 0
+
+            if not self.token: self.get_token()
+
+            start_time = time.time()
+            MAX_EXECUTION_TIME = 24 * 60
+            total_actualizado = 0
+            total_no_encontrado = 0
+            paginas = 0
+            CHECKPOINT_KEY = 'checkpoint_dolar_pedidos_skip'
+            LIMIT = 200
+
+            with pyodbc.connect(self.conn_str) as conn:
+                mode = getattr(self, 'LOAD_MODE_DOLAR_PEDIDOS', 'INCREMENTAL')
+
+                if mode == 'HISTORICAL':
+                    params_base = {"sort": "id:asc"}
+                    skip = self._get_checkpoint(conn, CHECKPOINT_KEY)
+                    skip = skip if isinstance(skip, int) else 0
+                    logging.info(f"   [Historical] Dolar Pedidos: Retomando desde skip {skip} (checkpoint).")
+                else:
+                    fecha_inicio = datetime.datetime.utcnow() - datetime.timedelta(days=3)
+                    params_base = {"modifiedAfter": fecha_inicio.strftime("%Y-%m-%dT%H:%M:%S") + "-04:00"}
+                    skip = 0
+                    logging.info(f"   [Incremental] Dolar Pedidos: Buscando modificados desde {params_base['modifiedAfter']}")
+
+                with conn.cursor() as cur_chk:
+                    cur_chk.execute("SELECT COUNT(*) FROM dbo.Param_Tasas_Cambio")
+                    hay_tasas = cur_chk.fetchone()[0] > 0
+                if not hay_tasas:
+                    logging.warning(
+                        "   [DOLAR_PEDIDOS] Param_Tasas_Cambio está vacía: los montos USD no se calcularán en esta "
+                        "corrida. Los campos v2 (code, total, totalPaid, deliveryStatus) sí se enriquecen igual. "
+                        "Re-ejecutar este módulo después de DOLAR_TASAS para completar el USD."
+                    )
+
+                while True:
+                    # El checkpoint de la página anterior ya quedó guardado al final de la iteración previa
+                    # (ver bloque "skip += LIMIT / _update_checkpoint" más abajo) antes de llegar aquí.
+                    if (time.time() - start_time) > MAX_EXECUTION_TIME:
+                        if mode == 'HISTORICAL':
+                            self._update_checkpoint(conn, CHECKPOINT_KEY, skip)
+                        logging.warning(f"   [TIMEOUT] Ronda finalizada por límite de 24 min. Checkpoint guardado: skip={skip}. RELANZAR para continuar.")
+                        logging.info(
+                            f"   [DOLAR_PEDIDOS] Resumen parcial: {total_actualizado} actualizados, "
+                            f"{total_no_encontrado} no encontrados, {paginas} páginas."
+                        )
+                        return total_actualizado
+
+                    params = params_base.copy()
+                    params["skip"] = skip
+                    params["limit"] = LIMIT
+
+                    items, total_count, has_more = self._get_v2("sales-orders", params)
+                    paginas += 1
+
+                    filas = []
+                    for item in items:
+                        if item.get('id') is None:
+                            logging.warning(f"   [!] Item de sales-orders sin 'id'. Omitido: {str(item)[:150]}")
+                            continue
+
+                        fecha_pedido_v2 = None
+                        doc_date = item.get('documentDate')
+                        if doc_date:
+                            try:
+                                dt_parsed = datetime.datetime.fromisoformat(doc_date)
+                                tz_gmt4 = datetime.timezone(datetime.timedelta(hours=-4))
+                                fecha_pedido_v2 = dt_parsed.astimezone(tz_gmt4).replace(tzinfo=None)
+                            except ValueError:
+                                logging.warning(f"   [!] documentDate inválido para id {item.get('id')}: {doc_date}")
+
+                        codigo_doc = None
+                        serie = item.get('series')
+                        numero = item.get('number')
+                        if serie and numero is not None:
+                            try:
+                                codigo_doc = f"{serie}/{int(numero):06d}"
+                            except (ValueError, TypeError):
+                                codigo_doc = None
+
+                        filas.append({
+                            'id_pedido': item['id'],
+                            'codigo_documento_api': codigo_doc,
+                            'monto_total_api': item.get('total'),
+                            'monto_pagado_api': item.get('totalPaid'),
+                            'estado_entrega_api': item.get('deliveryStatus'),
+                            'fecha_pedido_v2': fecha_pedido_v2,
+                            'fecha_sync_v2': datetime.datetime.utcnow()
+                        })
+
+                    if filas:
+                        df = pd.DataFrame(filas)
+                        df = df.where(pd.notnull(df), None)
+
+                        actualizados, no_encontrados = self._enrich_sql(conn, df, "Ventas_Pedidos", "id_pedido")
+                        total_actualizado += actualizados
+                        total_no_encontrado += no_encontrados
+
+                        ids_pagina = [f['id_pedido'] for f in filas]
+
+                        if no_encontrados > 0:
+                            logging.warning(f"   [BRECHA] {no_encontrados} pedidos de v2 no existen en Ventas_Pedidos (página skip {skip})")
+                            with conn.cursor() as cur:
+                                placeholders_brecha = ','.join(['?'] * len(ids_pagina))
+                                cur.execute(f"SELECT id_pedido FROM Ventas_Pedidos WHERE id_pedido IN ({placeholders_brecha})", ids_pagina)
+                                existentes = {row[0] for row in cur.fetchall()}
+                            faltantes = sorted(set(ids_pagina) - existentes)
+                            logging.warning(f"   [BRECHA-IDS] {len(faltantes)} ids | Muestra: {faltantes[:10]}")
+
+                        # Derivar USD con la tasa oficial de la fecha del pedido (SQL puro, ids parametrizados)
+                        try:
+                            with conn.cursor() as cursor:
+                                placeholders = ','.join(['?'] * len(ids_pagina))
+                                cursor.execute(
+                                    f"""
+                                    UPDATE p
+                                       SET p.tasa_cambio_aplicada = t.tasa,
+                                           p.monto_total_usd      = ROUND(p.monto_total_api / t.tasa, 2),
+                                           p.monto_pagado_usd     = ROUND(ISNULL(p.monto_pagado_api,0) / t.tasa, 2),
+                                           p.saldo_pendiente_usd  = ROUND((p.monto_total_api - ISNULL(p.monto_pagado_api,0)) / t.tasa, 2)
+                                    FROM dbo.Ventas_Pedidos p
+                                    CROSS APPLY (SELECT TOP 1 pt.tasa
+                                                 FROM dbo.Param_Tasas_Cambio pt
+                                                 WHERE pt.fecha <= CAST(p.fecha_pedido_v2 AS DATE)
+                                                 ORDER BY pt.fecha DESC) t
+                                    WHERE p.id_pedido IN ({placeholders})
+                                      AND p.fecha_pedido_v2 IS NOT NULL
+                                      AND p.monto_total_api > 0
+                                      AND t.tasa > 0
+                                    """,
+                                    ids_pagina
+                                )
+                                filas_dolarizadas = cursor.rowcount
+                            conn.commit()
+                            logging.info(f"   -> [DOLAR_PEDIDOS] Pedidos dolarizados: {filas_dolarizadas} (skip {skip})")
+                        except Exception:
+                            conn.rollback()
+                            raise
+
+                    if mode == 'HISTORICAL':
+                        skip += LIMIT
+                        self._update_checkpoint(conn, CHECKPOINT_KEY, skip)
+                    else:
+                        skip += LIMIT
+
+                    if not has_more:
+                        if mode == 'HISTORICAL':
+                            self._update_checkpoint(conn, CHECKPOINT_KEY, 0)
+                        break
+
+                logging.info(
+                    f"   ✅ [DOLAR_PEDIDOS] Resumen: {total_actualizado} actualizados, "
+                    f"{total_no_encontrado} no encontrados, {paginas} páginas."
+                )
+                return total_actualizado
+
+# ====================================================================================================
+# [TESTING LOCAL] Función temporal para probar envío de Telegram - DESHABILITADA 05/05/2026
+# ====================================================================================================
+# Deshabilitada después de confirmar que Telegram funciona correctamente
+# Chat ID actualizado a: -1003693182380 (grupo fue upgradeable a supergrupo)
+# Para reactivar, descomenta @app.route y la función TestTelegram
+# @app.route(route="test-telegram", methods=["POST"])
+# def TestTelegram(req: func.HttpRequest) -> func.HttpResponse:
+#     """
+#     Función TEMPORAL para probar envío de mensajes a Telegram localmente.
+#
+#     Uso:
+#         POST http://localhost:7071/api/test-telegram
+#         Body: {"mensaje": "Tu mensaje aquí"}
+#
+#     Después de enviar el mensaje, sigue procesando normalmente.
+#     """
+#     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#
+#     try:
+#         # Usar logging en lugar de print para evitar problemas de codificación en Windows
+#         logging.info("[TEST TELEGRAM] Iniciando prueba de envio")
+#         logging.info(f"Timestamp: {timestamp}")
+#
+#         # Parsear mensaje del body
+#         logging.info("[PASO 1] Parseando mensaje del request...")
+#         try:
+#             req_body = req.get_json()
+#             mensaje_test = req_body.get("mensaje", "Prueba de Telegram - ETL Opticolor funcionando")
+#             logging.info(f"Mensaje recibido: {mensaje_test}")
+#         except Exception as parse_err:
+#             logging.warning(f"No hay JSON, usando mensaje por defecto: {parse_err}")
+#             mensaje_test = "Prueba de Telegram - ETL Opticolor funcionando"
+#
+#         # Verificar variables de entorno
+#         logging.info("[PASO 2] Verificando credenciales de Telegram...")
+#         token = os.getenv("TELEGRAM_BOT_TOKEN")
+#         chat_id = os.getenv("TELEGRAM_CHAT_ID")
+#
+#         if token:
+#             token_display = f"{token[:10]}...{token[-5:]}"
+#             logging.info(f"TELEGRAM_BOT_TOKEN configurado: {token_display}")
+#         else:
+#             logging.error("TELEGRAM_BOT_TOKEN NO CONFIGURADO")
+#
+#         if chat_id:
+#             logging.info(f"TELEGRAM_CHAT_ID configurado: {chat_id}")
+#         else:
+#             logging.error("TELEGRAM_CHAT_ID NO CONFIGURADO")
+#
+#         # Crear instancia ETL y enviar mensaje
+#         logging.info("[PASO 3] Creando instancia GesvisionEtl...")
+#         etl = GesvisionEtl()
+#         logging.info("Instancia creada exitosamente")
+#
+#         logging.info("[PASO 4] Enviando mensaje a Telegram...")
+#         etl.notificar_telegram(f"TEST: {mensaje_test}")
+#         logging.info(f"Mensaje enviado a Telegram: {mensaje_test}")
+#
+#         # Respuesta exitosa
+#         response_msg = f"OK - Mensaje enviado a Telegram: '{mensaje_test}'\n\nAhora sigue procesando..."
+#         logging.info("[TEST COMPLETADO] Telegram funcionando correctamente")
+#
+#         return func.HttpResponse(response_msg, status_code=200)
+#
+#     except Exception as e:
+#         error_msg = str(e)
+#         logging.error(f"Error en TestTelegram: {error_msg}", exc_info=True)
+#
+#         return func.HttpResponse(
+#             f"ERROR: {error_msg}",
+#             status_code=500
+#         )
