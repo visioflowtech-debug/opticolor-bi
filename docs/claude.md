@@ -132,6 +132,36 @@
 
 ---
 
+## Fase 2 — Dolarización (en curso)
+
+**Objetivo:** indicadores en USD usando la API v2 de Gesvision.
+
+**Host v2:** `https://app.gesvision.com/api/v2` · auth: mismo token JWT que v1.
+
+**Arquitectura:** tablero `API_VERSION_<MODULO>` con 3 estados (`'V1'` | `'V1+V2_ENRIQUECE'` | `'V2'`).
+Los módulos `DOLAR_*` son de **ENRIQUECIMIENTO**: solo `UPDATE` vía `_enrich_sql` (MERGE sin
+`WHEN NOT MATCHED`). Regla no negociable: jamás insertan filas ni tocan columnas VES. La BD es
+producción.
+
+**Módulos:** 19 `DOLAR_VENTAS`, 20 `DOLAR_TASAS`, 21 `DOLAR_PEDIDOS`.
+
+**Hechos verificados de la API v2 (no re-investigar):**
+- `sales-invoices`: trae `currencyCode`, `exchangeRate`, `totalSystem` (USD), `code`, `deliveryStatus`,
+  `paymentMethodTaxAmount` (IGTF 3%, confirmado en la UI de Gesvision). NO trae `lineItems` en el listado.
+- `sales-orders`: NO trae `currencyCode`/`exchangeRate`/`totalSystem`/`code`. Sí trae `series` + `number`
+  (código compuesto: `f"{series}/{number:06d}"`, formato idéntico al de Gesvision web), `total`,
+  `totalPaid`, `deliveryStatus`.
+- `incoming-payments` y `outgoing-payments`: HTTP 403 (permisos del usuario API; reportado a Gesvision).
+- v2 omite campos null del JSON: usar siempre `.get()` con default.
+- Fechas ISO 8601 con offset; v1 entrega las fechas con +2h de desfase (medido: 120 min exactos).
+- 53 facturas tienen `exchangeRate=1.0` defectuoso en Gesvision → el detalle se dolariza con tasa
+  implícita (`monto_total_usd/monto_total`), no con `tasa_cambio`.
+
+**Estado:** backfill local de VENTAS y PEDIDOS ejecutado; sin deploy a Azure aún; ETL de Azure pausado
+durante los backfills (app setting `AzureWebJobs.EtlControladorPendientes.Disabled = true`).
+
+---
+
 ## Power BI: 5 Informes (Copiar Optilux, adaptar)
 
 1. **Resumen Comercial** — Venta, Cobrados, Ticket, Run Rate, OTIF
