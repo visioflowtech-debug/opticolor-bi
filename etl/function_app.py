@@ -1018,10 +1018,10 @@ class GesvisionEtl:
 
     # Base de la API v2
     BASE_URL_V2 = "https://app.gesvision.com/api/v2"
-    LOAD_MODE_DOLAR_VENTAS = 'HISTORICAL'   # 'HISTORICAL' para el backfill
+    LOAD_MODE_DOLAR_VENTAS = 'INCREMENTAL'   # 'HISTORICAL' para el backfill
 
     API_VERSION_PEDIDOS = 'V1+V2_ENRIQUECE'
-    LOAD_MODE_DOLAR_PEDIDOS = 'HISTORICAL'   # backfill primero; luego 'INCREMENTAL'
+    LOAD_MODE_DOLAR_PEDIDOS = 'INCREMENTAL'   # backfill primero; luego 'INCREMENTAL'
 
     # --- CONSTANTES DE MAPEO CENTRALIZADO PARA MANTENIBILIDAD ---
     # --- CONSTANTES DE MAPEO ACTUALIZADAS ---
@@ -4642,7 +4642,10 @@ class GesvisionEtl:
                                        SET p.tasa_cambio_aplicada = t.tasa,
                                            p.monto_total_usd      = ROUND(p.monto_total_api / t.tasa, 2),
                                            p.monto_pagado_usd     = ROUND(ISNULL(p.monto_pagado_api,0) / t.tasa, 2),
-                                           p.saldo_pendiente_usd  = ROUND((p.monto_total_api - ISNULL(p.monto_pagado_api,0)) / t.tasa, 2)
+                                           p.saldo_pendiente_usd  = CASE
+                                                                       WHEN (p.monto_total_api - ISNULL(p.monto_pagado_api,0)) < 0 THEN 0
+                                                                       ELSE ROUND((p.monto_total_api - ISNULL(p.monto_pagado_api,0)) / t.tasa, 2)
+                                                                     END
                                     FROM dbo.Ventas_Pedidos p
                                     CROSS APPLY (SELECT TOP 1 pt.tasa
                                                  FROM dbo.Param_Tasas_Cambio pt
