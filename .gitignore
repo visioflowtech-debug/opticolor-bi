@@ -26,6 +26,10 @@ local.settings.json
 etl/zoho_tokens.json
 etl/__azurite_db_*.json
 etl/__azurite_data__/
+salida/
+*_anonimizado.json
+BKfunction_app.py
+*_antes_*.py
 
 # Sistema
 .DS_Store
