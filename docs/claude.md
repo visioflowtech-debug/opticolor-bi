@@ -157,8 +157,21 @@ producción.
 - 53 facturas tienen `exchangeRate=1.0` defectuoso en Gesvision → el detalle se dolariza con tasa
   implícita (`monto_total_usd/monto_total`), no con `tasa_cambio`.
 
-**Estado:** backfill local de VENTAS y PEDIDOS ejecutado; sin deploy a Azure aún; ETL de Azure pausado
-durante los backfills (app setting `AzureWebJobs.EtlControladorPendientes.Disabled = true`).
+**Estado:** VENTAS, PEDIDOS y TASAS dolarizados; backfill histórico completo (marzo–julio); modo
+`INCREMENTAL` activo en los tres; desplegados a Azure y ETL reactivado.
+
+**Notas de producción:**
+- **IGTF 3%** en pagos con divisas: capturado en `Ventas_Cabecera.igtf_ves` (4,193 facturas). En
+  pedidos, explica la diferencia entre v1 (suma de líneas) y v2 (total nativo).
+- `saldo_pendiente_usd` de pedidos se trunca a 0 cuando `totalPaid > total` (sobrepagos/abonos).
+- `codigo_documento_api` normalizado con barra para coincidir con Gesvision web.
+- `numero_doc_fiscal_api` viene `NULL` (Gesvision no lo puebla en el JSON).
+
+**Pendiente:**
+- **COBROS**: 403 en `incoming-payments`/`outgoing-payments`, reportado a Gesvision vía Eduardo.
+- **INVENTARIO**: ronda 3 del probador sobre `products`.
+- **Visualización**: vistas SQL + DAX + portal en USD.
+- **Deuda técnica**: reintento de `_enrich_sql` ante corte de red (`08S01`).
 
 ---
 
