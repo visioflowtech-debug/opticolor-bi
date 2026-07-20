@@ -132,6 +132,78 @@
 
 ---
 
+## Fase 2 — Dolarización (en curso)
+
+**Objetivo:** indicadores en USD usando la API v2 de Gesvision.
+
+**Host v2:** `https://app.gesvision.com/api/v2` · auth: mismo token JWT que v1.
+
+**Arquitectura:** tablero `API_VERSION_<MODULO>` con 3 estados (`'V1'` | `'V1+V2_ENRIQUECE'` | `'V2'`).
+Los módulos `DOLAR_*` son de **ENRIQUECIMIENTO**: solo `UPDATE` vía `_enrich_sql` (MERGE sin
+`WHEN NOT MATCHED`). Regla no negociable: jamás insertan filas ni tocan columnas VES. La BD es
+producción.
+
+**Módulos:** 19 `DOLAR_VENTAS`, 20 `DOLAR_TASAS`, 21 `DOLAR_PEDIDOS`, 22 `DOLAR_INVENTARIO`, 23 `DOLAR_COBROS`.
+
+**DOLAR_COBROS (módulo 23):** SQL puro, sin API. Dolariza `Finanzas_Cobros` con `COALESCE`: prioriza la
+tasa REAL de la factura vinculada (`Ventas_Cabecera.tasa_cambio`) cuando existe (98.2% de los casos);
+si el cobro no tiene factura, deriva de la tasa oficial del día (`Param_Tasas_Cambio`) según
+`fecha_cobro`. Validado: 82,797 de 83,079 cobros dolarizados (99.66%), 0 aritmética sospechosa,
+$5,686,112 USD cobrados desde marzo. Independiente del 403 de Gesvision en `incoming-payments`.
+
+**Fase 2 comercial CERRADA:** los 4 módulos vendidos (VENTAS, PEDIDOS, INVENTARIO, COBROS) están en
+producción con datos reales, sin depender del bloqueo de Gesvision en cobros nativos.
+
+**Hechos verificados de la API v2 (no re-investigar):**
+- `sales-invoices`: trae `currencyCode`, `exchangeRate`, `totalSystem` (USD), `code`, `deliveryStatus`,
+  `paymentMethodTaxAmount` (IGTF 3%, confirmado en la UI de Gesvision). NO trae `lineItems` en el listado.
+- `sales-orders`: NO trae `currencyCode`/`exchangeRate`/`totalSystem`/`code`. Sí trae `series` + `number`
+  (código compuesto: `f"{series}/{number:06d}"`, formato idéntico al de Gesvision web), `total`,
+  `totalPaid`, `deliveryStatus`.
+- `incoming-payments` y `outgoing-payments`: HTTP 403 (permisos del usuario API; reportado a Gesvision).
+- v2 omite campos null del JSON: usar siempre `.get()` con default.
+- Fechas ISO 8601 con offset; v1 entrega las fechas con +2h de desfase (medido: 120 min exactos).
+- 53 facturas tienen `exchangeRate=1.0` defectuoso en Gesvision → el detalle se dolariza con tasa
+  implícita (`monto_total_usd/monto_total`), no con `tasa_cambio`.
+
+**Estado:** VENTAS, PEDIDOS, TASAS, INVENTARIO y COBROS dolarizados; backfill histórico completo
+(marzo–julio); modo `INCREMENTAL` activo; desplegados a Azure y ETL reactivado.
+
+**Notas de producción:**
+- **IGTF 3%** en pagos con divisas: capturado en `Ventas_Cabecera.igtf_ves` (4,193 facturas). En
+  pedidos, explica la diferencia entre v1 (suma de líneas) y v2 (total nativo).
+- `saldo_pendiente_usd` de pedidos se trunca a 0 cuando `totalPaid > total` (sobrepagos/abonos).
+- `codigo_documento_api` normalizado con barra para coincidir con Gesvision web.
+- `numero_doc_fiscal_api` viene `NULL` (Gesvision no lo puebla en el JSON).
+- **INVENTARIO**: v2 no expone stock a escala (investigación exhaustiva); DOLAR_INVENTARIO es SQL
+  puro sobre `Operaciones_Inventario`, sin llamadas a la API.
+
+**Pendiente:**
+- **Visualización**: vistas SQL + DAX + portal en USD.
+- **Deuda técnica**: reintento de `_enrich_sql` ante corte de red (`08S01`).
+
+### Optimización del orquestador (operativa, no comercial)
+
+Descubierta durante la Fase 2, corrige un problema del controlador `EtlControladorPendientes` que
+no es parte del alcance vendido:
+
+- **Diagnóstico:** el ciclo tardaba ~3 horas en cerrar por dos causas: (a) `obtener_modulos_ejecutables`
+  calculaba el set de completados UNA VEZ por invocación del timer (cada 30 min), requiriendo
+  ~6 invocaciones para cascadear las ~6 "olas" de dependencias de `MODULOS_CONFIG`; (b) `RECEPCIONES_LAB`
+  (bug conocido de Gesvision, ver abajo) consumía 3 "olas" completas en sus 3 reintentos antes de
+  quedar terminal.
+- **Arreglo 1 — `MODULOS_DEGRADADOS_CONOCIDOS`:** para módulos con fallo permanente ya diagnosticado,
+  se omite la alerta de Telegram por intento y se fuerza `intentos=max_intentos` en el primer fallo
+  (fail-fast), evitando gastar reintentos en algo que sabemos que seguirá fallando.
+- **Arreglo 2 — cascada dinámica:** `EtlControladorPendientes` recalcula módulos ejecutables tras cada
+  "ola" y sigue avanzando mientras haya presupuesto de tiempo (`MAX_DURACION_EJECUCION` = 25 min), en
+  vez de una sola pasada estática por invocación.
+- **Resultado esperado:** ciclo de ~3 horas → ~7-10 minutos, en una sola invocación del timer.
+- `RECEPCIONES_LAB` sigue fallando (bug de Gesvision, reportado, sin ETA) pero ahora sin spam de
+  Telegram y sin consumir tiempo extra del ciclo.
+
+---
+
 ## Power BI: 5 Informes (Copiar Optilux, adaptar)
 
 1. **Resumen Comercial** — Venta, Cobrados, Ticket, Run Rate, OTIF
