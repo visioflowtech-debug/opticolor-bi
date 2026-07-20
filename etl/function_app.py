@@ -553,7 +553,14 @@ MODULOS_CONFIG = [
     (19, 'DOLAR_VENTAS', 'sync_dolar_ventas', ['VENTAS']),
     (20, 'DOLAR_TASAS', 'sync_dolar_tasas', ['DOLAR_VENTAS']),
     (21, 'DOLAR_PEDIDOS', 'sync_dolar_pedidos', ['PEDIDOS', 'DOLAR_TASAS']),
+    (22, 'DOLAR_INVENTARIO', 'sync_dolar_inventario', ['INVENTARIO', 'DOLAR_TASAS']),
+    (23, 'DOLAR_COBROS', 'sync_dolar_cobros', ['DOLAR_VENTAS', 'DOLAR_TASAS']),
 ]
+
+MODULOS_DEGRADADOS_CONOCIDOS = {
+    'RECEPCIONES_LAB': 'HTTP 500 en Gesvision (ParseException de fecha en su backend). '
+                        'Reportado al proveedor. Sin ETA de corrección.',
+}
 
 HORAS_INICIO_CICLO_UTC = [12, 14, 16, 18, 20, 22, 0, 2]
 MAX_DURACION_EJECUCION = 25 * 60  # 25 minutos máximo por ejecución
@@ -648,26 +655,50 @@ def EtlControladorPendientes(myTimer: func.TimerRequest) -> None:
 
         logging.info(f"[CONTROLADOR] Ciclo activo: {ciclo_id}")
 
-        # PASO 2: Obtener módulos pendientes (considerando dependencias)
-        pendientes = obtener_modulos_ejecutables(etl, ciclo_id)
+        # PASO 2+3: Cascada dinámica — recalcula qué se desbloqueó tras cada tanda, en vez de una sola
+        # pasada estática (antes: 1 ola por invocación de 30 min; ahora: todas las olas que quepan en
+        # MAX_DURACION_EJECUCION, dentro de esta misma invocación).
+        MAX_OLAS_POR_INVOCACION = 30  # salvaguarda defensiva; con ~23 módulos, de sobra
+        ola = 0
+        total_ejecutados_invocacion = 0
 
-        if not pendientes:
-            logging.info("[CONTROLADOR] No hay módulos pendientes ejecutables")
-            verificar_y_cerrar_ciclo(etl, ciclo_id)
-            return
-
-        logging.info(f"[CONTROLADOR] {len(pendientes)} módulos pendientes ejecutables")
-
-        # PASO 3: Ejecutar pendientes
-        for modulo_info in pendientes:
+        while True:
+            ola += 1
             elapsed = time.time() - start_time
             if elapsed > MAX_DURACION_EJECUCION:
-                logging.warning(f"⏰ Tiempo límite alcanzado ({elapsed/60:.1f} min). Próximos pendientes en siguiente ejecución.")
+                logging.warning(f"⏰ Tiempo límite alcanzado ({elapsed/60:.1f} min) en la ola {ola}. "
+                                 f"Módulos restantes en la siguiente invocación.")
+                break
+            if ola > MAX_OLAS_POR_INVOCACION:
+                logging.warning(f"⚠️ Tope de {MAX_OLAS_POR_INVOCACION} olas alcanzado. Deteniendo por seguridad.")
                 break
 
-            ejecutar_modulo_pendiente(etl, ciclo_id, modulo_info)
+            pendientes = obtener_modulos_ejecutables(etl, ciclo_id)
+            if not pendientes:
+                if ola == 1:
+                    logging.info("[CONTROLADOR] No hay módulos pendientes ejecutables")
+                else:
+                    logging.info(f"[CONTROLADOR] Ola {ola}: sin más módulos ejecutables. Cascada completa.")
+                break
 
-        # PASO 4: Verificar si ciclo completó
+            logging.info(f"[CONTROLADOR] Ola {ola}: {len(pendientes)} módulos ejecutables")
+
+            for modulo_info in pendientes:
+                elapsed = time.time() - start_time
+                if elapsed > MAX_DURACION_EJECUCION:
+                    logging.warning(f"⏰ Tiempo límite alcanzado ({elapsed/60:.1f} min) a mitad de la ola {ola}. "
+                                     f"Módulos restantes en la siguiente invocación.")
+                    break
+                ejecutar_modulo_pendiente(etl, ciclo_id, modulo_info)
+                total_ejecutados_invocacion += 1
+            else:
+                continue  # la ola terminó completa sin cortar por tiempo -> seguir a la siguiente ola
+            break  # se cortó por tiempo a mitad de una ola -> salir del while también
+
+        logging.info(f"[CONTROLADOR] Invocación terminada: {total_ejecutados_invocacion} módulos "
+                     f"ejecutados en {ola} ola(s), {(time.time()-start_time)/60:.1f} min")
+
+        # PASO 4: Verificar si ciclo completó (sin cambios)
         verificar_y_cerrar_ciclo(etl, ciclo_id)
 
     except Exception as e:
@@ -855,6 +886,7 @@ def ejecutar_modulo_pendiente(etl, ciclo_id, modulo_info):
     except Exception as e:
         # Marcar como FAILED
         try:
+            es_degradado_conocido = nombre in MODULOS_DEGRADADOS_CONOCIDOS
             with pyodbc.connect(etl.conn_str) as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
@@ -862,9 +894,10 @@ def ejecutar_modulo_pendiente(etl, ciclo_id, modulo_info):
                     SET estado = 'FAILED',
                         fecha_fin = GETUTCDATE(),
                         mensaje_error = ?,
-                        proximo_intento = DATEADD(minute, 30, GETUTCDATE())
+                        proximo_intento = DATEADD(minute, 30, GETUTCDATE()),
+                        intentos = CASE WHEN ? = 1 THEN max_intentos ELSE intentos END
                     WHERE id = ?
-                """, str(e)[:500], modulo_info['id'])
+                """, str(e)[:500], 1 if es_degradado_conocido else 0, modulo_info['id'])
                 conn.commit()
 
             logging.error(f"❌ {nombre} FAILED: {e}")
@@ -1311,7 +1344,12 @@ class GesvisionEtl:
                 origen = f"{tb[-1].name}:{tb[-1].lineno}" if tb else "?"
                 logging.error(f"[MÓDULO {nombre_modulo}] Error después de {elapsed_mod:.2f}s en {origen}: {e}\n{traceback.format_exc()}")
                 self.registrar_fin(nombre_modulo, 'ERROR', e)
-                self.notificar_telegram(f"❌ ETL [{nombre_modulo}] FALLÓ en {elapsed_mod:.1f}s\n📍 {origen}\n{str(e)[:300]}")
+                es_degradado_conocido = nombre_modulo in MODULOS_DEGRADADOS_CONOCIDOS
+                if not es_degradado_conocido:
+                    self.notificar_telegram(f"❌ ETL [{nombre_modulo}] FALLÓ en {elapsed_mod:.1f}s\n📍 {origen}\n{str(e)[:300]}")
+                else:
+                    logging.info(f"   [DEGRADACIÓN CONOCIDA] {nombre_modulo} falló como es esperado "
+                                  f"({MODULOS_DEGRADADOS_CONOCIDOS[nombre_modulo]}). Alerta de Telegram omitida.")
                 return {'modulo': nombre_modulo, 'status': '❌', 'resultado': f"ERROR: {str(e)[:200]}"}
             finally:
                 self.current_module = None
@@ -4681,6 +4719,98 @@ class GesvisionEtl:
                     f"{total_no_encontrado} no encontrados, {paginas} páginas."
                 )
                 return total_actualizado
+
+    def sync_dolar_inventario(self):
+            """Dolariza Operaciones_Inventario con la tasa oficial más reciente (Param_Tasas_Cambio).
+            Costo de reposición: costo_promedio_ves / tasa_actual. SQL puro, sin API. Idempotente."""
+            with pyodbc.connect(self.conn_str) as conn:
+                cursor = conn.cursor()
+                try:
+                    row_tasa = cursor.execute(
+                        "SELECT TOP 1 fecha, tasa FROM dbo.Param_Tasas_Cambio ORDER BY fecha DESC"
+                    ).fetchone()
+
+                    if not row_tasa:
+                        logging.warning("   [DOLAR_INVENTARIO] Sin tasas registradas, abortando")
+                        return 0
+
+                    fecha_tasa, tasa = row_tasa[0], row_tasa[1]
+
+                    cursor.execute(
+                        """
+                        UPDATE dbo.Operaciones_Inventario
+                           SET costo_promedio_usd   = ROUND(costo_promedio / ?, 4),
+                               valor_total_usd      = ROUND((cantidad_disponible * costo_promedio) / ?, 2),
+                               tasa_cambio_aplicada = ?,
+                               fecha_dolarizacion   = SYSUTCDATETIME()
+                         WHERE costo_promedio > 0
+                           AND cantidad_disponible IS NOT NULL
+                        """,
+                        tasa, tasa, tasa
+                    )
+                    filas_actualizadas = cursor.rowcount
+                    conn.commit()
+
+                    logging.info(f"   -> [DOLAR_INVENTARIO] {filas_actualizadas} filas dolarizadas | tasa {tasa} ({fecha_tasa})")
+
+                    return filas_actualizadas
+                except Exception as e:
+                    logging.error(f"Error en sync_dolar_inventario: {e}")
+                    conn.rollback()
+                    raise
+                finally:
+                    cursor.close()
+
+    def sync_dolar_cobros(self):
+            """Dolariza Finanzas_Cobros. Prioriza la tasa REAL de la factura vinculada (Ventas_Cabecera);
+            si el cobro no tiene factura, deriva de la tasa oficial del día (Param_Tasas_Cambio) según
+            fecha_cobro. SQL puro, sin API. Idempotente."""
+            with pyodbc.connect(self.conn_str) as conn:
+                cursor = conn.cursor()
+                try:
+                    inicio_run = cursor.execute("SELECT SYSUTCDATETIME()").fetchone()[0]
+
+                    cursor.execute("""
+                        UPDATE fc
+                           SET fc.tasa_cambio_aplicada = COALESCE(vc.tasa_cambio, pt.tasa),
+                               fc.monto_cobrado_usd    = ROUND(fc.monto_cobrado / COALESCE(vc.tasa_cambio, pt.tasa), 2),
+                               fc.origen_tasa          = CASE WHEN vc.tasa_cambio IS NOT NULL THEN 'FACTURA_REAL'
+                                                              ELSE 'DERIVADA_FECHA' END,
+                               fc.fecha_dolarizacion   = SYSUTCDATETIME()
+                        FROM dbo.Finanzas_Cobros fc
+                        LEFT JOIN dbo.Ventas_Cabecera vc ON vc.id_factura = fc.id_factura AND vc.tasa_cambio IS NOT NULL
+                        OUTER APPLY (
+                            SELECT TOP 1 tasa FROM dbo.Param_Tasas_Cambio
+                            WHERE fecha <= CAST(fc.fecha_cobro AS DATE)
+                            ORDER BY fecha DESC
+                        ) pt
+                        WHERE fc.monto_cobrado > 0
+                          AND COALESCE(vc.tasa_cambio, pt.tasa) IS NOT NULL
+                    """)
+                    filas_actualizadas = cursor.rowcount
+                    conn.commit()
+
+                    desglose = cursor.execute(
+                        "SELECT origen_tasa, COUNT(*) FROM dbo.Finanzas_Cobros WHERE fecha_dolarizacion >= ? GROUP BY origen_tasa",
+                        inicio_run
+                    ).fetchall()
+                    n_factura_real = 0
+                    n_derivada = 0
+                    for origen, cnt in desglose:
+                        if origen == 'FACTURA_REAL':
+                            n_factura_real = cnt
+                        elif origen == 'DERIVADA_FECHA':
+                            n_derivada = cnt
+
+                    logging.info(f"   -> [DOLAR_COBROS] {filas_actualizadas} cobros dolarizados | factura_real: {n_factura_real} | derivada: {n_derivada}")
+
+                    return filas_actualizadas
+                except Exception as e:
+                    logging.error(f"Error en sync_dolar_cobros: {e}")
+                    conn.rollback()
+                    raise
+                finally:
+                    cursor.close()
 
 # ====================================================================================================
 # [TESTING LOCAL] Función temporal para probar envío de Telegram - DESHABILITADA 05/05/2026
