@@ -555,6 +555,7 @@ MODULOS_CONFIG = [
     (21, 'DOLAR_PEDIDOS', 'sync_dolar_pedidos', ['PEDIDOS', 'DOLAR_TASAS']),
     (22, 'DOLAR_INVENTARIO', 'sync_dolar_inventario', ['INVENTARIO', 'DOLAR_TASAS']),
     (23, 'DOLAR_COBROS', 'sync_dolar_cobros', ['DOLAR_VENTAS', 'DOLAR_TASAS']),
+    (24, 'DOLAR_TESORERIA', 'sync_dolar_tesoreria', ['DOLAR_TASAS']),
 ]
 
 MODULOS_DEGRADADOS_CONOCIDOS = {
@@ -739,15 +740,21 @@ def obtener_o_crear_ciclo(etl):
             if hora_utc not in HORAS_INICIO_CICLO_UTC:
                 return None
 
-            # Verificar que no se haya creado ya un ciclo en esta hora
+            # Verificar que no se haya creado ya un ciclo en esta MISMA hora calendario UTC de hoy.
+            # Más robusto que "últimos 30 min": el timer de Azure (Flex Consumption) puede disparar con
+            # retraso variable dentro de la hora (cold start), y comparar por hora-calendario evita crear
+            # un segundo ciclo dentro de la misma ventana horaria permitida, sin importar cuándo dispare
+            # exactamente el timer.
             cursor.execute("""
                 SELECT COUNT(*)
                 FROM Etl_Ciclos
-                WHERE DATEDIFF(minute, fecha_inicio, GETUTCDATE()) < 30
-            """)
+                WHERE CAST(fecha_inicio AS DATE) = CAST(GETUTCDATE() AS DATE)
+                  AND DATEPART(HOUR, fecha_inicio) = ?
+            """, hora_utc)
 
             if cursor.fetchone()[0] > 0:
-                logging.info("[CONTROLADOR] Ya se creó un ciclo en los últimos 30 min")
+                logging.info(f"[CONTROLADOR] Ya se creó un ciclo en la hora {hora_utc} UTC de hoy. "
+                              f"Esperando la siguiente ventana horaria permitida.")
                 return None
 
             # Crear nuevo ciclo
@@ -4807,6 +4814,52 @@ class GesvisionEtl:
                     return filas_actualizadas
                 except Exception as e:
                     logging.error(f"Error en sync_dolar_cobros: {e}")
+                    conn.rollback()
+                    raise
+                finally:
+                    cursor.close()
+
+    def sync_dolar_tesoreria(self):
+            """Dolariza Finanzas_Tesoreria con la tasa oficial vigente a la fecha del movimiento
+            (Param_Tasas_Cambio). SQL puro, sin API. Idempotente."""
+            with pyodbc.connect(self.conn_str) as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute("""
+                        UPDATE ft
+                           SET ft.tasa_cambio_aplicada = pt.tasa,
+                               ft.monto_usd            = ROUND(ft.monto / pt.tasa, 2),
+                               ft.fecha_dolarizacion   = SYSUTCDATETIME()
+                        FROM dbo.Finanzas_Tesoreria ft
+                        OUTER APPLY (
+                            SELECT TOP 1 tasa FROM dbo.Param_Tasas_Cambio
+                            WHERE fecha <= CAST(ft.fecha_movimiento AS DATE)
+                            ORDER BY fecha DESC
+                        ) pt
+                        WHERE ft.monto IS NOT NULL
+                          AND pt.tasa IS NOT NULL AND pt.tasa > 0
+                    """)
+                    filas_actualizadas = cursor.rowcount
+                    conn.commit()
+
+                    row = cursor.execute(
+                        "SELECT COUNT(*), MIN(fecha_movimiento), MAX(fecha_movimiento) FROM dbo.Finanzas_Tesoreria WHERE monto_usd IS NOT NULL"
+                    ).fetchone()
+                    n = row[0] if row else 0
+                    fecha_min = row[1] if row else None
+                    fecha_max = row[2] if row else None
+
+                    if filas_actualizadas == 0:
+                        logging.warning(
+                            "   [DOLAR_TESORERIA] Ningún movimiento se pudo dolarizar en esta corrida "
+                            "(¿Param_Tasas_Cambio vacía o sin tasa aplicable?). Se reintentará en el siguiente ciclo."
+                        )
+                    else:
+                        logging.info(f"   -> [DOLAR_TESORERIA] {filas_actualizadas} movimientos dolarizados | rango {fecha_min} .. {fecha_max}")
+
+                    return filas_actualizadas
+                except Exception as e:
+                    logging.error(f"Error en sync_dolar_tesoreria: {e}")
                     conn.rollback()
                     raise
                 finally:
