@@ -1,5 +1,9 @@
 # 🎯 Opticolor BI — Ecosistema de Inteligencia de Datos Venezuela
 
+> ⚠️ Las secciones anteriores a "Fase 2 — Dolarización" (conteo de 18 módulos, 5 vistas, RBAC,
+> estado de abril 2026) están desactualizadas respecto al estado actual del proyecto y requieren
+> una revisión aparte — no reflejan el número real de módulos (24+) ni de vistas (52).
+
 ## Identidad
 
 | Campo | Valor |
@@ -143,7 +147,8 @@ Los módulos `DOLAR_*` son de **ENRIQUECIMIENTO**: solo `UPDATE` vía `_enrich_s
 `WHEN NOT MATCHED`). Regla no negociable: jamás insertan filas ni tocan columnas VES. La BD es
 producción.
 
-**Módulos:** 19 `DOLAR_VENTAS`, 20 `DOLAR_TASAS`, 21 `DOLAR_PEDIDOS`, 22 `DOLAR_INVENTARIO`, 23 `DOLAR_COBROS`.
+**Módulos:** 19 `DOLAR_VENTAS`, 20 `DOLAR_TASAS`, 21 `DOLAR_PEDIDOS`, 22 `DOLAR_INVENTARIO`, 23 `DOLAR_COBROS`,
+24 `DOLAR_TESORERIA`.
 
 **DOLAR_COBROS (módulo 23):** SQL puro, sin API. Dolariza `Finanzas_Cobros` con `COALESCE`: prioriza la
 tasa REAL de la factura vinculada (`Ventas_Cabecera.tasa_cambio`) cuando existe (98.2% de los casos);
@@ -151,8 +156,13 @@ si el cobro no tiene factura, deriva de la tasa oficial del día (`Param_Tasas_C
 `fecha_cobro`. Validado: 82,797 de 83,079 cobros dolarizados (99.66%), 0 aritmética sospechosa,
 $5,686,112 USD cobrados desde marzo. Independiente del 403 de Gesvision en `incoming-payments`.
 
-**Fase 2 comercial CERRADA:** los 4 módulos vendidos (VENTAS, PEDIDOS, INVENTARIO, COBROS) están en
-producción con datos reales, sin depender del bloqueo de Gesvision en cobros nativos.
+**DOLAR_TESORERIA (módulo 24):** SQL puro, sin API. Dolariza `Finanzas_Tesoreria` derivando de
+`Param_Tasas_Cambio` según `fecha_movimiento` (mismo patrón `OUTER APPLY` que DOLAR_COBROS/PEDIDOS).
+Validado: 205 de 205 movimientos dolarizados (100%), 0 aritmética sospechosa, $1,295,233.81 USD.
+Cierra el alcance de dolarización de todos los módulos financieros del proyecto.
+
+**Fase 2 CERRADA:** los 6 módulos de dolarización (VENTAS, PEDIDOS, INVENTARIO, COBROS, TESORERIA,
+más TASAS de soporte) están en producción con datos reales.
 
 **Hechos verificados de la API v2 (no re-investigar):**
 - `sales-invoices`: trae `currencyCode`, `exchangeRate`, `totalSystem` (USD), `code`, `deliveryStatus`,
@@ -179,8 +189,41 @@ producción con datos reales, sin depender del bloqueo de Gesvision en cobros na
   puro sobre `Operaciones_Inventario`, sin llamadas a la API.
 
 **Pendiente:**
-- **Visualización**: vistas SQL + DAX + portal en USD.
+- **Visualización**: DAX + portal en USD.
 - **Deuda técnica**: reintento de `_enrich_sql` ante corte de red (`08S01`).
+
+### Capa de vistas SQL (52 vistas, 28 modificadas)
+
+Auditoría exhaustiva de las 52 vistas del esquema `dbo`, una por una, para exponer columnas USD.
+Resultado: 28 vistas modificadas (`Dim_Productos` + 12 `Fact_*` + 15 `KPI_Inf1/3/5`), 21 sin cambios
+(conteos/ratios sin componente monetario), 5 bugs independientes descubiertos y corregidos:
+`Dim_Sucursales_Limpia` y `KPI_Inf1_Net_Sales` (vistas rotas, columnas inexistentes en su fuente),
+`Vista_Notificacion_ETL` y `Fact_Tesoreria` (filtros con códigos de módulo/movimiento desactualizados
+que dejaban esas vistas efectivamente vacías o con falsos positivos de error), `Fact_Ventas_por_Tipo_Lente`
+(doble ajuste de zona horaria GMT-4). Además se corrigió un hueco de datos: 44 líneas de
+`Ventas_Detalle` y 210 filas de `Finanzas_Cobros` que el ETL no había dolarizado (causa raíz pendiente
+de investigar, bajo volumen). Script completo en `sql/fase2/03_vistas_dolarizacion.sql`.
+
+**Decisiones de diseño documentadas:**
+- `Fact_Ventas.monto_sin_iva_usd` usa `monto_neto_usd` real de Gesvision (no recalcula `/1.16`, para no
+  mezclar el IGTF con el IVA).
+- `Fact_Pedidos.Estado_Orden_Detalle` (v1, siempre `'SIN ESTADO'`) se conserva junto a
+  `Estado_Entrega_Detalle` (v2, real) — no se reemplaza, se agrega.
+- KPIs de ratio (Ticket_Promedio, ASP) recalculan sumando montos USD a nivel de línea/factura antes
+  de dividir, no reconvierten el agregado VES con una tasa genérica.
+- Duplicados de vista (`Pedidos_Liquidar`/`Saldo_Pendiente`, `Fact_Ventas_Analitico`/`KPI_Inf5_Volumen_Unidades`)
+  se mantienen SIN fusionar (decisión explícita: no hay visibilidad completa de consumidores en
+  portal/Power BI) — el mismo cambio se aplica por duplicado en ambas copias.
+
+**Números de negocio verificados:** capital de inventario $5,798,359.05 (excluye LENTES/TRATAMIENTOS/
+LENTES DE CONTACTO, reconciliado por 3 vías tras descartar un cálculo erróneo previo de $1.9M);
+ventas netas ~$5.4M; total cobrado ~$5.69M; total tesorería $1,295,233.81.
+
+**Pendiente de decisión (no urgente):** filtro de `KPI_Inf3_Pedidos_Liquidar`/`Saldo_Pendiente` muestra 36
+pedidos con saldo VES>0 pero `saldo_usd=0` (truncamiento de sobrepago) — inconsistencia visual, no
+de cálculo. Significado exacto de `tipo_movimiento='CP'` vs `'MC'` en `Finanzas_Tesoreria` sin confirmar
+con Gesvision/Opticolor (se ajustó el filtro de `Fact_Tesoreria` a `'CP'` por ser el único valor
+presente en los datos).
 
 ### Optimización del orquestador (operativa, no comercial)
 
@@ -201,6 +244,11 @@ no es parte del alcance vendido:
 - **Resultado esperado:** ciclo de ~3 horas → ~7-10 minutos, en una sola invocación del timer.
 - `RECEPCIONES_LAB` sigue fallando (bug de Gesvision, reportado, sin ETA) pero ahora sin spam de
   Telegram y sin consumir tiempo extra del ciclo.
+- **Arreglo 3 — anti-duplicado por hora:** `obtener_o_crear_ciclo` comparaba "últimos 30 minutos"
+  para evitar crear dos ciclos en la misma ventana horaria permitida. Con el ciclo ahora cerrando en
+  minutos (no horas), el timer podía disparar dos veces dentro de la misma hora-calendario UTC y
+  crear un ciclo duplicado. Corregido comparando por hora-calendario exacta en vez de minutos
+  transcurridos, robusto ante el jitter de arranque en frío de Azure Flex Consumption.
 
 ---
 
@@ -298,7 +346,7 @@ portal/
 
 ---
 
-**Última actualización:** 23 de abril de 2026 (ETL Semana 2 completada)  
+**Última actualización:** 20 de julio de 2026 (Fase 2 — DOLAR_TESORERIA + capa de vistas SQL)  
 **Versión:** 2.0  
 **Estado:** Semana 2/6 ✅ COMPLETADA — ETL cascada operativo, 208K+ registros, deploy Azure
 
