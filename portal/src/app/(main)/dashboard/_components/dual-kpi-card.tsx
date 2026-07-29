@@ -3,22 +3,34 @@
 /**
  * Ejemplo de uso:
  *
- * import { DollarSign } from "lucide-react";
  * import { DualKpiCard } from "@/app/(main)/dashboard/_components/dual-kpi-card";
  *
  * <DualKpiCard
  *   title="Venta Neta"
- *   icon={DollarSign}
+ *   iconName="dollar-sign"
  *   primary={{ label: "Con Impuesto", value: 125430.55 }}
  *   secondary={{ label: "Sin Impuesto", value: 108190.02 }}
  *   subtitle="Periodo seleccionado"
  *   highlight
  * />
+ *
+ * Nota: `iconName` es un string (no la referencia cruda al componente de
+ * lucide-react) porque este componente se renderiza desde Server Components
+ * (ej. resumen-comercial/page.tsx) — React no puede serializar una referencia
+ * de función/componente en el límite Server→Client, solo datos planos o JSX
+ * ya renderizado. Mismo patrón que ya usa `KpiCard` en todo el portal.
  */
 
-import type { LucideIcon } from "lucide-react";
+import {
+  DollarSign,
+  type LucideIcon,
+} from "lucide-react";
 
 import { cn, formatCurrency } from "@/lib/utils";
+
+const ICON_MAP: Record<string, LucideIcon> = {
+  "dollar-sign": DollarSign,
+};
 
 interface DualKpiValue {
   label: string;
@@ -29,7 +41,7 @@ interface DualKpiCardProps {
   title: string;
   primary: DualKpiValue;
   secondary: DualKpiValue;
-  icon?: LucideIcon;
+  iconName?: string;
   subtitle?: string;
   className?: string;
   highlight?: boolean;
@@ -40,12 +52,13 @@ export function DualKpiCard({
   title,
   primary,
   secondary,
-  icon: Icon,
+  iconName,
   subtitle,
   className,
   highlight = false,
   currencyOptions,
 }: DualKpiCardProps) {
+  const Icon = iconName ? ICON_MAP[iconName] : undefined;
   const iconClass = highlight
     ? "bg-primary text-primary-foreground"
     : "bg-secondary text-secondary-foreground";

@@ -39,7 +39,7 @@ function DonutTooltip({
       <div className="space-y-0.5 text-xs">
         <div className="flex items-center justify-between gap-5">
           <span className="text-muted-foreground">Total cobrado</span>
-          <span className="font-medium tabular-nums">{formatCurrency(value)}</span>
+          <span className="font-medium tabular-nums">{formatCurrency(value, { currency: "USD" })}</span>
         </div>
         <div className="flex items-center justify-between gap-5">
           <span className="text-muted-foreground">Participación</span>
@@ -98,7 +98,7 @@ export function MediosPagoChart({ data }: Props) {
               cy="50%"
               innerRadius="32%"
               outerRadius="82%"
-              dataKey="monto"
+              dataKey="montoUsd"
               nameKey="medioPago"
               paddingAngle={2}
               strokeWidth={0}

@@ -12,33 +12,35 @@ import { MAP_MES_NUM_TO_ABBR as MES_ABBR } from "@/lib/date-utils";
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
 export type KpiData = {
-  ventaNetaYTD: number;   // siempre Ene-1 → hoy (independiente del filtro)
-  ventaNeta: number;      // período filtrado (se usa internamente para proyeccionPct)
-  proyeccion: number;
-  totalCobrado: number;
-  ticketPromedio: number;
+  ventaNetaYTDUsd: number;         // siempre Ene-1 → hoy (independiente del filtro)
+  ventaNetaYTDSinIvaUsd: number;
+  ventaNetaUsd: number;            // período filtrado (con IVA — se usa internamente para proyeccionPct)
+  ventaNetaSinIvaUsd: number;
+  proyeccionUsd: number;
+  totalCobradoUsd: number;
+  ticketPromedioUsd: number;
   cantidadPedidos: number;
-  totalExamenes: number;
+  cantidadFacturas: number;
   clientesNuevos: number;
 };
 
 export type MonthlyTrendData = {
   periodo: string;  // "YYYY-MM"
   label: string;    // "Ene", "Feb", ...
-  ventaNeta: number;
+  ventaNetaUsd: number;
   cantidadFacturas: number;
 };
 
 export type VentaSucursal = {
   idSucursal: number;
   nombreSucursal: string;
-  ventaNeta: number;
-  estimadoCierre: number;
+  ventaNetaUsd: number;
+  estimadoCierreUsd: number;
 };
 
 export type MedioPago = {
   medioPago: string;
-  monto: number;
+  montoUsd: number;
   porcentaje: number; // con 1 decimal (ej: 45.2)
 };
 
@@ -58,11 +60,12 @@ type FetchTrendParams = TrendParams & {
 
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
-type VentasKpiRow       = { anio: number; mes_nro: number; periodo: string; ventaMensual: number; trafico: number };
+type VentasKpiRow       = { anio: number; mes_nro: number; periodo: string; ventaMensualUsd: number; trafico: number };
 type ValorRow           = { valor: number };
-type PedidosClientesRow = { cantidadPedidos: number; clientesNuevos: number };
-type TopSucursalRow     = { idSucursal: number; nombreSucursal: string; ventaNeta: number; estimadoCierre: number };
-type MedioPagoRow       = { medioPago: string; monto: number };
+type VentaNetaRow       = { ventaNetaUsd: number; ventaNetaSinIvaUsd: number };
+type PedidosRow         = { cantidadPedidos: number };
+type TopSucursalRow     = { idSucursal: number; nombreSucursal: string; ventaNetaUsd: number; estimadoCierreUsd: number };
+type MedioPagoRow       = { medioPago: string; montoUsd: number };
 
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
@@ -95,13 +98,19 @@ const fetchResumenKPIs = unstable_cache(
       ventaNetaYtdRes,
       proyeccionRes,
       cobradoRes,
-      pedidosClientesRes,
-      examenesRes,
+      pedidosRes,
+      facturasRes,
+      clientesNuevosRes,
     ] = await Promise.all([
 
       // C-1.1 — Venta Neta: período filtrado exacto, con ROUND para paridad DAX
+      // Trae ambas variantes (con y sin IVA) — monto_neto_usd/monto_neto_sin_iva_usd
+      // ya vienen precalculadas 1:1 con la fórmula DAX (validado: Venta Bruta USD -
+      // Devoluciones USD == monto_neto_usd, en agregado y en caso puntual).
       req().query(`
-        SELECT ISNULL(ROUND(SUM(monto_neto), 2), 0) AS valor
+        SELECT
+          ISNULL(ROUND(SUM(monto_neto_usd), 2), 0)         AS ventaNetaUsd,
+          ISNULL(ROUND(SUM(monto_neto_sin_iva_usd), 2), 0) AS ventaNetaSinIvaUsd
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
           ${buildSucursalFilter("")}
@@ -109,97 +118,113 @@ const fetchResumenKPIs = unstable_cache(
 
       // C-1.6 — Venta Neta YTD: query independiente — año en curso GMT-4, sin OR contaminante
       req().query(`
-        SELECT ISNULL(ROUND(SUM(monto_neto), 2), 0) AS valor
+        SELECT
+          ISNULL(ROUND(SUM(monto_neto_usd), 2), 0)         AS ventaNetaUsd,
+          ISNULL(ROUND(SUM(monto_neto_sin_iva_usd), 2), 0) AS ventaNetaSinIvaUsd
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @ytdStart AND @ytdEnd
           ${buildSucursalFilter("")}
       `),
 
-      // C-1.2 — Proyección: condicional mes histórico (→ venta real) vs mes en curso (→ extrapolación)
-      // Los días transcurridos y el último día del mes se calculan en tiempo real con GMT-4
+      // C-1.2 — Proyección: regla de negocio confirmada con el autor del DAX —
+      // el cálculo NUNCA depende del rango seleccionado, siempre extrapola el mes
+      // calendario actual completo. El rango elegido solo decide si esa proyección
+      // se muestra (el mes actual cae dentro del rango) o se muestra 0 (el rango
+      // son solo meses ya cerrados, sin tocar el mes en curso).
       req().query(`
         DECLARE @DiaHoyGMT4  INT = DAY(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
         DECLARE @MesHoyGMT4  INT = MONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
         DECLARE @AnioHoyGMT4 INT = YEAR(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
         DECLARE @DiasTranscurridos INT = CASE WHEN @DiaHoyGMT4 = 1 THEN 1 ELSE @DiaHoyGMT4 - 1 END;
         DECLARE @UltimoDiaMes      INT = DAY(EOMONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE)));
-        DECLARE @MesStart  INT = MONTH(CAST(@startDate AS DATE));
-        DECLARE @AnioStart INT = YEAR(CAST(@startDate AS DATE));
+
+        -- "Periodo" como año*12+mes para comparar rangos de mes calendario sin ambigüedad
+        DECLARE @PeriodoHoy   INT = @AnioHoyGMT4 * 12 + @MesHoyGMT4;
+        DECLARE @PeriodoStart INT = YEAR(CAST(@startDate AS DATE)) * 12 + MONTH(CAST(@startDate AS DATE));
+        DECLARE @PeriodoEnd   INT = YEAR(CAST(@endDate AS DATE))   * 12 + MONTH(CAST(@endDate AS DATE));
+
         SELECT CASE
-          WHEN @AnioStart < @AnioHoyGMT4
-            OR (@AnioStart = @AnioHoyGMT4 AND @MesStart < @MesHoyGMT4)
-            THEN ISNULL(ROUND(SUM(monto_neto), 2), 0)
+          WHEN @PeriodoHoy NOT BETWEEN @PeriodoStart AND @PeriodoEnd THEN 0
           ELSE ISNULL(ROUND(
-            SUM(CAST(monto_neto AS DECIMAL(18,4)))
+            SUM(CAST(monto_neto_usd AS DECIMAL(18,4)))
             / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0)
             * CAST(@UltimoDiaMes AS DECIMAL(18,4))
           , 2), 0)
         END AS valor
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
+        WHERE anio_factura = @AnioHoyGMT4 AND mes_factura_nro = @MesHoyGMT4
+          ${buildSucursalFilter("")}
+      `),
+
+      // C-1.3 — Total Cobrado: Fact_Recaudo (reemplaza Dash_Recaudo_Agregado, sin columna _usd)
+      req().query(`
+        SELECT ISNULL(ROUND(SUM(importe_neto_usd), 2), 0) AS valor
+        FROM dbo.Fact_Recaudo
+        WHERE fecha_completa BETWEEN @startDate AND @endDate
+          ${buildSucursalFilter("")}
+      `),
+
+      // C-1.5 — Órdenes: DISTINCT id_pedido en el rango (Fact_Pedidos)
+      req().query(`
+        SELECT COUNT(DISTINCT id_pedido) AS cantidadPedidos
+        FROM dbo.Fact_Pedidos
+        WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
+          ${buildSucursalFilter("")}
+      `),
+
+      // C-1.4 — Cantidad Facturas: DISTINCTCOUNT(Fact_Ventas[id_factura]) — alimenta
+      // tanto el denominador de Ticket Promedio como la tarjeta "Órdenes Facturadas"
+      // (Fact_Ventas es una tabla distinta de Fact_Pedidos: una factura no es lo
+      // mismo que un pedido/orden de laboratorio).
+      req().query(`
+        SELECT COUNT(DISTINCT id_factura) AS valor
+        FROM dbo.Fact_Ventas
         WHERE fecha_factura BETWEEN @startDate AND @endDate
           ${buildSucursalFilter("")}
       `),
 
-      // C-1.3 — Total Cobrado: Dash_Recaudo_Agregado (pre-calculado por el ETL)
+      // C-1.8 — Clientes Nuevos: KPI_Inf1_Clientes_Nuevos (DAX real) — UNION de
+      // fecha de registro (Dim_Clientes) + fecha de primera actividad (Fact_Ventas
+      // UNION Fact_Pedidos). Paridad exacta con Power BI, incluyendo el artefacto de
+      // backfill de junio 2026 (reportado aparte a VisioFlow, no se corrige acá).
       req().query(`
-        SELECT ISNULL(ROUND(SUM(monto_total), 2), 0) AS valor
-        FROM dbo.Dash_Recaudo_Agregado
-        WHERE fecha_recaudo BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
-      `),
-
-      // C-1.5 + C-1.8 — Órdenes (DISTINCT id_pedido) y Clientes Nuevos
-      req().query(`
-        WITH pedidos_periodo AS (
-          SELECT DISTINCT
-            fp.id_pedido,
-            fp.id_cliente,
-            CASE WHEN NOT EXISTS (
-              SELECT 1 FROM dbo.Fact_Pedidos fp2
-              WHERE fp2.id_cliente = fp.id_cliente
-                AND CAST(fp2.fecha_pedido_completa AS DATE) < @startDate
-            ) THEN 1 ELSE 0 END AS es_nuevo
-          FROM dbo.Fact_Pedidos fp
-          WHERE CAST(fp.fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("fp")}
-        )
-        SELECT
-          COUNT(DISTINCT id_pedido)                                   AS cantidadPedidos,
-          COUNT(DISTINCT CASE WHEN es_nuevo = 1 THEN id_cliente END)  AS clientesNuevos
-        FROM pedidos_periodo
-      `),
-
-      // C-1.7 — Total Exámenes: Fact_Examenes usando COUNT(DISTINCT id_examen)
-      req().query(`
-        SELECT COUNT(DISTINCT id_examen) AS valor
-        FROM dbo.Fact_Examenes
-        WHERE fecha_examen_completa BETWEEN @startDate AND @endDate
+        SELECT COUNT(DISTINCT id_cliente) AS valor
+        FROM dbo.KPI_Inf1_Clientes_Nuevos
+        WHERE fecha_evento BETWEEN @startDate AND @endDate
           ${buildSucursalFilter("")}
       `),
     ]);
 
-    const ventaNeta       = Number((ventaNetaRes.recordset    as ValorRow[])[0]?.valor ?? 0);
-    const ventaNetaYTD    = Number((ventaNetaYtdRes.recordset as ValorRow[])[0]?.valor ?? 0);
-    const proyeccion      = Number((proyeccionRes.recordset   as ValorRow[])[0]?.valor ?? 0);
-    const totalCobrado    = Number((cobradoRes.recordset      as ValorRow[])[0]?.valor ?? 0);
-    const pedidosRow      = pedidosClientesRes.recordset[0]   as PedidosClientesRow;
-    const cantidadPedidos = Number(pedidosRow?.cantidadPedidos ?? 0);
+    const ventaNetaRow      = (ventaNetaRes.recordset    as VentaNetaRow[])[0];
+    const ventaNetaYtdRow   = (ventaNetaYtdRes.recordset as VentaNetaRow[])[0];
+    const ventaNetaUsd         = Number(ventaNetaRow?.ventaNetaUsd ?? 0);
+    const ventaNetaSinIvaUsd   = Number(ventaNetaRow?.ventaNetaSinIvaUsd ?? 0);
+    const ventaNetaYTDUsd      = Number(ventaNetaYtdRow?.ventaNetaUsd ?? 0);
+    const ventaNetaYTDSinIvaUsd = Number(ventaNetaYtdRow?.ventaNetaSinIvaUsd ?? 0);
+    const proyeccionUsd     = Number((proyeccionRes.recordset as ValorRow[])[0]?.valor ?? 0);
+    const totalCobradoUsd   = Number((cobradoRes.recordset    as ValorRow[])[0]?.valor ?? 0);
+    const cantidadPedidos   = Number((pedidosRes.recordset as PedidosRow[])[0]?.cantidadPedidos ?? 0);
+    const cantidadFacturas  = Number((facturasRes.recordset as ValorRow[])[0]?.valor ?? 0);
+    const clientesNuevos    = Number((clientesNuevosRes.recordset as ValorRow[])[0]?.valor ?? 0);
 
-    // C-1.4 — Ticket Promedio: derivado de ventaNeta y cantidadPedidos ya corregidos
-    // Equivalente exacto al DAX: DIVIDE([Venta Neta], [Cantidad Pedidos], 0)
-    const ticketPromedio = cantidadPedidos > 0
-      ? Math.round((ventaNeta / cantidadPedidos) * 100) / 100
+    // C-1.4 — Ticket Promedio: DIVIDE([Venta Neta USD], [Cantidad Facturas], 0) —
+    // el denominador real del DAX es Fact_Ventas.id_factura, NO Fact_Pedidos.id_pedido
+    // (confirmado con evidencia: son tablas distintas, factura ≠ pedido/orden de lab).
+    const ticketPromedioUsd = cantidadFacturas > 0
+      ? Math.round((ventaNetaUsd / cantidadFacturas) * 100) / 100
       : 0;
 
     return {
-      ventaNetaYTD,
-      ventaNeta,
-      proyeccion,
-      totalCobrado,
-      ticketPromedio,
+      ventaNetaYTDUsd,
+      ventaNetaYTDSinIvaUsd,
+      ventaNetaUsd,
+      ventaNetaSinIvaUsd,
+      proyeccionUsd,
+      totalCobradoUsd,
+      ticketPromedioUsd,
       cantidadPedidos,
-      totalExamenes:  Number((examenesRes.recordset as ValorRow[])[0]?.valor ?? 0),
-      clientesNuevos: Number(pedidosRow?.clientesNuevos ?? 0),
+      cantidadFacturas,
+      clientesNuevos,
     };
   },
   ["dash-ventas-kpis"],
@@ -242,7 +267,7 @@ const fetchVentasDiarias = unstable_cache(
         anio_factura                                                                  AS anio,
         mes_factura_nro                                                               AS mes_nro,
         periodo_factura                                                               AS periodo,
-        ISNULL(SUM(monto_neto), 0)                                                   AS ventaMensual,
+        ISNULL(SUM(monto_neto_usd), 0)                                               AS ventaMensualUsd,
         COUNT(DISTINCT id_factura)                                                    AS trafico
       FROM dbo.KPI_Inf1_Venta_Neta
       WHERE anio_factura = YEAR(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00'))
@@ -256,7 +281,7 @@ const fetchVentasDiarias = unstable_cache(
       return {
         periodo:          String(r.periodo ?? `${r.anio}-${String(mesNum).padStart(2, "0")}`),
         label:            `${MES_ABBR[String(mesNum).padStart(2, "0")] ?? String(mesNum)} '${String(r.anio).slice(-2)}`,
-        ventaNeta:        Number(r.ventaMensual ?? 0),
+        ventaNetaUsd:     Number(r.ventaMensualUsd ?? 0),
         cantidadFacturas: Number(r.trafico ?? 0),
       };
     });
@@ -310,12 +335,12 @@ const fetchTopSucursales = unstable_cache(
       SELECT
         vn.idSucursal,
         ds.nombre_sucursal              AS nombreSucursal,
-        vn.ventaNeta,
-        ISNULL(pv.estimado, 0)         AS estimadoCierre
+        vn.ventaNetaUsd,
+        ISNULL(pv.estimado, 0)         AS estimadoCierreUsd
       FROM (
         SELECT
           id_sucursal                  AS idSucursal,
-          ISNULL(ROUND(SUM(monto_neto), 2), 0)  AS ventaNeta
+          ISNULL(ROUND(SUM(monto_neto_usd), 2), 0)  AS ventaNetaUsd
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
           ${buildSucursalFilter("")}
@@ -327,22 +352,22 @@ const fetchTopSucursales = unstable_cache(
           id_sucursal,
           ISNULL(ROUND(CASE
             WHEN @AnioStart < @AnioHoyGMT4 OR (@AnioStart = @AnioHoyGMT4 AND @MesStart < @MesHoyGMT4)
-              THEN SUM(monto_neto)
-            ELSE SUM(CAST(monto_neto AS DECIMAL(18,4))) / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0) * CAST(@UltimoDiaMes AS DECIMAL(18,4))
+              THEN SUM(monto_neto_usd)
+            ELSE SUM(CAST(monto_neto_usd AS DECIMAL(18,4))) / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0) * CAST(@UltimoDiaMes AS DECIMAL(18,4))
           END, 2), 0) AS estimado
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
           ${buildSucursalFilter("")}
         GROUP BY id_sucursal
       ) pv ON pv.id_sucursal = vn.idSucursal
-      ORDER BY vn.ventaNeta DESC
+      ORDER BY vn.ventaNetaUsd DESC
     `);
 
     return (res.recordset as TopSucursalRow[]).map((r) => ({
-      idSucursal:     Number(r.idSucursal),
-      nombreSucursal: String(r.nombreSucursal ?? ""),
-      ventaNeta:      Number(r.ventaNeta ?? 0),
-      estimadoCierre: Number(r.estimadoCierre ?? 0),
+      idSucursal:        Number(r.idSucursal),
+      nombreSucursal:    String(r.nombreSucursal ?? ""),
+      ventaNetaUsd:      Number(r.ventaNetaUsd ?? 0),
+      estimadoCierreUsd: Number(r.estimadoCierreUsd ?? 0),
     }));
   },
   ["dash-ventas-top-sucursales"],
@@ -384,24 +409,24 @@ const fetchMediosPago = unstable_cache(
 
     const res = await req().query(`
       SELECT
-        metodo_pago                       AS medioPago,
-        ISNULL(SUM(monto_total), 0)       AS monto
-      FROM dbo.Dash_Recaudo_Agregado
-      WHERE fecha_recaudo BETWEEN @startDate AND @endDate
+        metodo_pago                          AS medioPago,
+        ISNULL(SUM(importe_neto_usd), 0)     AS montoUsd
+      FROM dbo.Fact_Recaudo
+      WHERE fecha_completa BETWEEN @startDate AND @endDate
         ${buildSucursalFilter("")}
       GROUP BY metodo_pago
-      ORDER BY monto DESC
+      ORDER BY montoUsd DESC
     `);
 
     const rawMedios = (res.recordset as MedioPagoRow[]).map((r) => ({
       medioPago: r.medioPago ?? "",
-      monto:     Number(r.monto ?? 0),
+      montoUsd:  Number(r.montoUsd ?? 0),
     }));
-    const totalMonto = rawMedios.reduce((acc, r) => acc + r.monto, 0);
+    const totalMonto = rawMedios.reduce((acc, r) => acc + r.montoUsd, 0);
     return rawMedios.map((r) => ({
       ...r,
       porcentaje:
-        totalMonto > 0 ? Math.round((r.monto / totalMonto) * 10000) / 100 : 0,
+        totalMonto > 0 ? Math.round((r.montoUsd / totalMonto) * 10000) / 100 : 0,
     }));
   },
   ["dash-ventas-medios-pago"],

@@ -41,11 +41,11 @@ function ChartTooltip({
         <div key={p.name} className="flex items-center gap-2.5 text-xs">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
           <span className="text-muted-foreground">
-            {p.name === "ventaNeta" ? "Venta Neta" : "Cantidad de Facturas"}
+            {p.name === "ventaNetaUsd" ? "Venta Neta" : "Cantidad de Facturas"}
           </span>
           <span className="ml-auto font-semibold tabular-nums">
-            {p.name === "ventaNeta"
-              ? formatCurrency(Number(p.value ?? 0))
+            {p.name === "ventaNetaUsd"
+              ? formatCurrency(Number(p.value ?? 0), { currency: "USD" })
               : Number(p.value ?? 0).toLocaleString("en-US")}
           </span>
         </div>
@@ -88,7 +88,7 @@ export function VentasChart({ data }: Props) {
         {/* Eje Y izquierdo: montos (barras) */}
         <YAxis
           yAxisId="left"
-          tickFormatter={formatCompactCurrency}
+          tickFormatter={(v) => formatCompactCurrency(v, { currency: "USD" })}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
@@ -114,8 +114,8 @@ export function VentasChart({ data }: Props) {
         {/* Barras redondeadas: Venta Neta — azul profundo */}
         <Bar
           yAxisId="left"
-          dataKey="ventaNeta"
-          name="ventaNeta"
+          dataKey="ventaNetaUsd"
+          name="ventaNetaUsd"
           fill="var(--primary)"
           radius={[6, 6, 0, 0]}
           maxBarSize={40}

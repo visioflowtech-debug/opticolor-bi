@@ -43,9 +43,9 @@ function SucursalesList({
   return (
     <div className="flex flex-col gap-2.5 w-full">
       {items.map((item, i) => {
-        const ventaPct = maxValue > 0 ? (item.ventaNeta / maxValue) * 100 : 0;
+        const ventaPct = maxValue > 0 ? (item.ventaNetaUsd / maxValue) * 100 : 0;
         const estimadoPct =
-          hasEstimado && maxValue > 0 ? (item.estimadoCierre / maxValue) * 100 : 0;
+          hasEstimado && maxValue > 0 ? (item.estimadoCierreUsd / maxValue) * 100 : 0;
 
         return (
           <Tooltip
@@ -95,7 +95,7 @@ function SucursalesList({
 
                 {/* Value */}
                 <span className="w-20 shrink-0 text-right text-xs font-semibold tabular-nums sm:w-24">
-                  {formatCompactCurrency(item.ventaNeta)}
+                  {formatCompactCurrency(item.ventaNetaUsd, { currency: "USD" })}
                 </span>
               </div>
             </TooltipTrigger>
@@ -112,14 +112,14 @@ function SucursalesList({
                 <div className="flex items-center justify-between gap-5">
                   <span className="text-muted-foreground">Venta Neta</span>
                   <span className="font-medium tabular-nums text-foreground">
-                    {formatCurrency(item.ventaNeta)}
+                    {formatCurrency(item.ventaNetaUsd, { currency: "USD" })}
                   </span>
                 </div>
-                {item.estimadoCierre > 0 && (
+                {item.estimadoCierreUsd > 0 && (
                   <div className="flex items-center justify-between gap-5">
                     <span className="text-muted-foreground">Proyección Cierre</span>
                     <span className="font-medium tabular-nums text-foreground">
-                      {formatCurrency(item.estimadoCierre)}
+                      {formatCurrency(item.estimadoCierreUsd, { currency: "USD" })}
                     </span>
                   </div>
                 )}
@@ -146,9 +146,9 @@ export function SucursalesChart({ data }: Props) {
     );
   }
 
-  const sortedData = [...data].sort((a, b) => b.ventaNeta - a.ventaNeta);
-  const maxValue = Math.max(...sortedData.map((d) => Math.max(d.ventaNeta, d.estimadoCierre)));
-  const hasEstimado = sortedData.some((d) => d.estimadoCierre > 0);
+  const sortedData = [...data].sort((a, b) => b.ventaNetaUsd - a.ventaNetaUsd);
+  const maxValue = Math.max(...sortedData.map((d) => Math.max(d.ventaNetaUsd, d.estimadoCierreUsd)));
+  const hasEstimado = sortedData.some((d) => d.estimadoCierreUsd > 0);
 
   const displayData = isMobile ? sortedData.slice(0, visibleCount) : sortedData.slice(0, 10);
 

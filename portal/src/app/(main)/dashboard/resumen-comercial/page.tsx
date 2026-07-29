@@ -17,13 +17,15 @@ import { ChartSkeleton } from "../_components/skeletons";
 type SearchParams = Promise<{ from?: string; to?: string; sucursal?: string }>;
 
 const EMPTY_KPIS = {
-  ventaNetaYTD: 0,
-  ventaNeta: 0,
-  proyeccion: 0,
-  totalCobrado: 0,
-  ticketPromedio: 0,
+  ventaNetaYTDUsd: 0,
+  ventaNetaYTDSinIvaUsd: 0,
+  ventaNetaUsd: 0,
+  ventaNetaSinIvaUsd: 0,
+  proyeccionUsd: 0,
+  totalCobradoUsd: 0,
+  ticketPromedioUsd: 0,
   cantidadPedidos: 0,
-  totalExamenes: 0,
+  cantidadFacturas: 0,
   clientesNuevos: 0,
 };
 
@@ -46,10 +48,12 @@ export default async function ResumenComercialPage({
   const kpis = result.data ?? EMPTY_KPIS;
 
   // proyeccionPct: compara venta real del período filtrado vs su proyección al cierre
+  // Usa la Venta Neta con IVA (ventaNetaUsd) — mismo concepto que ya usaba este
+  // cálculo antes de la migración.
   const proyeccionPct =
-    kpis.proyeccion > 0 ? Math.round((kpis.ventaNeta / kpis.proyeccion) * 100) : 0;
+    kpis.proyeccionUsd > 0 ? Math.round((kpis.ventaNetaUsd / kpis.proyeccionUsd) * 100) : 0;
 
-  const pendienteCobro = kpis.ventaNeta - kpis.totalCobrado;
+  const pendienteCobro = kpis.ventaNetaUsd - kpis.totalCobradoUsd;
 
   return (
     <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
@@ -64,52 +68,52 @@ export default async function ResumenComercialPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <KpiCard
           title="Venta Neta"
-          value={formatCompactCurrency(kpis.ventaNeta)}
-          fullValue={formatCurrency(kpis.ventaNeta)}
+          value={formatCompactCurrency(kpis.ventaNetaUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.ventaNetaUsd, { currency: "USD" })}
           iconName="dollar-sign"
           highlight
         />
         <KpiCard
+          title="Venta Neta Sin Impuesto"
+          value={formatCompactCurrency(kpis.ventaNetaSinIvaUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.ventaNetaSinIvaUsd, { currency: "USD" })}
+          iconName="wallet"
+        />
+        <KpiCard
           title="Proyección Cierre"
-          value={formatCompactCurrency(kpis.proyeccion)}
-          fullValue={formatCurrency(kpis.proyeccion)}
+          value={formatCompactCurrency(kpis.proyeccionUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.proyeccionUsd, { currency: "USD" })}
           subtitle={`${proyeccionPct}% del objetivo alcanzado`}
           iconName="trending-up"
         />
         <KpiCard
           title="Total Cobrado"
-          value={formatCompactCurrency(kpis.totalCobrado)}
-          fullValue={formatCurrency(kpis.totalCobrado)}
+          value={formatCompactCurrency(kpis.totalCobradoUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.totalCobradoUsd, { currency: "USD" })}
           subtitle={
             pendienteCobro > 0
-              ? `${formatCompactCurrency(pendienteCobro)} pendiente de cobro`
+              ? `${formatCompactCurrency(pendienteCobro, { currency: "USD" })} pendiente de cobro`
               : "Sin pendientes"
           }
           iconName="credit-card"
         />
         <KpiCard
           title="Ticket Promedio"
-          value={formatCompactCurrency(kpis.ticketPromedio)}
-          fullValue={formatCurrency(kpis.ticketPromedio)}
+          value={formatCompactCurrency(kpis.ticketPromedioUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.ticketPromedioUsd, { currency: "USD" })}
           iconName="bar-chart-3"
         />
         <KpiCard
           title="Venta Neta YTD"
-          value={formatCompactCurrency(kpis.ventaNetaYTD)}
-          fullValue={formatCurrency(kpis.ventaNetaYTD)}
+          value={formatCompactCurrency(kpis.ventaNetaYTDUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.ventaNetaYTDUsd, { currency: "USD" })}
           iconName="dollar-sign"
         />
         <KpiCard
           title="Ordenes Facturadas"
-          value={formatCompactNumber(kpis.cantidadPedidos)}
-          fullValue={kpis.cantidadPedidos.toLocaleString("en-US")}
+          value={formatCompactNumber(kpis.cantidadFacturas)}
+          fullValue={kpis.cantidadFacturas.toLocaleString("en-US")}
           iconName="shopping-cart"
-        />
-        <KpiCard
-          title="Total Exámenes"
-          value={formatCompactNumber(kpis.totalExamenes)}
-          fullValue={kpis.totalExamenes.toLocaleString("en-US")}
-          iconName="eye"
         />
         <KpiCard
           title="Clientes Nuevos"

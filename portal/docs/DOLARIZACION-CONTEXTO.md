@@ -107,15 +107,17 @@ Confirmado por revisión directa del .pbix (Edit Interactions / Performance Anal
 visuales NO están vinculados al slicer de fecha en Power BI — solo al de sucursal. Al migrar
 cada reporte, verificar si el portal replica esto o si aplica un filtro de fecha que no debería.
 
-- **Resumen Comercial:** gráfico de relación de Ventas Netas y Tráfico de Ventas — pendiente de
-  verificar cuando se migre este reporte.
-- **Cartera:** Monto Saldo Pendiente, Órdenes por Liquidar (ya corregidos), gráfico de tendencia
-  GAP de Cobro, tabla de Clientes Deudores (corregidos en este prompt).
-- **Eficiencia:** gráfico de Tendencia de Órdenes (corregido en este prompt).
+- **Resumen Comercial:** gráfico de relación de Ventas Netas y Tráfico de Ventas — confirmado por
+  el usuario en el `.pbix`, pendiente de aplicar cuando se migre este reporte.
+- **Cartera:** Monto Saldo Pendiente, Órdenes por Liquidar, gráfico de tendencia GAP de Cobro,
+  tabla de Clientes Deudores — todos corregidos.
+- **Eficiencia:** gráfico de Tendencia de Órdenes — corregido.
 - **Desempeño Clínico:** gráfico de Exámenes (Volumen Total vs. Conversión), gráfico de Tendencia
-  de Exámenes por Mes — pendiente de verificar cuando se migre este reporte.
-- **Inventario:** Stock Físico (Unidades), Capital Invertido — pendiente de verificar cuando se
-  migre este reporte.
+  de Exámenes por Mes — corregidos (Prompt Fase 2 Clínico). Nota: este módulo no tiene ningún KPI
+  ni gráfico monetario (todos son de conteo/porcentaje), así que el único fix aplicable acá fue el
+  de la ventana de tendencia, no hubo migración de moneda.
+- **Inventario:** Stock Físico (Unidades), Capital Invertido — confirmado por el usuario en el
+  `.pbix`, pendiente de aplicar cuando se migre este reporte.
 
 Metodología: nunca asumir que un visual debe desvincularse solo por estar en esta lista — validar
 primero con una consulta directa comparando contra el valor/comportamiento real de Power BI, y
@@ -130,3 +132,38 @@ completa se vaciaba. El fix fue anclar la ventana a `GETDATE()` (fecha actual de
 de `@endDate`, dejando el filtro de sucursal/RLS intacto. Este mismo patrón ("ventana de tiempo
 fija de N meses, pero anclada a `@endDate` en vez de a `GETDATE()`") es el primer lugar a revisar
 en cualquier gráfico de tendencia de los reportes aún no migrados.
+
+## Metodología de validación
+
+- **Nunca validar el portal contra Power BI usando un rango de fechas que incluya el día de hoy**
+  (o cualquier día posterior al último refresh conocido de Power BI). El portal consulta la base
+  de datos en vivo; Power BI trabaja sobre un snapshot que se actualiza en su propio ciclo de
+  refresh (confirmado: el último fue a las 8pm). El ETL interno de Opticolor (`Etl_Ciclos`) sigue
+  corriendo después de ese refresh — se confirmó actividad a las 20:00, 22:00, 00:00 y 02:28 del
+  mismo ciclo diario, con `Etl_Checkpoints.checkpoint_exams_watermark` en `2026-07-29 02:29:22` —
+  por lo que cualquier transacción cargada por esos ciclos posteriores al refresh de Power BI
+  aparece de inmediato en el portal pero no en Power BI hasta su próximo refresh.
+- **Cómo validar correctamente:** comparar siempre contra días ya cerrados (ej. 01/07 al 27/07 en
+  vez de 01/07 al 28/07 si "hoy" es 28/07), o si hace falta validar el día en curso, comparar contra
+  la hora exacta del último refresh conocido de Power BI, no contra "ahora".
+- **Evidencia de referencia (Eficiencia, todas las sucursales):** rango 01/07 al 27/07 (cerrado) =
+  16,158 órdenes / \$2,220,796.33 USD. Rango 01/07 al 28/07 (incluye hoy) = 16,681 órdenes /
+  \$2,297,218.67 USD. El día de hoy por sí solo aporta 523 órdenes / \$76,422.34 USD — una
+  diferencia grande, esperable, y que no debe interpretarse como un bug de cálculo.
+
+## `DualKpiCard`: el ícono debe pasarse como string, no como referencia cruda al componente
+
+`DualKpiCard` (y `KpiCard`) son Client Components (`"use client"`), pero se renderizan siempre
+desde Server Components (los `page.tsx` de cada reporte). React no puede serializar en el límite
+Server→Client una referencia de función/componente sin resolver (ej. `icon={DollarSign}`, la
+importación cruda de `lucide-react`) — solo datos planos (string, number, boolean, objetos/arrays
+de esos) o JSX ya renderizado. Pasar `icon={DollarSign}` directo desde un `page.tsx` revienta el
+sitio con: *"Functions cannot be passed directly to Client Components..."* / *"Only plain objects
+can be passed to Client Components..."*.
+
+El patrón correcto, ya usado por `KpiCard` en todo el portal: el Server Component pasa un
+`iconName` de tipo `string` (ej. `"dollar-sign"`), y el propio Client Component resuelve ese string
+a un componente de ícono mediante un diccionario (`ICON_MAP`) importado y definido **dentro** del
+archivo cliente. `DualKpiCard` se corrigió para seguir el mismo patrón (antes recibía `icon:
+LucideIcon` como prop). Cualquier uso futuro de `DualKpiCard` en otro módulo debe pasar
+`iconName="..."`, nunca la referencia al componente de ícono.

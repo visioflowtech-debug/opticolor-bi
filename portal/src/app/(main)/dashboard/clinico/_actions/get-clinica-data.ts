@@ -180,27 +180,30 @@ export async function getClinicaKPIs(
 }
 
 // ─── 2. Tendencia ────────────────────────────────────────────────────────────
-
+// Tendencia de los últimos 12 meses, SIN vínculo al slicer de fecha (paridad con
+// Power BI: confirmado por Edit Interactions/Performance Analyzer que este gráfico
+// no reacciona al filtro de fecha, solo al de sucursal). La ventana se ancla a
+// GETDATE() — antes usaba @endDate, lo que hacía que el gráfico se vaciara por
+// completo si el usuario seleccionaba un rango fuera de los últimos 12 meses
+// (mismo patrón detectado y corregido en Cartera/GAP de Cobro y Eficiencia/Tendencia).
 const fetchTendenciaExamen = unstable_cache(
   async (params: FetchParams): Promise<TendenciaExamen[]> => {
-    const { endDate, sucursales, allowedSucursales, excludedClinica } = params;
+    const { sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",           endDate)
         .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("excludedClinica",   excludedClinica);
 
     const res = await req().query(`
-      SELECT 
+      SELECT
         CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120) AS periodo,
         COUNT(DISTINCT fe.id_examen) AS total_examenes
       FROM dbo.Fact_Examenes fe
-      WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
-        AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
+      WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
         AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
         ${buildSucursalFilter("fe")}
       GROUP BY CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120)
@@ -233,29 +236,28 @@ export async function getTendenciaExamen(
 }
 
 // ─── 3. Volumen vs Conversión ─────────────────────────────────────────────────
-
+// Mismo criterio que Tendencia de Exámenes: últimos 12 meses anclados a
+// GETDATE(), sin vínculo al slicer de fecha (paridad con Power BI).
 const fetchVolumenConversion = unstable_cache(
   async (params: FetchParams): Promise<VolumenConversion[]> => {
-    const { endDate, sucursales, allowedSucursales, excludedClinica } = params;
+    const { sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",           endDate)
         .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales)
         .input("excludedClinica",   excludedClinica);
 
     const res = await req().query(`
-      SELECT 
+      SELECT
         CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120) AS periodo,
         COUNT(DISTINCT fe.id_examen) AS total_examenes,
         COUNT(DISTINCT CASE WHEN fe.estado_conversion = 'Convertido' THEN fe.id_examen END) AS convertidos,
         COUNT(DISTINCT CASE WHEN fe.estado_conversion != 'Convertido' OR fe.estado_conversion IS NULL THEN fe.id_examen END) AS no_convertidos
       FROM dbo.Fact_Examenes fe
-      WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
-        AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
+      WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
         AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
         ${buildSucursalFilter("fe")}
       GROUP BY CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120)
