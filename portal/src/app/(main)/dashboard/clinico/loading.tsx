@@ -19,7 +19,7 @@ export default function ClinicaLoading() {
         <Skeleton className="h-[350px] w-full rounded-2xl" />
       </div>
 
-      {/* ── Fila 4: Top Sucursales y Volumen vs Conversión ────────── */}
+      {/* ── Fila 4: Exámenes: Volumen Total vs. Conversión ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Skeleton className="h-[480px] w-full rounded-2xl" />
         <Skeleton className="h-[480px] w-full rounded-2xl" />

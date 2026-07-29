@@ -16,7 +16,7 @@ export async function TendenciaExamenesChartWrapper({ startDate, endDate, sucurs
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Tendencia de Exámenes · Últimos 12 Meses
+          Tendencia de Exámenes por Mes
         </CardTitle>
       </CardHeader>
       <CardContent>

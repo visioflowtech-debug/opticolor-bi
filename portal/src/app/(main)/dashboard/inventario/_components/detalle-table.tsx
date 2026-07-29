@@ -14,7 +14,7 @@ import {
   TableRow,
   TableFooter,
 } from "@/components/ui/table";
-import { formatBsCurrency } from "@/lib/utils";
+import { formatCurrency } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { MarcaItem } from "../_actions/get-inventario-data";
 
@@ -37,7 +37,7 @@ export function DetalleTable({ data, error }: Props) {
   // 2. Calcular los totales basados exclusivamente en el conjunto filtrado
   const totalUnidades = filteredData.reduce((sum, item) => sum + item.unidadesVendidas, 0);
   const totalStock = filteredData.reduce((sum, item) => sum + item.stockFisico, 0);
-  const totalVentaNeta = filteredData.reduce((sum, item) => sum + item.ventaNeta, 0);
+  const totalVentaNeta = filteredData.reduce((sum, item) => sum + item.ventaNetaUsd, 0);
 
   // 3. Paginación
   const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
@@ -52,7 +52,7 @@ export function DetalleTable({ data, error }: Props) {
     <Card className="w-full h-auto flex flex-col justify-between min-w-0 overflow-hidden rounded-2xl shadow-md border border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900">
       <CardHeader className="shrink-0 pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Detalle por Marca
+          Detalle Operativo de cobertura de inventario
         </CardTitle>
         <div className="relative w-full sm:w-60">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -110,9 +110,9 @@ export function DetalleTable({ data, error }: Props) {
                       </TableCell>
                       <TableCell
                         className="text-right tabular-nums font-medium"
-                        title={formatBsCurrency(item.ventaNeta)}
+                        title={formatCurrency(item.ventaNetaUsd, { currency: "USD" })}
                       >
-                        {formatBsCurrency(item.ventaNeta)}
+                        {formatCurrency(item.ventaNetaUsd, { currency: "USD" })}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -127,7 +127,7 @@ export function DetalleTable({ data, error }: Props) {
                       {totalStock.toLocaleString("en-US")}
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums font-semibold">
-                      {formatBsCurrency(totalVentaNeta)}
+                      {formatCurrency(totalVentaNeta, { currency: "USD" })}
                     </TableCell>
                   </TableRow>
                 </TableFooter>

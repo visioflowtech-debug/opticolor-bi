@@ -1,4 +1,5 @@
 import { format, startOfMonth } from "date-fns";
+import { AlertTriangle } from "lucide-react";
 import { Suspense } from "react";
 
 import {
@@ -6,6 +7,12 @@ import {
   formatCompactNumber,
   formatCurrency,
 } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 import { getInventarioKPIs } from "./_actions/get-inventario-data";
 import { KpiCard } from "./_components/kpi-card";
@@ -25,12 +32,10 @@ type SearchParams = Promise<{
 
 const EMPTY_KPIS = {
   stockFisico: 0,
-  capitalInvertido: 0,
+  capitalInvertidoUsd: 0,
   unidadesVendidas: 0,
   ventaNetaProducto: 0,
   upt: 0,
-  asp: 0,
-  volumenUnidades: 0,
 };
 
 export default async function InventarioPage({
@@ -68,8 +73,8 @@ export default async function InventarioPage({
         </div>
       )}
 
-      {/* ── Fila 1: 6 KPI Cards ──────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {/* ── Fila 1: 4 KPI Cards ──────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Stock Físico"
           value={formatCompactNumber(kpis.stockFisico)}
@@ -80,8 +85,8 @@ export default async function InventarioPage({
         />
         <KpiCard
           title="Capital Invertido"
-          value={formatCompactCurrency(kpis.capitalInvertido)}
-          fullValue={formatCurrency(kpis.capitalInvertido)}
+          value={formatCompactCurrency(kpis.capitalInvertidoUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.capitalInvertidoUsd, { currency: "USD" })}
           subtitle="Snapshot · hasta hoy"
           iconName="dollar-sign"
         />
@@ -91,31 +96,31 @@ export default async function InventarioPage({
           fullValue={kpis.unidadesVendidas.toLocaleString("en-US")}
           iconName="trending-up"
         />
-        <KpiCard
-          title="UPT"
-          value={kpis.upt.toFixed(2)}
-          subtitle="Unidades por ticket"
-          iconName="bar-chart-2"
-        />
-        <KpiCard
-          title="ASP"
-          value={formatCompactCurrency(kpis.asp)}
-          fullValue={formatCurrency(kpis.asp)}
-          subtitle="Precio promedio de venta"
-          iconName="tag"
-        />
-        <KpiCard
-          title="Volumen Total"
-          value={formatCompactNumber(kpis.volumenUnidades)}
-          fullValue={kpis.volumenUnidades.toLocaleString("en-US")}
-          subtitle="Control analítico · sin exclusiones"
-          iconName="layers"
-        />
+        <div className="relative">
+          <KpiCard
+            title="UPT"
+            value={kpis.upt.toFixed(2)}
+            subtitle="Unidades por ticket"
+            iconName="bar-chart-2"
+          />
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="absolute bottom-3 right-3 cursor-default text-amber-500">
+                  <AlertTriangle className="h-3.5 w-3.5" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Pendiente de validación contra Gesvision
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       {/* ── Fila 2: Tabla Detalle (izq) | Dispersión (der) ────────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<TableSkeleton title="Detalle por Marca" rows={8} />}>
+        <Suspense fallback={<TableSkeleton title="Detalle Operativo de cobertura de inventario" rows={8} />}>
           <DetalleTableWrapper
             startDate={startDate}
             endDate={endDate}
@@ -125,7 +130,7 @@ export default async function InventarioPage({
           />
         </Suspense>
 
-        <Suspense fallback={<ChartSkeleton title="Eficiencia de Inventario · Stock vs Ventas" height="h-[500px]" />}>
+        <Suspense fallback={<ChartSkeleton title="Eficiencia de Inventario: Ventas vs. Stock" height="h-[500px]" />}>
           <DispersionChartWrapper
             startDate={startDate}
             endDate={endDate}
@@ -138,7 +143,7 @@ export default async function InventarioPage({
 
       {/* ── Fila 3: Ranking Marcas (izq) | Mix Grupos (der) ───────────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ChartSkeleton title="Ranking de Marcas · Unidades Vendidas" height="h-[500px]" />}>
+        <Suspense fallback={<ChartSkeleton title="Ranking de Ventas por Marca" height="h-[500px]" />}>
           <RankingMarcasChartWrapper
             startDate={startDate}
             endDate={endDate}
@@ -148,7 +153,7 @@ export default async function InventarioPage({
           />
         </Suspense>
 
-        <Suspense fallback={<ChartSkeleton title="Mix de Venta · Por Grupo Comercial" height="h-[500px]" />}>
+        <Suspense fallback={<ChartSkeleton title="Mix de Venta por Grupo Comercial" height="h-[500px]" />}>
           <TreemapChartWrapper
             startDate={startDate}
             endDate={endDate}

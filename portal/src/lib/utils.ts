@@ -84,12 +84,3 @@ export function truncateText(value: string, limit: number = 15): string {
   return value.length > limit ? `${value.substring(0, limit)}...` : value;
 }
 
-/**
- * @deprecated Alias temporal de formatCurrency. Los componentes de Inventario
- * todavía la importan directamente; se elimina cuando ese reporte se migre a
- * USD (ver docs/DOLARIZACION-CONTEXTO.md) y sus call sites pasen a formatCurrency.
- */
-export function formatBsCurrency(value: number): string {
-  return formatCurrency(value);
-}
-

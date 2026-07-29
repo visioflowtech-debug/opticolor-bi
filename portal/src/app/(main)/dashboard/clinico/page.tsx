@@ -91,28 +91,28 @@ export default async function ClinicaPage({
       </div>
 
       {/* ── Fila 4: Tendencia Full Width ────────── */}
-      <Suspense fallback={<ChartSkeleton title="Tendencia de Exámenes · Últimos 12 Meses" height="h-72" />}>
+      <Suspense fallback={<ChartSkeleton title="Tendencia de Exámenes por Mes" height="h-72" />}>
         <TendenciaExamenesChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
       </Suspense>
 
       {/* ── Fila 3: Género y Edad ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ChartSkeleton title="Distribución por Género" height="h-52" />}>
+        <Suspense fallback={<ChartSkeleton title="Distribución de Pacientes por Género" height="h-52" />}>
           <GeneroChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
 
-        <Suspense fallback={<ChartSkeleton title="Pacientes por Rango de Edad" height="h-[350px]" />}>
+        <Suspense fallback={<ChartSkeleton title="Distribución de Pacientes por Rango de Edad" height="h-[350px]" />}>
           <EdadChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
       </div>
 
-      {/* ── Fila 2: Sucursales + Volumen vs Conversión ────────── */}
+      {/* ── Fila 2: Exámenes: Volumen Total vs. Conversión ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Suspense fallback={<ChartSkeleton title="Top Sucursales por Volumen de Exámenes" height="h-[500px]" />}>
           <TopSucursalesClinicaChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
 
-        <Suspense fallback={<ChartSkeleton title="Volumen vs Conversión" height="h-[350px]" />}>
+        <Suspense fallback={<ChartSkeleton title="Exámenes: Volumen Total vs. Conversión" height="h-[350px]" />}>
           <VolumenConversionChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
       </div>

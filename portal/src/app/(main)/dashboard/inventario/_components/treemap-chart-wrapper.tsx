@@ -18,7 +18,7 @@ export async function TreemapChartWrapper({ startDate, endDate, sucursales, marc
     <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col h-auto md:h-[480px] w-full min-w-0 justify-between">
       <CardHeader className="shrink-0 pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Mix de Venta · Por Grupo Comercial
+          Mix de Venta por Grupo Comercial
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-1 flex flex-col min-h-0 pb-4">

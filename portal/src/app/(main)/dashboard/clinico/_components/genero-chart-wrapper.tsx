@@ -16,7 +16,7 @@ export async function GeneroChartWrapper({ startDate, endDate, sucursales }: Wra
     <Card className="overflow-hidden rounded-2xl shadow-md flex flex-col w-full h-auto md:h-[480px] min-w-0">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Distribución por Género
+          Distribución de Pacientes por Género
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col min-h-0 pt-0 pb-4">

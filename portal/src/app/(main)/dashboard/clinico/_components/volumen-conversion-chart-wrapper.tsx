@@ -16,7 +16,7 @@ export async function VolumenConversionChartWrapper({ startDate, endDate, sucurs
     <Card className="w-full h-auto md:h-[480px] flex flex-col justify-between min-w-0 overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Volumen vs Conversión
+          Exámenes: Volumen Total vs. Conversión
         </CardTitle>
       </CardHeader>
       <CardContent className="flex-grow flex flex-col min-h-0 p-4 md:p-6 pt-0">

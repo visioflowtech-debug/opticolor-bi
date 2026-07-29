@@ -11,27 +11,24 @@ import { getUserAllowedSucursales } from "@/lib/security";
 
 export type InventarioKpis = {
   stockFisico: number;
-  capitalInvertido: number;
+  capitalInvertidoUsd: number;
   unidadesVendidas: number;
   ventaNetaProducto: number;
   upt: number;
-  asp: number;
-  /** C-5.6 · Volumen analítico total (Dash_Ventas_Resumen sin join de dimensión) — métrica de control cruzado */
-  volumenUnidades: number;
 };
 
 export type MarcaItem = {
   marca: string;
   unidadesVendidas: number;
   stockFisico: number;
-  ventaNeta: number;
+  ventaNetaUsd: number;
 };
 
 export type DispersionItem = {
   grupo: string;
   unidadesVendidas: number;
   stockFisico: number;
-  ventaNeta: number;
+  ventaNetaUsd: number;
 };
 
 export type GrupoMix = {
@@ -51,7 +48,7 @@ type FetchParams = Params & { allowedSucursales: string };
 type InvAggRow = {
   marca: string;
   stockFisico: number;
-  capitalInvertido: number;
+  capitalInvertidoUsd: number;
 };
 
 type VentaFusedRow = {
@@ -93,12 +90,14 @@ const fetchInventarioKPIs = unstable_cache(
       return r;
     };
 
-    const [inventarioRes, salesRes, volumenRes] = await Promise.all([
+    const [inventarioRes, salesRes, facturasRes] = await Promise.all([
       // C-5.1 / C-5.2 · Stock y Capital — direct query on Fact_Inventario (acumulados históricos sin snapshot temporal)
+      // Sin filtro de fecha — confirmado que ya cumple la paridad con Power BI (no
+      // reacciona al slicer de fecha), no se le agrega ninguno.
       req().query(`
         SELECT
           ISNULL(SUM(fi.cantidad_disponible), 0) AS stockFisico,
-          ISNULL(SUM(fi.valor_total_inventario), 0) AS capitalInvertido
+          ISNULL(SUM(fi.valor_total_inventario_usd), 0) AS capitalInvertidoUsd
         FROM dbo.Fact_Inventario fi
         LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
         WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
@@ -107,49 +106,49 @@ const fetchInventarioKPIs = unstable_cache(
           ${grupoSql}
       `),
 
-      // C-5.3 / UPT / ASP · LEFT JOIN recupera líneas huérfanas y no excluye "LENTES" / "TRATAMIENTOS" (volumen bruto)
+      // C-5.3 · Unidades Vendidas (numerador de UPT) — sin cambios, sigue sobre
+      // Fact_Ventas_Detalle con filtro de marca/grupo (ya confirmado exacto vs Power BI).
       req().query(`
         SELECT
-          ISNULL(SUM(dvr.cantidad), 0)                                     AS unidadesVendidas,
-          ISNULL(SUM(dvr.monto_total), 0)                                  AS ventaNetaProducto,
-          ROUND(
-            CAST(SUM(dvr.cantidad) AS decimal(18,4)) /
-            NULLIF(COUNT(DISTINCT dvr.id_factura), 0),
-          4)                                                               AS upt,
-          ROUND(
-            ISNULL(SUM(dvr.monto_total), 0) /
-            NULLIF(SUM(dvr.cantidad), 0),
-          4)                                                               AS asp
-        FROM dbo.Dash_Ventas_Resumen dvr
-        LEFT JOIN dbo.Dim_Productos dp ON dvr.id_producto = dp.SK_Producto
-        WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
-          ${buildSucursalFilter("dvr")}
+          ISNULL(SUM(fvd.cantidad), 0)                                     AS unidadesVendidas,
+          ISNULL(SUM(fvd.total_linea_usd), 0)                              AS ventaNetaProducto
+        FROM dbo.Fact_Ventas_Detalle fvd
+        LEFT JOIN dbo.Dim_Productos dp ON fvd.id_producto = dp.SK_Producto
+        WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+          ${buildSucursalFilter("fvd")}
           ${marcaSql}
           ${grupoSql}
       `),
 
-      // C-5.6 · Volumen analítico de control: total transaccional sin join de Dim_Productos
-      // Sirve como validación cruzada contra unidadesVendidas (que filtra por segmento)
+      // C-5.4 · Cantidad Facturas (denominador de UPT) — DISTINCTCOUNT(Fact_Ventas[id_factura])
+      // sobre la cabecera de factura, NO sobre Fact_Ventas_Detalle (mismo tipo de error ya
+      // corregido en Ticket Promedio de Resumen Comercial). Fact_Ventas no tiene columna de
+      // producto, así que este conteo no puede filtrarse por marca/grupo — coincide con la
+      // definición real del DAX, que tampoco lo permite.
       req().query(`
-        SELECT ISNULL(SUM(dvr.cantidad), 0) AS volumenUnidades
-        FROM dbo.Dash_Ventas_Resumen dvr
-        WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
-          ${buildSucursalFilter("dvr")}
+        SELECT COUNT(DISTINCT id_factura) AS cantidadFacturas
+        FROM dbo.Fact_Ventas
+        WHERE fecha_factura BETWEEN @startDate AND @endDate
+          ${buildSucursalFilter("")}
       `),
     ]);
 
-    const inv    = inventarioRes.recordset[0] ?? { stockFisico: 0, capitalInvertido: 0 };
-    const sales  = salesRes.recordset[0] ?? { unidadesVendidas: 0, ventaNetaProducto: 0, upt: 0, asp: 0 };
-    const vol    = volumenRes.recordset[0] ?? { volumenUnidades: 0 };
+    const inv    = inventarioRes.recordset[0] ?? { stockFisico: 0, capitalInvertidoUsd: 0 };
+    const sales  = salesRes.recordset[0] ?? { unidadesVendidas: 0, ventaNetaProducto: 0 };
+    const unidadesVendidas = Number(sales.unidadesVendidas ?? 0);
+    const cantidadFacturas = Number((facturasRes.recordset as { cantidadFacturas: number }[])[0]?.cantidadFacturas ?? 0);
+
+    // UPT: DIVIDE([Unidades Vendidas], [Cantidad Facturas], 0)
+    const upt = cantidadFacturas > 0
+      ? Math.round((unidadesVendidas / cantidadFacturas) * 10000) / 10000
+      : 0;
 
     return {
-      stockFisico:       Number(inv.stockFisico ?? 0),
-      capitalInvertido:  Number(inv.capitalInvertido ?? 0),
-      unidadesVendidas:  Number(sales.unidadesVendidas ?? 0),
-      ventaNetaProducto: Number(sales.ventaNetaProducto ?? 0),
-      upt:               Number(sales.upt ?? 0),
-      asp:               Number(sales.asp ?? 0),
-      volumenUnidades:   Number(vol.volumenUnidades ?? 0),
+      stockFisico:         Number(inv.stockFisico ?? 0),
+      capitalInvertidoUsd: Number(inv.capitalInvertidoUsd ?? 0),
+      unidadesVendidas,
+      ventaNetaProducto:   Number(sales.ventaNetaProducto ?? 0),
+      upt,
     };
   },
   ["dash-inventario-kpis"],
@@ -202,7 +201,7 @@ const fetchMarcasDetalle = unstable_cache(
         SELECT
           ISNULL(dp.Marca, 'SIN MARCA')                 AS marca,
           ISNULL(SUM(fi.cantidad_disponible),  0)       AS stockFisico,
-          ISNULL(SUM(fi.valor_total_inventario),  0)    AS capitalInvertido
+          ISNULL(SUM(fi.valor_total_inventario_usd),  0) AS capitalInvertidoUsd
         FROM dbo.Fact_Inventario fi
         LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
         WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
@@ -216,21 +215,21 @@ const fetchMarcasDetalle = unstable_cache(
       req().query(`
         SELECT
           ISNULL(dp.Marca, 'SIN MARCA')             AS marca,
-          ISNULL(SUM(dvr.cantidad), 0)              AS unidadesVendidas,
-          ISNULL(SUM(dvr.monto_total), 0)           AS ventaNeta
-        FROM dbo.Dash_Ventas_Resumen dvr
-        LEFT JOIN dbo.Dim_Productos dp ON dvr.id_producto = dp.SK_Producto
-        WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+          ISNULL(SUM(fvd.cantidad), 0)              AS unidadesVendidas,
+          ISNULL(SUM(fvd.total_linea_usd), 0)       AS ventaNetaUsd
+        FROM dbo.Fact_Ventas_Detalle fvd
+        LEFT JOIN dbo.Dim_Productos dp ON fvd.id_producto = dp.SK_Producto
+        WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${marcaSql}
           ${grupoSql}
-          ${buildSucursalFilter("dvr")}
+          ${buildSucursalFilter("fvd")}
         GROUP BY dp.Marca
-        ORDER BY SUM(dvr.monto_total) DESC
+        ORDER BY SUM(fvd.total_linea_usd) DESC
       `),
     ]);
 
     const invRows = inventarioRes.recordset as InvAggRow[];
-    const salesRows = salesRes.recordset as { marca: string; unidadesVendidas: number; ventaNeta: number }[];
+    const salesRows = salesRes.recordset as { marca: string; unidadesVendidas: number; ventaNetaUsd: number }[];
 
     const stockByMarca = new Map(
       invRows.map((r) => [String(r.marca ?? ""), Number(r.stockFisico ?? 0)]),
@@ -245,7 +244,7 @@ const fetchMarcasDetalle = unstable_cache(
         marca:            name,
         unidadesVendidas: Number(r.unidadesVendidas ?? 0),
         stockFisico:      stockByMarca.get(name) ?? 0,
-        ventaNeta:        Number(r.ventaNeta ?? 0),
+        ventaNetaUsd:     Number(r.ventaNetaUsd ?? 0),
       });
     });
 
@@ -256,7 +255,7 @@ const fetchMarcasDetalle = unstable_cache(
           marca:            name,
           unidadesVendidas: 0,
           stockFisico:      Number(r.stockFisico ?? 0),
-          ventaNeta:        0,
+          ventaNetaUsd:     0,
         });
       }
     });
@@ -308,27 +307,36 @@ const fetchGruposMix = unstable_cache(
       return r;
     };
 
+    // INNER JOIN (no LEFT JOIN) — confirmado con evidencia que "Sin Grupo" eran
+    // 100% líneas huérfanas de Fact_Ventas_Detalle sin match en Dim_Productos (no
+    // hay casos de producto existente con Segmento_Comercial nulo). Power BI no
+    // muestra esas filas en el treemap, así que se excluyen para tener paridad
+    // exacta. Se excluye también LENTES/TRATAMIENTOS, mismo filtro que el resto
+    // del reporte (Stock Físico/Capital Invertido) — confirmado que quita "Lentes"
+    // sin alterar los montos de los demás grupos.
     const res = await req().query(`
       SELECT
-        ISNULL(dp.Segmento_Comercial, 'SIN GRUPO') AS grupo,
-        ISNULL(SUM(dvr.monto_total), 0)           AS ventaNeta
-      FROM dbo.Dash_Ventas_Resumen dvr
-      LEFT JOIN dbo.Dim_Productos dp ON dvr.id_producto = dp.SK_Producto
-      WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+        dp.Segmento_Comercial AS grupo,
+        ISNULL(SUM(fvd.total_linea_usd), 0)       AS ventaNetaUsd
+      FROM dbo.Fact_Ventas_Detalle fvd
+      INNER JOIN dbo.Dim_Productos dp ON fvd.id_producto = dp.SK_Producto
+      WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+        AND dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS')
+        AND dp.Segmento_Comercial IS NOT NULL AND LTRIM(RTRIM(dp.Segmento_Comercial)) <> ''
         ${marcaSql}
         ${grupoSql}
-        ${buildSucursalFilter("dvr")}
+        ${buildSucursalFilter("fvd")}
       GROUP BY dp.Segmento_Comercial
-      ORDER BY SUM(dvr.monto_total) DESC
+      ORDER BY SUM(fvd.total_linea_usd) DESC
     `);
 
-    const rows = res.recordset as { grupo: string; ventaNeta: number }[];
-    const totalGrupos = rows.reduce((acc, r) => acc + Number(r.ventaNeta ?? 0), 0);
+    const rows = res.recordset as { grupo: string; ventaNetaUsd: number }[];
+    const totalGrupos = rows.reduce((acc, r) => acc + Number(r.ventaNetaUsd ?? 0), 0);
 
     return rows.map((r) => ({
       name:       String(r.grupo ?? ""),
-      size:       Number(r.ventaNeta ?? 0),
-      porcentaje: totalGrupos > 0 ? Math.round((Number(r.ventaNeta ?? 0) / totalGrupos) * 10000) / 100 : 0,
+      size:       Number(r.ventaNetaUsd ?? 0),
+      porcentaje: totalGrupos > 0 ? Math.round((Number(r.ventaNetaUsd ?? 0) / totalGrupos) * 10000) / 100 : 0,
     }));
   },
   ["dash-inventario-grupos-mix"],
@@ -381,7 +389,7 @@ const fetchDispersionData = unstable_cache(
         SELECT
           ISNULL(dp.Segmento_Comercial, 'SIN GRUPO')    AS grupo,
           ISNULL(SUM(fi.cantidad_disponible),  0)       AS stockFisico,
-          ISNULL(SUM(fi.valor_total_inventario),  0)    AS capitalInvertido
+          ISNULL(SUM(fi.valor_total_inventario_usd),  0) AS capitalInvertidoUsd
         FROM dbo.Fact_Inventario fi
         LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
         WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
@@ -394,20 +402,20 @@ const fetchDispersionData = unstable_cache(
       req().query(`
         SELECT
           ISNULL(dp.Segmento_Comercial, 'SIN GRUPO') AS grupo,
-          ISNULL(SUM(dvr.cantidad), 0)              AS unidadesVendidas,
-          ISNULL(SUM(dvr.monto_total), 0)           AS ventaNeta
-        FROM dbo.Dash_Ventas_Resumen dvr
-        LEFT JOIN dbo.Dim_Productos dp ON dvr.id_producto = dp.SK_Producto
-        WHERE CAST(dvr.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+          ISNULL(SUM(fvd.cantidad), 0)              AS unidadesVendidas,
+          ISNULL(SUM(fvd.total_linea_usd), 0)       AS ventaNetaUsd
+        FROM dbo.Fact_Ventas_Detalle fvd
+        LEFT JOIN dbo.Dim_Productos dp ON fvd.id_producto = dp.SK_Producto
+        WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${marcaSql}
           ${grupoSql}
-          ${buildSucursalFilter("dvr")}
+          ${buildSucursalFilter("fvd")}
         GROUP BY dp.Segmento_Comercial
       `),
     ]);
 
-    const invRows = inventarioRes.recordset as { grupo: string; stockFisico: number; capitalInvertido: number }[];
-    const salesRows = salesRes.recordset as { grupo: string; unidadesVendidas: number; ventaNeta: number }[];
+    const invRows = inventarioRes.recordset as { grupo: string; stockFisico: number; capitalInvertidoUsd: number }[];
+    const salesRows = salesRes.recordset as { grupo: string; unidadesVendidas: number; ventaNetaUsd: number }[];
 
     const stockByGrupo = new Map(
       invRows.map((r) => [String(r.grupo ?? ""), Number(r.stockFisico ?? 0)]),
@@ -421,7 +429,7 @@ const fetchDispersionData = unstable_cache(
         grupo:            name,
         unidadesVendidas: Number(r.unidadesVendidas ?? 0),
         stockFisico:      stockByGrupo.get(name) ?? 0,
-        ventaNeta:        Number(r.ventaNeta ?? 0),
+        ventaNetaUsd:     Number(r.ventaNetaUsd ?? 0),
       });
     });
 
@@ -432,7 +440,7 @@ const fetchDispersionData = unstable_cache(
           grupo:            name,
           unidadesVendidas: 0,
           stockFisico:      Number(r.stockFisico ?? 0),
-          ventaNeta:        0,
+          ventaNetaUsd:     0,
         });
       }
     });

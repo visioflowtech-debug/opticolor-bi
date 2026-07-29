@@ -40,7 +40,7 @@ function TreemapTooltip({
       <div className="space-y-0.5 text-xs">
         <div className="flex items-center justify-between gap-5">
           <span className="text-muted-foreground">Venta Neta</span>
-          <span className="font-medium tabular-nums">{formatCurrency(d.size)}</span>
+          <span className="font-medium tabular-nums">{formatCurrency(d.size, { currency: "USD" })}</span>
         </div>
         <div className="flex items-center justify-between gap-5">
           <span className="text-muted-foreground">Participación</span>

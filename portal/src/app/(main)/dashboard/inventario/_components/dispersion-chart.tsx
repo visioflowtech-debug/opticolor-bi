@@ -13,7 +13,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { DispersionItem } from "../_actions/get-inventario-data";
-import { formatBsCurrency, formatCompactNumber } from "@/lib/utils";
+import { formatCurrency, formatCompactNumber } from "@/lib/utils";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -37,7 +37,7 @@ interface CustomTooltipProps {
       grupo?: string;
       unidadesVendidas?: number;
       stockFisico?: number;
-      ventaNeta?: number;
+      ventaNetaUsd?: number;
     };
   }>;
 }
@@ -63,7 +63,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
         </span>
         <span className="text-muted-foreground">Venta Neta Producto:</span>
         <span className="text-right font-medium tabular-nums text-foreground">
-          {formatBsCurrency(d.ventaNeta ?? 0)}
+          {formatCurrency(d.ventaNetaUsd ?? 0, { currency: "USD" })}
         </span>
       </div>
     </div>
@@ -87,7 +87,7 @@ export function DispersionChart({ data }: Props) {
     grupo: m.grupo,
     unidadesVendidas: m.unidadesVendidas,
     stockFisico: m.stockFisico,
-    ventaNeta: m.ventaNeta,
+    ventaNetaUsd: m.ventaNetaUsd,
     idx,
   }));
 
