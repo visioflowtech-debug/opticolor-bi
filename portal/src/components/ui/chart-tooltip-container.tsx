@@ -15,6 +15,7 @@ interface ChartTooltipContainerProps {
   payload?: TooltipPayloadItem[];
   label?: string;
   isCurrency?: boolean;
+  currency?: string;
 }
 
 export function ChartTooltipContainer({
@@ -22,6 +23,7 @@ export function ChartTooltipContainer({
   payload,
   label,
   isCurrency = false,
+  currency,
 }: ChartTooltipContainerProps) {
   if (!active || !payload?.length) return null;
 
@@ -36,7 +38,7 @@ export function ChartTooltipContainer({
           const numericValue =
             typeof item.value === "number" ? item.value : Number(item.value ?? 0);
           const formatted = isCurrency
-            ? formatCurrency(numericValue)
+            ? formatCurrency(numericValue, currency ? { currency } : undefined)
             : numericValue.toLocaleString("en-US");
 
           return (

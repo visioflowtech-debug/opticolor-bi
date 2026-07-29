@@ -18,9 +18,9 @@ import { ChartSkeleton, TableSkeleton } from "../_components/skeletons";
 type SearchParams = Promise<{ from?: string; to?: string; sucursal?: string }>;
 
 const EMPTY_KPIS = {
-  montoPedidos: 0,
-  recaudado: 0,
-  saldoPendiente: 0,
+  montoPedidosUsd: 0,
+  recaudadoUsd: 0,
+  saldoPendienteUsd: 0,
   pedidosLiquidar: 0,
   pctCobroInmediato: 0,
   pctNivelAbono: 0,
@@ -57,20 +57,20 @@ export default async function CarteraPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <KpiCard
           title="Monto Ordenes"
-          value={formatCompactCurrency(kpis.montoPedidos)}
-          fullValue={formatCurrency(kpis.montoPedidos)}
+          value={formatCompactCurrency(kpis.montoPedidosUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.montoPedidosUsd, { currency: "USD" })}
           iconName="dollar-sign"
         />
         <KpiCard
           title="Recaudado en Ordenes"
-          value={formatCompactCurrency(kpis.recaudado)}
-          fullValue={formatCurrency(kpis.recaudado)}
+          value={formatCompactCurrency(kpis.recaudadoUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.recaudadoUsd, { currency: "USD" })}
           iconName="wallet"
         />
         <KpiCard
           title="Monto Saldo Pendiente"
-          value={formatCompactCurrency(kpis.saldoPendiente)}
-          fullValue={formatCurrency(kpis.saldoPendiente)}
+          value={formatCompactCurrency(kpis.saldoPendienteUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.saldoPendienteUsd, { currency: "USD" })}
           iconName="alert-triangle"
           highlight
         />

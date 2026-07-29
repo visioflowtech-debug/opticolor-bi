@@ -116,15 +116,19 @@ export async function getEficienciaKPIs(
 
 // ─── 2. Tendencia ────────────────────────────────────────────────────────────
 
+// Tendencia de los últimos 12 meses, SIN vínculo al slicer de fecha (paridad con
+// Power BI: confirmado por Edit Interactions/Performance Analyzer que este gráfico
+// no reacciona al filtro de fecha, solo al de sucursal). La ventana se ancla a
+// GETDATE() — antes usaba @endDate, lo que hacía que el gráfico se vaciara por
+// completo si el usuario seleccionaba un rango fuera de los últimos 12 meses.
 const fetchTendenciaOrden = unstable_cache(
   async (params: FetchParams): Promise<TendenciaOrden[]> => {
-    const { endDate, sucursales, allowedSucursales } = params;
+    const { sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",           endDate)
         .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales);
 
@@ -135,8 +139,7 @@ const fetchTendenciaOrden = unstable_cache(
         DATENAME(MONTH, MIN(f.fecha_pedido)) AS mes_nombre,
         COUNT(f.id_pedido)                   AS volumen_ordenes
       FROM dbo.Fact_Eficiencia_Ordenes f
-      WHERE CAST(f.fecha_pedido AS DATE) >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
-        AND CAST(f.fecha_pedido AS DATE) <= CAST(@endDate AS DATE)
+      WHERE CAST(f.fecha_pedido AS DATE) >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
         AND ISNULL(NULLIF(RTRIM(LTRIM(f.tipo_lente_descripcion)), ''), 'No Definido') IS NOT NULL
         ${buildSucursalFilter("f")}
       GROUP BY YEAR(f.fecha_pedido), f.periodo

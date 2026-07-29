@@ -18,8 +18,8 @@ interface Props {
 }
 
 const SERIES_LABELS: Record<string, string> = {
-  monto_total:     "Monto Pedidos",
-  saldo_pendiente: "Saldo Pendiente",
+  monto_total_usd:     "Monto Pedidos",
+  saldo_pendiente_usd: "Saldo Pendiente",
 };
 
 function ChartTooltip({
@@ -47,7 +47,7 @@ function ChartTooltip({
             </span>
           </div>
           <span className="font-semibold tabular-nums">
-            {formatCurrency(p.value)}
+            {formatCurrency(p.value, { currency: "USD" })}
           </span>
         </div>
       ))}
@@ -94,7 +94,7 @@ export function GapCobroChart({ data }: Props) {
           axisLine={false}
         />
         <YAxis
-          tickFormatter={formatCompactCurrency}
+          tickFormatter={(v) => formatCompactCurrency(v, { currency: "USD" })}
           tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
           tickLine={false}
           axisLine={false}
@@ -104,8 +104,8 @@ export function GapCobroChart({ data }: Props) {
 
         <Area
           type="linear"
-          dataKey="monto_total"
-          name="monto_total"
+          dataKey="monto_total_usd"
+          name="monto_total_usd"
           stroke="var(--primary)"
           fill="url(#fillMonto)"
           strokeWidth={2}
@@ -114,8 +114,8 @@ export function GapCobroChart({ data }: Props) {
         />
 <Area
           type="linear"
-          dataKey="saldo_pendiente"
-          name="saldo_pendiente"
+          dataKey="saldo_pendiente_usd"
+          name="saldo_pendiente_usd"
           stroke="var(--destructive)"
           fill="url(#fillSaldo)"
           strokeWidth={2}

@@ -47,11 +47,11 @@ export function ClientesDeudoresTable({ data }: Props) {
 
   const totales = filteredData.reduce(
     (acc, c) => ({
-      monto_total: acc.monto_total + c.monto_total,
-      monto_pagado: acc.monto_pagado + c.monto_pagado,
-      saldo_pendiente: acc.saldo_pendiente + c.saldo_pendiente,
+      monto_total_usd: acc.monto_total_usd + c.monto_total_usd,
+      monto_pagado_usd: acc.monto_pagado_usd + c.monto_pagado_usd,
+      saldo_pendiente_usd: acc.saldo_pendiente_usd + c.saldo_pendiente_usd,
     }),
-    { monto_total: 0, monto_pagado: 0, saldo_pendiente: 0 }
+    { monto_total_usd: 0, monto_pagado_usd: 0, saldo_pendiente_usd: 0 }
   );
 
   // Paginación
@@ -100,8 +100,8 @@ export function ClientesDeudoresTable({ data }: Props) {
               </TableHeader>
               <TableBody>
                 {displayData.map((cliente) => {
-                  const pctPagado = cliente.monto_total > 0
-                    ? (cliente.monto_pagado / cliente.monto_total) * 100
+                  const pctPagado = cliente.monto_total_usd > 0
+                    ? (cliente.monto_pagado_usd / cliente.monto_total_usd) * 100
                     : 0;
 
                   return (
@@ -116,14 +116,14 @@ export function ClientesDeudoresTable({ data }: Props) {
                         {cliente.nombre_completo}
                       </TableCell>
                       <TableCell className="text-right text-xs font-medium text-foreground whitespace-nowrap py-2">
-                        {formatCurrency(cliente.monto_total)}
+                        {formatCurrency(cliente.monto_total_usd, { currency: "USD" })}
                       </TableCell>
                       <TableCell className="text-right text-xs font-medium text-foreground whitespace-nowrap py-2">
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <span className="cursor-default underline decoration-dashed decoration-muted-foreground/40 underline-offset-4">
-                                {formatCurrency(cliente.monto_pagado)}
+                                {formatCurrency(cliente.monto_pagado_usd, { currency: "USD" })}
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -133,7 +133,7 @@ export function ClientesDeudoresTable({ data }: Props) {
                         </TooltipProvider>
                       </TableCell>
                       <TableCell className="text-right text-xs font-medium text-destructive whitespace-nowrap py-2">
-                        {formatCurrency(cliente.saldo_pendiente)}
+                        {formatCurrency(cliente.saldo_pendiente_usd, { currency: "USD" })}
                       </TableCell>
                     </TableRow>
                   );
@@ -145,13 +145,13 @@ export function ClientesDeudoresTable({ data }: Props) {
                     Total General ({filteredData.length} Clientes)
                   </TableCell>
                   <TableCell className="text-right text-xs font-bold text-foreground whitespace-nowrap py-2">
-                    {formatCurrency(totales.monto_total)}
+                    {formatCurrency(totales.monto_total_usd, { currency: "USD" })}
                   </TableCell>
                   <TableCell className="text-right text-xs font-bold text-foreground whitespace-nowrap py-2">
-                    {formatCurrency(totales.monto_pagado)}
+                    {formatCurrency(totales.monto_pagado_usd, { currency: "USD" })}
                   </TableCell>
                   <TableCell className="text-right text-xs font-bold text-destructive whitespace-nowrap py-2">
-                    {formatCurrency(totales.saldo_pendiente)}
+                    {formatCurrency(totales.saldo_pendiente_usd, { currency: "USD" })}
                   </TableCell>
                 </TableRow>
               </TableFooter>

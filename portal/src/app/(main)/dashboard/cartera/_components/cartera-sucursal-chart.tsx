@@ -36,16 +36,16 @@ export function CarteraSucursalChart({ data }: Props) {
   }
 
   if (isMobile) {
-    // Ordena el arreglo de datos de forma descendente por saldo_pendiente
-    const sortedData = [...data].sort((a, b) => b.saldo_pendiente - a.saldo_pendiente);
-    
+    // Ordena el arreglo de datos de forma descendente por saldo_pendiente_usd
+    const sortedData = [...data].sort((a, b) => b.saldo_pendiente_usd - a.saldo_pendiente_usd);
+
     // Obtener el valor máximo para calcular la participación relativa en barra de progreso
-    const maxSaldo = Math.max(...data.map((d) => d.saldo_pendiente), 0);
+    const maxSaldo = Math.max(...data.map((d) => d.saldo_pendiente_usd), 0);
 
     // Calcular el porcentaje de participación relativo al máximo
     const dataWithPct = sortedData.map((item) => ({
       ...item,
-      porcentaje_participacion: maxSaldo > 0 ? (item.saldo_pendiente / maxSaldo) * 100 : 0,
+      porcentaje_participacion: maxSaldo > 0 ? (item.saldo_pendiente_usd / maxSaldo) * 100 : 0,
     }));
 
     // Carga incremental segmentada por bloques de 10
@@ -66,9 +66,9 @@ export function CarteraSucursalChart({ data }: Props) {
                 style={{ width: `${item.porcentaje_participacion}%` }}
               />
             </div>
-            {/* Exposición directa del dato (Moneda Local Bs.) */}
+            {/* Exposición directa del dato en USD */}
             <span className="w-28 shrink-0 text-right text-xs font-bold text-foreground whitespace-nowrap">
-              {formatCurrency(item.saldo_pendiente)}
+              {formatCurrency(item.saldo_pendiente_usd, { currency: "USD" })}
             </span>
           </div>
         ))}
@@ -126,15 +126,15 @@ export function CarteraSucursalChart({ data }: Props) {
           />
           <YAxis
             type="number"
-            tickFormatter={formatCompactCurrency}
+            tickFormatter={(v) => formatCompactCurrency(v, { currency: "USD" })}
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
             width={60}
           />
-          <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.2 }} content={<ChartTooltipContainer isCurrency={true} />} />
+          <Tooltip cursor={{ fill: "var(--muted)", opacity: 0.2 }} content={<ChartTooltipContainer isCurrency={true} currency="USD" />} />
           <Bar
-            dataKey="saldo_pendiente"
+            dataKey="saldo_pendiente_usd"
             name="Saldo Pendiente"
             fill="var(--destructive)"
             radius={[4, 4, 0, 0]}

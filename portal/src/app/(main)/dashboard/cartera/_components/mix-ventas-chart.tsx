@@ -39,7 +39,7 @@ function ChartTooltip({
   if (!active || !payload?.length) return null;
 
   const data = payload[0].payload as MixVenta;
-  const pct = totalVenta > 0 ? (data.venta_neta / totalVenta) * 100 : 0;
+  const pct = totalVenta > 0 ? (data.venta_neta_usd / totalVenta) * 100 : 0;
 
   return (
     <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[220px]">
@@ -50,7 +50,7 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">Venta Neta</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {formatCurrency(data.venta_neta)}
+            {formatCurrency(data.venta_neta_usd, { currency: "USD" })}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
@@ -86,7 +86,7 @@ export function MixVentasChart({ data }: Props) {
     );
   }
 
-  const totalVenta = data.reduce((acc, curr) => acc + curr.venta_neta, 0);
+  const totalVenta = data.reduce((acc, curr) => acc + curr.venta_neta_usd, 0);
 
   return (
     <SafeChartContainer 
@@ -113,7 +113,7 @@ export function MixVentasChart({ data }: Props) {
           />
           <XAxis
             type="number"
-            tickFormatter={formatCompactCurrency}
+            tickFormatter={(v) => formatCompactCurrency(v, { currency: "USD" })}
             tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
             tickLine={false}
             axisLine={false}
@@ -133,7 +133,7 @@ export function MixVentasChart({ data }: Props) {
             trigger={isMobile ? "click" : "hover"}
           />
           <Bar
-            dataKey="venta_neta"
+            dataKey="venta_neta_usd"
             name="Venta Neta"
             fill="var(--chart-1)"
             radius={[0, 4, 4, 0]}

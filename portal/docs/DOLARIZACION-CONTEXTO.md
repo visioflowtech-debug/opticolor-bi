@@ -64,3 +64,69 @@ definido, salvo que se indique explícitamente lo contrario en el prompt de la t
 - No se deben asumir, adivinar ni inventar nombres de columnas o vistas que no figuren
   explícitamente en ese archivo. Si una columna que se necesita no aparece ahí, se reporta como
   pregunta abierta en vez de asumir un nombre plausible.
+
+## Lecciones de Fase 2 (por módulo)
+
+- **Bug de parseo de fechas (ya corregido en los 5 reportes).** Los 5 `page.tsx` de reporte
+  (`resumen-comercial`, `cartera`, `clinico`, `eficiencia`, `inventario`) reparseaban `from`/`to`
+  con `format(new Date(from), "yyyy-MM-dd")` aunque esos parámetros ya llegan en formato
+  `"yyyy-MM-dd"` válido desde `date-range-picker.tsx`. Un string solo-fecha se interpreta como
+  medianoche UTC, y `format()` la renderiza en la zona horaria local del servidor — en zonas al
+  oeste de UTC (Venezuela incluida) esto podía correr la fecha seleccionada un día completo hacia
+  atrás, mostrando datos de un día distinto al elegido en el UI. Se corrigió en los 5 archivos:
+  ahora `from`/`to` se usan directamente (`from ?? format(startOfMonth(new Date()), "yyyy-MM-dd")`),
+  sin volver a pasarlos por `new Date(...)`.
+- **Algunos KPIs reflejan el estado actual de la base, no una foto histórica de la fecha
+  filtrada.** En Cartera, "Monto Saldo Pendiente" y "Órdenes por Liquidar" (`KPI_Inf3_Saldo_Pendiente`,
+  `KPI_Inf3_Pedidos_Liquidar`) filtran con `fecha_pedido_completa <= @endDate`, pero el
+  `saldo_pendiente_usd` que traen es el saldo **vigente hoy** de esos pedidos, no el saldo que
+  tenían el día del filtro. Si un pedido se termina de pagar entre la fecha filtrada y el momento
+  de la consulta, deja de aparecer con saldo pendiente — es comportamiento esperado, no un bug.
+  Esto hace que validar estos KPIs específicos contra un cuadre capturado en otro día casi
+  siempre dé una diferencia (generalmente a la baja, nunca al alza) que no hay que "corregir".
+  Antes de asumir un bug en un KPI de este tipo en otro módulo, primero confirmar con casos
+  puntuales (pedido por pedido, contra `Fact_Pedidos`/la vista `KPI_*` correspondiente) si el
+  cálculo en sí es correcto — recién si un caso puntual también difiere, hay algo real que mirar.
+- **`ChartTooltipContainer`** (`src/components/ui/chart-tooltip-container.tsx`, componente
+  compartido) ahora acepta un prop opcional `currency` — se usa junto con `isCurrency={true}`
+  para pedir formateo en USD explícito (`<ChartTooltipContainer isCurrency currency="USD" />`).
+  Sin ese prop sigue formateando en Bs por default, así que los módulos no migrados no se ven
+  afectados.
+- **Cuidado al tocar funciones compartidas que algún módulo pasa "bare" a `tickFormatter` de
+  Recharts** (`formatCompactCurrency`, y potencialmente otras). Recharts invoca esos callbacks
+  como `(value, index: number)`; si se le agrega un segundo parámetro de opciones al tipo de la
+  función, TypeScript puede romper la compilación en *otro* módulo que ni se está tocando, porque
+  el `index` numérico ya no es asignable al nuevo tipo del segundo parámetro. Antes de agregar un
+  parámetro a una función compartida, grepear todo `src/` por usos "bare" (`tickFormatter={fn}`,
+  sin arrow function envolviendo la llamada) y diseñar el tipo para que siga aceptando `number`
+  en ese segundo lugar sin cambiar el comportamiento por default.
+
+## Visuales sin filtro de fecha (paridad con Power BI)
+
+Confirmado por revisión directa del .pbix (Edit Interactions / Performance Analyzer) que estos
+visuales NO están vinculados al slicer de fecha en Power BI — solo al de sucursal. Al migrar
+cada reporte, verificar si el portal replica esto o si aplica un filtro de fecha que no debería.
+
+- **Resumen Comercial:** gráfico de relación de Ventas Netas y Tráfico de Ventas — pendiente de
+  verificar cuando se migre este reporte.
+- **Cartera:** Monto Saldo Pendiente, Órdenes por Liquidar (ya corregidos), gráfico de tendencia
+  GAP de Cobro, tabla de Clientes Deudores (corregidos en este prompt).
+- **Eficiencia:** gráfico de Tendencia de Órdenes (corregido en este prompt).
+- **Desempeño Clínico:** gráfico de Exámenes (Volumen Total vs. Conversión), gráfico de Tendencia
+  de Exámenes por Mes — pendiente de verificar cuando se migre este reporte.
+- **Inventario:** Stock Físico (Unidades), Capital Invertido — pendiente de verificar cuando se
+  migre este reporte.
+
+Metodología: nunca asumir que un visual debe desvincularse solo por estar en esta lista — validar
+primero con una consulta directa comparando contra el valor/comportamiento real de Power BI, y
+recién ahí aplicar el cambio.
+
+**Nota sobre gráficos de tendencia (series, no tarjetas):** en Cartera (GAP de Cobro) y Eficiencia
+(Tendencia de Órdenes) las queries ya usaban una ventana de "últimos 12 meses" independiente de
+`@startDate`, pero seguían anclando el límite superior de esa ventana a `@endDate` (el fin del
+rango seleccionado en el picker). Se confirmó con una consulta directa que esto SÍ hacía
+reaccionar el gráfico al slicer: con un `@endDate` fuera del rango real de datos, la serie
+completa se vaciaba. El fix fue anclar la ventana a `GETDATE()` (fecha actual del servidor) en vez
+de `@endDate`, dejando el filtro de sucursal/RLS intacto. Este mismo patrón ("ventana de tiempo
+fija de N meses, pero anclada a `@endDate` en vez de a `GETDATE()`") es el primer lugar a revisar
+en cualquier gráfico de tendencia de los reportes aún no migrados.

@@ -10,9 +10,9 @@ import { getUserAllowedSucursales } from "@/lib/security";
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
 export type CarteraKpiData = {
-  montoPedidos: number;
-  recaudado: number;
-  saldoPendiente: number;
+  montoPedidosUsd: number;
+  recaudadoUsd: number;
+  saldoPendienteUsd: number;
   pedidosLiquidar: number;
   pctCobroInmediato: number;
   pctNivelAbono: number;
@@ -20,27 +20,27 @@ export type CarteraKpiData = {
 
 export type GapCobro = {
   mes_pedido_nombre: string;
-  monto_total: number;
-  saldo_pendiente: number;
+  monto_total_usd: number;
+  saldo_pendiente_usd: number;
 };
 
 export type MixVenta = {
   categoria_agrupada: string;
-  venta_neta: number;
+  venta_neta_usd: number;
   facturas: number;
 };
 
 export type CarteraSucursal = {
   nombre_sucursal: string;
-  saldo_pendiente: number;
+  saldo_pendiente_usd: number;
 };
 
 export type ClienteDeudor = {
   nombre_sucursal: string;
   nombre_completo: string;
-  monto_total: number;
-  monto_pagado: number;
-  saldo_pendiente: number;
+  monto_total_usd: number;
+  monto_pagado_usd: number;
+  saldo_pendiente_usd: number;
 };
 
 import { ReportParams } from "@/types/dashboard";
@@ -52,10 +52,10 @@ type FetchParams = Params & { allowedSucursales: string };
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
 type ValorRow         = { valor: number };
-type GapCobroRow      = { mes_pedido_nombre: string; monto_total: number; saldo_pendiente: number };
-type MixVentaRow      = { categoria_agrupada: string; venta_neta: number; facturas: number };
-type CarteraSucRow    = { nombre_sucursal: string; saldo_pendiente: number };
-type ClienteDeudorRow = { nombre_sucursal: string; nombre_completo: string; monto_total: number; monto_pagado: number; saldo_pendiente: number };
+type GapCobroRow      = { mes_pedido_nombre: string; monto_total_usd: number; saldo_pendiente_usd: number };
+type MixVentaRow      = { categoria_agrupada: string; venta_neta_usd: number; facturas: number };
+type CarteraSucRow    = { nombre_sucursal: string; saldo_pendiente_usd: number };
+type ClienteDeudorRow = { nombre_sucursal: string; nombre_completo: string; monto_total_usd: number; monto_pagado_usd: number; saldo_pendiente_usd: number };
 
 // ─── Cache & Actions ─────────────────────────────────────────────────────────
 
@@ -83,7 +83,7 @@ const fetchCarteraKPIs = unstable_cache(
     ] = await Promise.all([
       // C-2.1 Monto Pedidos
       req().query(`
-        SELECT ISNULL(SUM(monto_total), 0) AS valor
+        SELECT ISNULL(SUM(monto_total_usd), 0) AS valor
         FROM dbo.KPI_Inf3_Monto_Pedidos
         WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
           ${buildSucursalFilter()}
@@ -91,25 +91,28 @@ const fetchCarteraKPIs = unstable_cache(
 
       // C-2.2 Recaudado en Pedidos — dinero abonado sobre órdenes nacidas en el período
       req().query(`
-        SELECT ISNULL(SUM(monto_pagado), 0) AS valor
+        SELECT ISNULL(SUM(monto_pagado_usd), 0) AS valor
         FROM dbo.KPI_Inf3_Recaudado_Pedidos
         WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
           ${buildSucursalFilter()}
       `),
 
-      // C-2.3 Saldo Pendiente — acumulado vigente hasta @endDate
+      // C-2.3 Saldo Pendiente — histórico total vigente de la sucursal, SIN filtro de
+      // fecha (paridad con la medida DAX de Power BI: esta tarjeta no está conectada
+      // al slicer de fecha, solo al de sucursal — ver diagnóstico de discrepancia).
       req().query(`
-        SELECT ROUND(COALESCE(SUM(saldo_pendiente), 0), 2) AS valor
+        SELECT ROUND(COALESCE(SUM(saldo_pendiente_usd), 0), 2) AS valor
         FROM dbo.KPI_Inf3_Saldo_Pendiente
-        WHERE CAST(fecha_pedido_completa AS DATE) <= @endDate
+        WHERE 1=1
           ${buildSucursalFilter()}
       `),
 
-      // C-2.4 Pedidos por Liquidar — acumulado vigente hasta @endDate
+      // C-2.4 Pedidos por Liquidar — histórico total vigente de la sucursal, SIN
+      // filtro de fecha (misma paridad con Power BI que Saldo Pendiente).
       req().query(`
         SELECT COUNT(DISTINCT id_pedido) AS valor
         FROM dbo.KPI_Inf3_Pedidos_Liquidar
-        WHERE CAST(fecha_pedido_completa AS DATE) <= @endDate
+        WHERE 1=1
           ${buildSucursalFilter()}
       `),
 
@@ -137,9 +140,9 @@ const fetchCarteraKPIs = unstable_cache(
     ]);
 
     return {
-      montoPedidos:      Number((montoPedidosRes.recordset    as ValorRow[])[0]?.valor ?? 0),
-      recaudado:         Number((recaudadoRes.recordset        as ValorRow[])[0]?.valor ?? 0),
-      saldoPendiente:    Number((saldoPendienteRes.recordset   as ValorRow[])[0]?.valor ?? 0),
+      montoPedidosUsd:   Number((montoPedidosRes.recordset    as ValorRow[])[0]?.valor ?? 0),
+      recaudadoUsd:      Number((recaudadoRes.recordset        as ValorRow[])[0]?.valor ?? 0),
+      saldoPendienteUsd: Number((saldoPendienteRes.recordset   as ValorRow[])[0]?.valor ?? 0),
       pedidosLiquidar:   Number((pedidosLiquidarRes.recordset  as ValorRow[])[0]?.valor ?? 0),
       pctCobroInmediato: Math.round(Number((pctCobroInmediatoRes.recordset as ValorRow[])[0]?.valor ?? 0) * 100) / 100,
       pctNivelAbono:     Math.round(Number((pctNivelAbonoRes.recordset     as ValorRow[])[0]?.valor ?? 0) * 100) / 100,
@@ -165,15 +168,19 @@ export async function getCarteraKPIs(
 }
 
 // 2. GAP Cobro — 3 series: Monto Pedidos, Saldo Pendiente, Recaudado
+// Tendencia de los últimos 12 meses, SIN vínculo al slicer de fecha (paridad con
+// Power BI: confirmado por Edit Interactions/Performance Analyzer que este gráfico
+// no reacciona al filtro de fecha, solo al de sucursal). La ventana se ancla a
+// GETDATE() — antes usaba @endDate, lo que hacía que el gráfico se vaciara por
+// completo si el usuario seleccionaba un rango fuera de los últimos 12 meses.
 const fetchGapCobro = unstable_cache(
   async (params: FetchParams): Promise<GapCobro[]> => {
-    const { endDate, sucursales, allowedSucursales } = params;
+    const { sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("endDate",           endDate)
         .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales);
 
@@ -182,20 +189,19 @@ const fetchGapCobro = unstable_cache(
         mes_pedido_nombre,
         anio_pedido,
         mes_pedido_nro,
-        ISNULL(SUM(monto_total),     0) AS monto_total,
-        ISNULL(SUM(saldo_pendiente), 0) AS saldo_pendiente
+        ISNULL(SUM(monto_total_usd),     0) AS monto_total_usd,
+        ISNULL(SUM(saldo_pendiente_usd), 0) AS saldo_pendiente_usd
       FROM dbo.KPI_Inf3_Monto_Pedidos
-      WHERE CAST(fecha_pedido_completa AS DATE) >= DATEADD(MONTH, -12, CAST(@endDate AS DATE))
-        AND CAST(fecha_pedido_completa AS DATE) <= @endDate
+      WHERE CAST(fecha_pedido_completa AS DATE) >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
         ${buildSucursalFilter()}
       GROUP BY mes_pedido_nombre, anio_pedido, mes_pedido_nro
       ORDER BY anio_pedido ASC, mes_pedido_nro ASC
     `);
 
     return (res.recordset as GapCobroRow[]).map((r) => ({
-      mes_pedido_nombre: String(r.mes_pedido_nombre ?? ""),
-      monto_total:       Number(r.monto_total ?? 0),
-      saldo_pendiente:   Number(r.saldo_pendiente ?? 0),
+      mes_pedido_nombre:   String(r.mes_pedido_nombre ?? ""),
+      monto_total_usd:     Number(r.monto_total_usd ?? 0),
+      saldo_pendiente_usd: Number(r.saldo_pendiente_usd ?? 0),
     }));
   },
   ["dash-cartera-gap-cobro"],
@@ -234,18 +240,18 @@ const fetchMixVentas = unstable_cache(
     const res = await req().query(`
       SELECT
         categoria_agrupada,
-        ISNULL(SUM(venta_neta), 0)       AS venta_neta,
+        ISNULL(SUM(venta_neta_usd), 0)   AS venta_neta_usd,
         COUNT(DISTINCT id_factura)        AS facturas
       FROM dbo.Fact_Ventas_por_Categoria
       WHERE CAST(fecha_factura AS DATE) BETWEEN @startDate AND @endDate
         ${buildSucursalFilter()}
       GROUP BY categoria_agrupada
-      ORDER BY venta_neta DESC
+      ORDER BY venta_neta_usd DESC
     `);
 
     return (res.recordset as MixVentaRow[]).map((r) => ({
       categoria_agrupada: String(r.categoria_agrupada ?? ""),
-      venta_neta:         Number(r.venta_neta ?? 0),
+      venta_neta_usd:     Number(r.venta_neta_usd ?? 0),
       facturas:           Number(r.facturas ?? 0),
     }));
   },
@@ -284,18 +290,18 @@ const fetchCarteraSucursal = unstable_cache(
     const res = await req().query(`
       SELECT
         ds.nombre_sucursal,
-        ROUND(COALESCE(SUM(k.saldo_pendiente), 0), 2) AS saldo_pendiente
+        ROUND(COALESCE(SUM(k.saldo_pendiente_usd), 0), 2) AS saldo_pendiente_usd
       FROM dbo.KPI_Inf3_Saldo_Pendiente k
       LEFT JOIN dbo.Dim_Sucursales ds ON k.id_sucursal = ds.id_sucursal
       WHERE CAST(k.fecha_pedido_completa AS DATE) <= @endDate
         ${buildSucursalFilter("k")}
       GROUP BY ds.nombre_sucursal
-      ORDER BY saldo_pendiente DESC
+      ORDER BY saldo_pendiente_usd DESC
     `);
 
     return (res.recordset as CarteraSucRow[]).map((r) => ({
-      nombre_sucursal: String(r.nombre_sucursal ?? ""),
-      saldo_pendiente: Number(r.saldo_pendiente ?? 0),
+      nombre_sucursal:     String(r.nombre_sucursal ?? ""),
+      saldo_pendiente_usd: Number(r.saldo_pendiente_usd ?? 0),
     }));
   },
   ["dash-cartera-sucursal"],
@@ -317,17 +323,19 @@ export async function getCarteraSucursalData(
   }
 }
 
-// 5. Clientes Deudores
+// 5. Clientes Deudores — histórico total vigente de la sucursal, SIN filtro de
+// fecha (paridad con Power BI: confirmado que la tabla "Top de Clientes
+// Deudores" tampoco está vinculada al slicer de fecha, solo al de sucursal —
+// misma lógica que Saldo Pendiente/Pedidos por Liquidar). Con este cambio, la
+// suma de esta tabla vuelve a cuadrar con la tarjeta "Monto Saldo Pendiente".
 const fetchClientesDeudores = unstable_cache(
   async (params: FetchParams): Promise<ClienteDeudor[]> => {
-    const { startDate, endDate, sucursales, allowedSucursales } = params;
+    const { sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
     const req = () =>
       pool
         .request()
-        .input("startDate",         startDate)
-        .input("endDate",           endDate)
         .input("sucursales",        sucursales)
         .input("allowedSucursales", allowedSucursales);
 
@@ -335,25 +343,25 @@ const fetchClientesDeudores = unstable_cache(
       SELECT
         ds.nombre_sucursal,
         ISNULL(dc.nombre_completo, 'CLIENTE NO CATALOGADO') AS nombre_completo,
-        ISNULL(SUM(fp.monto_total),     0) AS monto_total,
-        ISNULL(SUM(fp.monto_pagado),    0) AS monto_pagado,
-        ISNULL(SUM(fp.saldo_pendiente), 0) AS saldo_pendiente
+        ISNULL(SUM(fp.monto_total_usd),     0) AS monto_total_usd,
+        ISNULL(SUM(fp.monto_pagado_usd),    0) AS monto_pagado_usd,
+        ISNULL(SUM(fp.saldo_pendiente_usd), 0) AS saldo_pendiente_usd
       FROM dbo.Fact_Pedidos fp
       LEFT JOIN dbo.Dim_Clientes     dc ON fp.id_cliente   = dc.id_cliente
       INNER JOIN dbo.Dim_Sucursales  ds ON fp.id_sucursal  = ds.id_sucursal
-      WHERE CAST(fp.fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
+      WHERE 1=1
         ${buildSucursalFilter("fp")}
       GROUP BY ds.nombre_sucursal, dc.nombre_completo
-      HAVING ISNULL(SUM(fp.saldo_pendiente), 0) > 0
-      ORDER BY saldo_pendiente DESC
+      HAVING ISNULL(SUM(fp.saldo_pendiente_usd), 0) > 0
+      ORDER BY saldo_pendiente_usd DESC
     `);
 
     return (res.recordset as ClienteDeudorRow[]).map((r) => ({
-      nombre_sucursal: String(r.nombre_sucursal ?? ""),
-      nombre_completo: String(r.nombre_completo ?? ""),
-      monto_total:     Number(r.monto_total ?? 0),
-      monto_pagado:    Number(r.monto_pagado ?? 0),
-      saldo_pendiente: Number(r.saldo_pendiente ?? 0),
+      nombre_sucursal:     String(r.nombre_sucursal ?? ""),
+      nombre_completo:     String(r.nombre_completo ?? ""),
+      monto_total_usd:     Number(r.monto_total_usd ?? 0),
+      monto_pagado_usd:    Number(r.monto_pagado_usd ?? 0),
+      saldo_pendiente_usd: Number(r.saldo_pendiente_usd ?? 0),
     }));
   },
   ["dash-cartera-clientes-deudores"],
