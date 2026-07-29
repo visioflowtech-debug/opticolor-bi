@@ -14,7 +14,7 @@ export type EficienciaKpis = {
   ordenesHoy: number;
   volumenOrdenes: number;
   promedioDiario: number;
-  montoTotal: number;
+  montoTotalUsd: number;
 };
 
 export type TendenciaOrden = {
@@ -25,7 +25,7 @@ export type TendenciaOrden = {
 export type TipoLenteDetalle = {
   tipo_lente_descripcion: string;
   volumen_ordenes: number;
-  monto_total: number;
+  monto_total_usd: number;
 };
 
 export type OrdenesSucursal = {
@@ -42,9 +42,9 @@ type FetchParams = Params & { allowedSucursales: string };
 // ─── Tipos de fila DB (privados) ─────────────────────────────────────────────
 
 type ValorRow        = { valor: number };
-type PeriodoStatsRow = { volumen_ordenes: number; monto_total: number; promedio_ordenes_diarias: number };
+type PeriodoStatsRow = { volumen_ordenes: number; monto_total_usd: number; promedio_ordenes_diarias: number };
 type TendenciaRow    = { periodo: string; anio: number; mes_nombre: string; volumen_ordenes: number };
-type TipoLenteRow    = { tipo_lente_descripcion: string; volumen_ordenes: number; monto_total: number };
+type TipoLenteRow    = { tipo_lente_descripcion: string; volumen_ordenes: number; monto_total_usd: number };
 type SucursalRow     = { nombre_sucursal: string; volumen_ordenes: number };
 
 
@@ -77,7 +77,7 @@ const fetchEficienciaKPIs = unstable_cache(
       req().query(`
         SELECT
           COUNT(f.id_pedido)                                                              AS volumen_ordenes,
-          ISNULL(SUM(f.monto_total), 0)                                                  AS monto_total,
+          ISNULL(SUM(f.monto_total_usd), 0)                                              AS monto_total_usd,
           COUNT(f.id_pedido) * 1.0 / NULLIF(COUNT(DISTINCT f.fecha_pedido), 0)          AS promedio_ordenes_diarias
         FROM dbo.Fact_Eficiencia_Ordenes f
         WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
@@ -86,13 +86,13 @@ const fetchEficienciaKPIs = unstable_cache(
     ]);
 
     const stats = (periodoStatsRes.recordset as PeriodoStatsRow[])[0]
-      ?? { volumen_ordenes: 0, promedio_ordenes_diarias: 0, monto_total: 0 };
+      ?? { volumen_ordenes: 0, promedio_ordenes_diarias: 0, monto_total_usd: 0 };
 
     return {
       ordenesHoy:     Number((ordenesHoyRes.recordset as ValorRow[])[0]?.valor ?? 0),
       volumenOrdenes: Number(stats.volumen_ordenes ?? 0),
       promedioDiario: Math.floor(Number(stats.promedio_ordenes_diarias ?? 0)),
-      montoTotal:     Math.round(Number(stats.monto_total ?? 0) * 100) / 100,
+      montoTotalUsd:  Math.round(Number(stats.monto_total_usd ?? 0) * 100) / 100,
     };
   },
   ["dash-eficiencia-kpis"],
@@ -186,7 +186,7 @@ const fetchTipoLente = unstable_cache(
       SELECT
         ISNULL(NULLIF(RTRIM(LTRIM(f.tipo_lente_descripcion)), ''), 'No Definido') AS tipo_lente_descripcion,
         COUNT(f.id_pedido)                                                          AS volumen_ordenes,
-        ISNULL(SUM(f.monto_total), 0)                                              AS monto_total
+        ISNULL(SUM(f.monto_total_usd), 0)                                          AS monto_total_usd
       FROM dbo.Fact_Eficiencia_Ordenes f
       WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
         ${buildSucursalFilter("f")}
@@ -197,7 +197,7 @@ const fetchTipoLente = unstable_cache(
     return (res.recordset as TipoLenteRow[]).map((r) => ({
       tipo_lente_descripcion: String(r.tipo_lente_descripcion ?? ""),
       volumen_ordenes:        Number(r.volumen_ordenes ?? 0),
-      monto_total:            Number(r.monto_total ?? 0),
+      monto_total_usd:        Number(r.monto_total_usd ?? 0),
     }));
   },
   ["dash-eficiencia-tipo-lente"],

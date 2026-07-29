@@ -1,5 +1,7 @@
 "use client";
 
+import { formatCurrency } from "@/lib/utils";
+
 interface TooltipPayloadItem {
   name?: string;
   value?: number | string;
@@ -34,10 +36,7 @@ export function ChartTooltipContainer({
           const numericValue =
             typeof item.value === "number" ? item.value : Number(item.value ?? 0);
           const formatted = isCurrency
-            ? `Bs. ${numericValue.toLocaleString("en-US", {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}`
+            ? formatCurrency(numericValue)
             : numericValue.toLocaleString("en-US");
 
           return (

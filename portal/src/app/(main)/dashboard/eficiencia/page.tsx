@@ -21,7 +21,7 @@ const EMPTY_KPIS = {
   ordenesHoy: 0,
   volumenOrdenes: 0,
   promedioDiario: 0,
-  montoTotal: 0,
+  montoTotalUsd: 0,
 };
 
 export default async function EficienciaPage({
@@ -31,12 +31,12 @@ export default async function EficienciaPage({
 }) {
   const { from, to, sucursal } = await searchParams;
 
-  const startDate = from
-    ? format(new Date(from), "yyyy-MM-dd")
-    : format(startOfMonth(new Date()), "yyyy-MM-dd");
-  const endDate = to
-    ? format(new Date(to), "yyyy-MM-dd")
-    : format(new Date(), "yyyy-MM-dd");
+  // `from`/`to` ya llegan en formato "yyyy-MM-dd" desde el date-range-picker —
+  // NO se deben reparsear con `new Date(...)`: un string solo-fecha se interpreta
+  // como medianoche UTC, y volver a formatearlo con la zona horaria local del
+  // servidor puede correr la fecha un día completo hacia atrás (ver Prompt 2-4).
+  const startDate = from ?? format(startOfMonth(new Date()), "yyyy-MM-dd");
+  const endDate = to ?? format(new Date(), "yyyy-MM-dd");
   const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
 
   const result = await getEficienciaKPIs({ startDate, endDate, sucursales });
@@ -74,8 +74,8 @@ export default async function EficienciaPage({
         />
         <KpiCard
           title="Monto Total Órdenes"
-          value={formatCompactCurrency(kpis.montoTotal)}
-          fullValue={formatCurrency(kpis.montoTotal)}
+          value={formatCompactCurrency(kpis.montoTotalUsd, { currency: "USD" })}
+          fullValue={formatCurrency(kpis.montoTotalUsd, { currency: "USD" })}
           iconName="dollar-sign"
         />
       </div>

@@ -48,9 +48,9 @@ export function DetalleCristalesTable({ data, error }: Props) {
   const totales = filteredData.reduce(
     (acc, item) => ({
       volumen_ordenes: acc.volumen_ordenes + item.volumen_ordenes,
-      monto_total: acc.monto_total + item.monto_total,
+      monto_total_usd: acc.monto_total_usd + item.monto_total_usd,
     }),
-    { volumen_ordenes: 0, monto_total: 0 }
+    { volumen_ordenes: 0, monto_total_usd: 0 }
   );
 
   // Paginación
@@ -109,7 +109,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
                       {new Intl.NumberFormat("en-US").format(item.volumen_ordenes)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
-                      {formatCurrency(item.monto_total)}
+                      {formatCurrency(item.monto_total_usd, { currency: "USD" })}
                     </TableCell>
                   </TableRow>
                 ))}
@@ -123,7 +123,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
                     {new Intl.NumberFormat("en-US").format(totales.volumen_ordenes)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-sm">
-                    {formatCurrency(totales.monto_total)}
+                    {formatCurrency(totales.monto_total_usd, { currency: "USD" })}
                   </TableCell>
                 </TableRow>
 
