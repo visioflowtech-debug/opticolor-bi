@@ -67,27 +67,27 @@ export default async function ResumenComercialPage({
       {/* ── KPIs Principales (8 Tarjetas) ────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <KpiCard
-          title="Venta Neta"
+          title="Venta Neta USD"
           value={formatCompactCurrency(kpis.ventaNetaUsd, { currency: "USD" })}
           fullValue={formatCurrency(kpis.ventaNetaUsd, { currency: "USD" })}
           iconName="dollar-sign"
           highlight
         />
         <KpiCard
-          title="Venta Neta Sin Impuesto"
+          title="Venta Neta Sin Impuesto USD"
           value={formatCompactCurrency(kpis.ventaNetaSinIvaUsd, { currency: "USD" })}
           fullValue={formatCurrency(kpis.ventaNetaSinIvaUsd, { currency: "USD" })}
           iconName="wallet"
         />
         <KpiCard
-          title="Proyección Cierre"
+          title="Proyección Venta Neta USD"
           value={formatCompactCurrency(kpis.proyeccionUsd, { currency: "USD" })}
           fullValue={formatCurrency(kpis.proyeccionUsd, { currency: "USD" })}
           subtitle={`${proyeccionPct}% del objetivo alcanzado`}
           iconName="trending-up"
         />
         <KpiCard
-          title="Total Cobrado"
+          title="Total Cobrado USD"
           value={formatCompactCurrency(kpis.totalCobradoUsd, { currency: "USD" })}
           fullValue={formatCurrency(kpis.totalCobradoUsd, { currency: "USD" })}
           subtitle={
@@ -98,13 +98,13 @@ export default async function ResumenComercialPage({
           iconName="credit-card"
         />
         <KpiCard
-          title="Ticket Promedio"
+          title="Ticket Promedio USD"
           value={formatCompactCurrency(kpis.ticketPromedioUsd, { currency: "USD" })}
           fullValue={formatCurrency(kpis.ticketPromedioUsd, { currency: "USD" })}
           iconName="bar-chart-3"
         />
         <KpiCard
-          title="Venta Neta YTD"
+          title="Venta Neta YTD USD"
           value={formatCompactCurrency(kpis.ventaNetaYTDUsd, { currency: "USD" })}
           fullValue={formatCurrency(kpis.ventaNetaYTDUsd, { currency: "USD" })}
           iconName="dollar-sign"
@@ -125,17 +125,17 @@ export default async function ResumenComercialPage({
 
       {/* ── Fila 3: Distribución — Top Sucursales | Medios de Pago ──────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ChartSkeleton title="Top 10 Sucursales · Venta Neta" height="h-64" />}>
+        <Suspense fallback={<ChartSkeleton title="Top  Sucursales: Venta Real vs. Estimados Cierre" height="h-64" />}>
           <SucursalesChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
 
-        <Suspense fallback={<ChartSkeleton title="Distribución · Medios de Pago" height="h-52" />}>
+        <Suspense fallback={<ChartSkeleton title="Distribución por Medios de Pago" height="h-52" />}>
           <MediosPagoChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
       </div>
 
       {/* ── Fila 4: Tendencia anual YTD — ancho completo ────────────────────── */}
-      <Suspense fallback={<ChartSkeleton title="Tendencia Anual · Ventas y Tráfico" height="h-[350px]" />}>
+      <Suspense fallback={<ChartSkeleton title="Relaciòn de Ventas Neta y Tràfico de Ventas" height="h-[350px]" />}>
         <VentasChartWrapper sucursales={sucursales} />
       </Suspense>
     </div>

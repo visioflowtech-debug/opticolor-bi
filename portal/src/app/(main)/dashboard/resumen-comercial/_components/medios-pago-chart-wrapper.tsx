@@ -16,7 +16,7 @@ export async function MediosPagoChartWrapper({ startDate, endDate, sucursales }:
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Distribución · Medios de Pago
+          Distribución por Medios de Pago
         </CardTitle>
       </CardHeader>
       <CardContent>

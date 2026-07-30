@@ -14,7 +14,7 @@ export async function VentasChartWrapper({ sucursales }: WrapperProps) {
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Tendencia Anual · Ventas y Tráfico
+          Relación de Ventas Neta y Tràfico de Ventas
         </CardTitle>
       </CardHeader>
       <CardContent>

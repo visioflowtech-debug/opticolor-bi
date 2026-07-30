@@ -75,8 +75,8 @@ export function MixVentasChart({ data }: Props) {
 
   if (!data.length) {
     return (
-      <SafeChartContainer 
-        height={isMobile ? "h-[260px]" : "h-full"} 
+      <SafeChartContainer
+        height={isMobile ? "h-[260px]" : "h-full"}
         className={isMobile ? "md:pb-0 md:p-0" : "min-h-[440px] w-full md:pb-0 md:p-0"}
       >
         <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -89,8 +89,8 @@ export function MixVentasChart({ data }: Props) {
   const totalVenta = data.reduce((acc, curr) => acc + curr.venta_neta_usd, 0);
 
   return (
-    <SafeChartContainer 
-      height={isMobile ? "h-[260px]" : "h-full"} 
+    <SafeChartContainer
+      height={isMobile ? "h-[260px]" : "h-full"}
       className={isMobile ? "md:pb-0 md:p-0" : "min-h-[440px] w-full md:pb-0 md:p-0"}
     >
       <ResponsiveContainer width="100%" height="100%">
