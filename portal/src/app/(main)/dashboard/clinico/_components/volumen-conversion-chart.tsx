@@ -15,7 +15,7 @@ import { TooltipProps } from "recharts";
 import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { VolumenConversion } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCompactNumber } from "@/lib/utils";
+import { formatCompactNumber, formatNumber } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
@@ -41,25 +41,25 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">Convertidos</span>
           <span className="font-semibold tabular-nums text-primary">
-            {new Intl.NumberFormat("en-US").format(data.convertidos)}
+            {formatNumber(data.convertidos)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">No Convertidos</span>
           <span className="font-semibold tabular-nums text-destructive">
-            {new Intl.NumberFormat("en-US").format(data.no_convertidos)}
+            {formatNumber(data.no_convertidos)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">Total Exámenes</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {new Intl.NumberFormat("en-US").format(data.total_examenes)}
+            {formatNumber(data.total_examenes)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6 mt-1 border-t border-border pt-2">
           <span className="text-muted-foreground">% Conversión</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {data.pct_conversion.toFixed(1)}%
+            {formatNumber(data.pct_conversion, { decimals: 1 })}%
           </span>
         </div>
       </div>

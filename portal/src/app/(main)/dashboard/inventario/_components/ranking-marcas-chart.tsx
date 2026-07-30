@@ -13,7 +13,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MarcaItem } from "../_actions/get-inventario-data";
-import { formatCurrency, formatCompactNumber, truncateText } from "@/lib/utils";
+import { formatCurrency, formatCompactNumber, formatNumber, truncateText } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import {
@@ -65,11 +65,11 @@ function RankingTooltip({ active, payload }: RankingTooltipProps) {
         </span>
         <span className="text-muted-foreground">Unidades Vendidas:</span>
         <span className="text-right font-medium tabular-nums text-foreground">
-          {d.unidadesVendidas?.toLocaleString("en-US") ?? "0"}
+          {d.unidadesVendidas != null ? formatNumber(d.unidadesVendidas) : "0"}
         </span>
         <span className="text-muted-foreground">Stock Físico Unidades:</span>
         <span className="text-right font-medium tabular-nums text-foreground">
-          {d.stockFisico?.toLocaleString("en-US") ?? "0"}
+          {d.stockFisico != null ? formatNumber(d.stockFisico) : "0"}
         </span>
         <span className="text-muted-foreground">ASP Precio Promedio:</span>
         <span className="text-right font-medium tabular-nums text-foreground">
@@ -130,7 +130,7 @@ export function RankingMarcasChart({ data }: Props) {
                     <span className="text-foreground font-normal truncate">{brand.marca}</span>
                   </div>
                   <span className="tabular-nums text-muted-foreground">
-                    {formatCurrency(brand.ventaNetaUsd, { currency: "USD" })} ({brand.unidadesVendidas.toLocaleString("en-US")} und)
+                    {formatCurrency(brand.ventaNetaUsd, { currency: "USD" })} ({formatNumber(brand.unidadesVendidas)} und)
                   </span>
                 </div>
                 <div className="w-full h-3 rounded-full bg-secondary overflow-hidden">
@@ -265,7 +265,7 @@ export function RankingMarcasChart({ data }: Props) {
                         <div className="text-right font-medium text-muted-foreground shrink-0">
                           {formatCurrency(brand.ventaNetaUsd, { currency: "USD" })}{" "}
                           <span className="text-muted-foreground font-normal text-xs ml-1">
-                            ({brand.unidadesVendidas.toLocaleString("en-US")} und)
+                            ({formatNumber(brand.unidadesVendidas)} und)
                           </span>
                         </div>
                       </div>

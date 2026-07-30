@@ -13,7 +13,7 @@ import { TooltipProps } from "recharts";
 import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { EdadExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCompactNumber } from "@/lib/utils";
+import { formatCompactNumber, formatNumber } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
@@ -42,13 +42,13 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">Pacientes</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {new Intl.NumberFormat("en-US").format(data.total_examenes)}
+            {formatNumber(data.total_examenes)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">% Participación</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {pct.toFixed(1)}%
+            {formatNumber(pct, { decimals: 1 })}%
           </span>
         </div>
       </div>

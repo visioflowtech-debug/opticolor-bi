@@ -19,7 +19,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import type { ClienteDeudor } from "../_actions/get-cartera-data";
 
 interface Props {
@@ -127,7 +127,7 @@ export function ClientesDeudoresTable({ data }: Props) {
                               </span>
                             </TooltipTrigger>
                             <TooltipContent>
-                              {pctPagado.toFixed(1)}% del total
+                              {formatNumber(pctPagado, { decimals: 1 })}% del total
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>

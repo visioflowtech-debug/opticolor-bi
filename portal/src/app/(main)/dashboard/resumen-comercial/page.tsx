@@ -3,8 +3,8 @@ import { Suspense } from "react";
 
 import {
   formatCompactCurrency,
-  formatCompactNumber,
   formatCurrency,
+  formatNumber,
 } from "@/lib/utils";
 
 import { getResumenKPIs } from "./_actions/get-resumen-data";
@@ -68,28 +68,24 @@ export default async function ResumenComercialPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
         <KpiCard
           title="Venta Neta USD"
-          value={formatCompactCurrency(kpis.ventaNetaUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.ventaNetaUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.ventaNetaUsd, { currency: "USD" })}
           iconName="dollar-sign"
           highlight
         />
         <KpiCard
           title="Venta Neta Sin Impuesto USD"
-          value={formatCompactCurrency(kpis.ventaNetaSinIvaUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.ventaNetaSinIvaUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.ventaNetaSinIvaUsd, { currency: "USD" })}
           iconName="wallet"
         />
         <KpiCard
           title="Proyección Venta Neta USD"
-          value={formatCompactCurrency(kpis.proyeccionUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.proyeccionUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.proyeccionUsd, { currency: "USD" })}
           subtitle={`${proyeccionPct}% del objetivo alcanzado`}
           iconName="trending-up"
         />
         <KpiCard
           title="Total Cobrado USD"
-          value={formatCompactCurrency(kpis.totalCobradoUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.totalCobradoUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.totalCobradoUsd, { currency: "USD" })}
           subtitle={
             pendienteCobro > 0
               ? `${formatCompactCurrency(pendienteCobro, { currency: "USD" })} pendiente de cobro`
@@ -99,26 +95,22 @@ export default async function ResumenComercialPage({
         />
         <KpiCard
           title="Ticket Promedio USD"
-          value={formatCompactCurrency(kpis.ticketPromedioUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.ticketPromedioUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.ticketPromedioUsd, { currency: "USD" })}
           iconName="bar-chart-3"
         />
         <KpiCard
           title="Venta Neta YTD USD"
-          value={formatCompactCurrency(kpis.ventaNetaYTDUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.ventaNetaYTDUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.ventaNetaYTDUsd, { currency: "USD" })}
           iconName="dollar-sign"
         />
         <KpiCard
           title="Ordenes Facturadas"
-          value={formatCompactNumber(kpis.cantidadFacturas)}
-          fullValue={kpis.cantidadFacturas.toLocaleString("en-US")}
+          value={formatNumber(kpis.cantidadFacturas)}
           iconName="shopping-cart"
         />
         <KpiCard
           title="Clientes Nuevos"
-          value={formatCompactNumber(kpis.clientesNuevos)}
-          fullValue={kpis.clientesNuevos.toLocaleString("en-US")}
+          value={formatNumber(kpis.clientesNuevos)}
           iconName="user-plus"
         />
       </div>

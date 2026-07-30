@@ -15,7 +15,7 @@ import type { NameType, ValueType, Payload } from "recharts/types/component/Defa
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MonthlyTrendData } from "../_actions/get-resumen-data";
-import { formatCurrency, formatCompactCurrency, formatCompactNumber } from "@/lib/utils";
+import { formatCurrency, formatCompactCurrency, formatCompactNumber, formatNumber } from "@/lib/utils";
 
 interface Props {
   data: MonthlyTrendData[];
@@ -46,7 +46,7 @@ function ChartTooltip({
           <span className="ml-auto font-semibold tabular-nums">
             {p.name === "ventaNetaUsd"
               ? formatCurrency(Number(p.value ?? 0), { currency: "USD" })
-              : Number(p.value ?? 0).toLocaleString("en-US")}
+              : formatNumber(Number(p.value ?? 0))}
           </span>
         </div>
       ))}

@@ -3,9 +3,8 @@ import { AlertTriangle } from "lucide-react";
 import { Suspense } from "react";
 
 import {
-  formatCompactCurrency,
-  formatCompactNumber,
   formatCurrency,
+  formatNumber,
 } from "@/lib/utils";
 import {
   Tooltip,
@@ -77,29 +76,26 @@ export default async function InventarioPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Stock Físico"
-          value={formatCompactNumber(kpis.stockFisico)}
-          fullValue={kpis.stockFisico.toLocaleString("en-US")}
+          value={formatNumber(kpis.stockFisico)}
           subtitle="Snapshot · hasta hoy"
           iconName="archive"
           highlight
         />
         <KpiCard
           title="Capital Invertido"
-          value={formatCompactCurrency(kpis.capitalInvertidoUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.capitalInvertidoUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.capitalInvertidoUsd, { currency: "USD" })}
           subtitle="Snapshot · hasta hoy"
           iconName="dollar-sign"
         />
         <KpiCard
           title="Unidades Vendidas"
-          value={formatCompactNumber(kpis.unidadesVendidas)}
-          fullValue={kpis.unidadesVendidas.toLocaleString("en-US")}
+          value={formatNumber(kpis.unidadesVendidas)}
           iconName="trending-up"
         />
         <div className="relative">
           <KpiCard
             title="UPT"
-            value={kpis.upt.toFixed(2)}
+            value={formatNumber(kpis.upt, { decimals: 2 })}
             subtitle="Unidades por ticket"
             iconName="bar-chart-2"
           />

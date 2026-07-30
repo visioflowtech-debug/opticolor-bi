@@ -167,3 +167,30 @@ a un componente de ícono mediante un diccionario (`ICON_MAP`) importado y defin
 archivo cliente. `DualKpiCard` se corrigió para seguir el mismo patrón (antes recibía `icon:
 LucideIcon` como prop). Cualquier uso futuro de `DualKpiCard` en otro módulo debe pasar
 `iconName="..."`, nunca la referencia al componente de ícono.
+
+## Formato numérico venezolano y precisión completa en tarjetas KPI
+
+- **Separadores:** el portal usa convención venezolana — punto de miles, coma decimal
+  (ej. `$1.234,56`, `60.112`), no el estilo `en-US` (`1,234.56`) usado originalmente. Esto se
+  implementa centralizado en `src/lib/utils.ts` vía el locale `es-VE` (constante interna
+  `VE_LOCALE`), usado por `formatCurrency`, `formatCompactCurrency`, `formatNumber` y
+  `formatCompactNumber`. Ningún componente debe formatear números por su cuenta con
+  `.toLocaleString("en-US")` ni codificar separadores a mano.
+- **Detalle importante de `Intl` verificado con ejecución real:** `Intl.NumberFormat('es-VE',
+  { style: 'currency', currency: 'USD' })` antepone el string `"USD"` en vez de un símbolo `$`
+  limpio (da `"USD 1.234,56"`). Hace falta el flag `currencyDisplay: 'narrowSymbol'` para obtener
+  `"$1.234,56"` exacto. `es-ES` tampoco sirve (pospone `"US$"` al final: `"1234,56 US$"`). Si en el
+  futuro se toca el formateo de moneda, verificar siempre con una ejecución real de `Intl` — el
+  comportamiento por locale no es intuitivo ni está bien documentado.
+- **`formatNumber`** (nueva función): formatea conteos/enteros no monetarios con separador de
+  miles venezolano, sin abreviar (ej. `60112` → `"60.112"`). Reemplaza los usos de
+  `.toLocaleString("en-US")` para conteos (Clientes Nuevos, Volumen de Órdenes, etc.).
+- **`formatCompactCurrency`/`formatCompactNumber`:** se mantienen (siguen usándose en ejes y
+  tooltips de gráficos, donde el espacio limitado sigue requiriendo abreviación K/M/B) — solo se
+  les aplicó el separador venezolano en la parte decimal (ej. `"271,8 M"` en vez de `"271.8 M"`).
+  Abreviación de magnitud y formato de separadores son decisiones independientes entre sí.
+- **Tarjetas KPI — valor completo, sin abreviar:** decisión de producto — las tarjetas KPI de los
+  5 reportes ya no muestran el patrón abreviado (`value` corto + `fullValue` completo solo en
+  tooltip); se pasa a mostrar siempre el valor completo (`formatCurrency`/`formatNumber`)
+  directamente. Este cambio de fuente es la base (Prompt 1); el rollout a los componentes de los
+  5 reportes es un prompt aparte.

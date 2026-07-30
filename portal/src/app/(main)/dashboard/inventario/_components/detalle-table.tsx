@@ -14,7 +14,7 @@ import {
   TableRow,
   TableFooter,
 } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import type { MarcaItem } from "../_actions/get-inventario-data";
 
@@ -103,10 +103,10 @@ export function DetalleTable({ data, error }: Props) {
                     <TableRow key={item.marca} className="text-xs">
                       <TableCell className="font-medium">{item.marca}</TableCell>
                       <TableCell className="text-right tabular-nums">
-                        {item.unidadesVendidas.toLocaleString("en-US")}
+                        {formatNumber(item.unidadesVendidas)}
                       </TableCell>
                       <TableCell className="text-right tabular-nums text-muted-foreground">
-                        {item.stockFisico.toLocaleString("en-US")}
+                        {formatNumber(item.stockFisico)}
                       </TableCell>
                       <TableCell
                         className="text-right tabular-nums font-medium"
@@ -121,10 +121,10 @@ export function DetalleTable({ data, error }: Props) {
                   <TableRow className="hover:bg-transparent font-semibold">
                     <TableCell className="text-xs uppercase">Total Filtrado</TableCell>
                     <TableCell className="text-right text-xs tabular-nums">
-                      {totalUnidades.toLocaleString("en-US")}
+                      {formatNumber(totalUnidades)}
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums text-muted-foreground">
-                      {totalStock.toLocaleString("en-US")}
+                      {formatNumber(totalStock)}
                     </TableCell>
                     <TableCell className="text-right text-xs tabular-nums font-semibold">
                       {formatCurrency(totalVentaNeta, { currency: "USD" })}

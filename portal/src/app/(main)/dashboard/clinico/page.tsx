@@ -1,7 +1,7 @@
 import { format, startOfMonth } from "date-fns";
 import { Suspense } from "react";
 
-import { formatCompactNumber } from "@/lib/utils";
+import { formatNumber } from "@/lib/utils";
 
 import { getClinicaKPIs } from "./_actions/get-clinica-data";
 import { KpiCard } from "../resumen-comercial/_components/kpi-card";
@@ -54,38 +54,33 @@ export default async function ClinicaPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <KpiCard
           title="Exámenes Hoy"
-          value={kpis.examenesHoy.toLocaleString("en-US")}
+          value={formatNumber(kpis.examenesHoy)}
           iconName="activity"
           highlight
         />
         <KpiCard
           title="Total Exámenes"
-          value={formatCompactNumber(kpis.totalExamenes)}
-          fullValue={kpis.totalExamenes.toLocaleString("en-US")}
+          value={formatNumber(kpis.totalExamenes)}
           iconName="users"
         />
         <KpiCard
           title="% Conversión"
-          value={`${kpis.pctConversion.toFixed(1)}%`}
-          fullValue={`${kpis.pctConversion.toFixed(2)}%`}
+          value={`${formatNumber(kpis.pctConversion, { decimals: 2 })}%`}
           iconName="check-circle"
         />
         <KpiCard
           title="Promedio Diario"
-          value={kpis.promedioDiario.toFixed(1)}
-          fullValue={kpis.promedioDiario.toFixed(2)}
+          value={formatNumber(kpis.promedioDiario, { decimals: 2 })}
           iconName="calendar"
         />
         <KpiCard
           title="Convertidos"
-          value={formatCompactNumber(kpis.convertidos)}
-          fullValue={kpis.convertidos.toLocaleString("en-US")}
+          value={formatNumber(kpis.convertidos)}
           iconName="clipboard"
         />
         <KpiCard
           title="No Convertidos"
-          value={formatCompactNumber(kpis.noConvertidos)}
-          fullValue={kpis.noConvertidos.toLocaleString("en-US")}
+          value={formatNumber(kpis.noConvertidos)}
           iconName="x-circle"
         />
       </div>

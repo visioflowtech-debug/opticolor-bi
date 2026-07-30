@@ -3,7 +3,7 @@
 import { ResponsiveContainer, Tooltip, Treemap } from "recharts";
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import type { GrupoMix } from "../_actions/get-inventario-data";
 
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -44,7 +44,7 @@ function TreemapTooltip({
         </div>
         <div className="flex items-center justify-between gap-5">
           <span className="text-muted-foreground">Participación</span>
-          <span className="font-medium tabular-nums">{d.porcentaje.toFixed(1)}%</span>
+          <span className="font-medium tabular-nums">{formatNumber(d.porcentaje, { decimals: 1 })}%</span>
         </div>
       </div>
     </div>
@@ -181,7 +181,7 @@ export function TreemapChart({ data }: Props) {
                   />
                   <span className="truncate text-foreground uppercase font-semibold text-[10px]">{item.name}</span>
                 </div>
-                <span className="text-muted-foreground ml-1 font-bold">{item.porcentaje}%</span>
+                <span className="text-muted-foreground ml-1 font-bold">{formatNumber(item.porcentaje, { decimals: 1 })}%</span>
               </div>
             );
           })}

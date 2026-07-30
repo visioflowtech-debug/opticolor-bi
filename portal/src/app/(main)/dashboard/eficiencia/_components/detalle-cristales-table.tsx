@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatNumber } from "@/lib/utils";
 import type { TipoLenteDetalle } from "../_actions/get-eficiencia-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -106,7 +106,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
                       {item.tipo_lente_descripcion}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
-                      {new Intl.NumberFormat("en-US").format(item.volumen_ordenes)}
+                      {formatNumber(item.volumen_ordenes)}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
                       {formatCurrency(item.monto_total_usd, { currency: "USD" })}
@@ -120,7 +120,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
                     Total
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-sm">
-                    {new Intl.NumberFormat("en-US").format(totales.volumen_ordenes)}
+                    {formatNumber(totales.volumen_ordenes)}
                   </TableCell>
                   <TableCell className="text-right tabular-nums text-sm">
                     {formatCurrency(totales.monto_total_usd, { currency: "USD" })}

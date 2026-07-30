@@ -2,9 +2,8 @@ import { format, startOfMonth } from "date-fns";
 import { Suspense } from "react";
 
 import {
-  formatCompactCurrency,
-  formatCompactNumber,
   formatCurrency,
+  formatNumber,
 } from "@/lib/utils";
 
 import { getEficienciaKPIs } from "./_actions/get-eficiencia-data";
@@ -55,27 +54,23 @@ export default async function EficienciaPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Órdenes Hoy"
-          value={kpis.ordenesHoy.toLocaleString("en-US")}
-          fullValue={kpis.ordenesHoy.toLocaleString("en-US")}
+          value={formatNumber(kpis.ordenesHoy)}
           iconName="shopping-cart"
           highlight
         />
         <KpiCard
           title="Volumen de Órdenes"
-          value={formatCompactNumber(kpis.volumenOrdenes)}
-          fullValue={kpis.volumenOrdenes.toLocaleString("en-US")}
+          value={formatNumber(kpis.volumenOrdenes)}
           iconName="package"
         />
         <KpiCard
           title="Promedio Órdenes Diario"
-          value={kpis.promedioDiario.toFixed(1)}
-          fullValue={kpis.promedioDiario.toFixed(2)}
+          value={formatNumber(kpis.promedioDiario, { decimals: 2 })}
           iconName="trending-up"
         />
         <KpiCard
           title="Monto Total Órdenes"
-          value={formatCompactCurrency(kpis.montoTotalUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.montoTotalUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.montoTotalUsd, { currency: "USD" })}
           iconName="dollar-sign"
         />
       </div>

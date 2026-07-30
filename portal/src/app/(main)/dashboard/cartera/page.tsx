@@ -2,9 +2,8 @@ import { format, startOfMonth } from "date-fns";
 import { Suspense } from "react";
 
 import {
-  formatCompactCurrency,
-  formatCompactNumber,
   formatCurrency,
+  formatNumber,
 } from "@/lib/utils";
 
 import { getCarteraKPIs } from "./_actions/get-cartera-data";
@@ -55,27 +54,23 @@ export default async function CarteraPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Monto Ordenes"
-          value={formatCompactCurrency(kpis.montoPedidosUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.montoPedidosUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.montoPedidosUsd, { currency: "USD" })}
           iconName="dollar-sign"
         />
         <KpiCard
           title="Recaudado en Ordenes"
-          value={formatCompactCurrency(kpis.recaudadoUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.recaudadoUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.recaudadoUsd, { currency: "USD" })}
           iconName="wallet"
         />
         <KpiCard
           title="Monto Saldo Pendiente"
-          value={formatCompactCurrency(kpis.saldoPendienteUsd, { currency: "USD" })}
-          fullValue={formatCurrency(kpis.saldoPendienteUsd, { currency: "USD" })}
+          value={formatCurrency(kpis.saldoPendienteUsd, { currency: "USD" })}
           iconName="alert-triangle"
           highlight
         />
         <KpiCard
           title="Ordenes por Liquidar"
-          value={formatCompactNumber(kpis.pedidosLiquidar)}
-          fullValue={kpis.pedidosLiquidar.toLocaleString("en-US")}
+          value={formatNumber(kpis.pedidosLiquidar)}
           iconName="clipboard-list"
         />
       </div>

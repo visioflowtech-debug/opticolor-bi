@@ -13,7 +13,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { DispersionItem } from "../_actions/get-inventario-data";
-import { formatCurrency, formatCompactNumber } from "@/lib/utils";
+import { formatCurrency, formatCompactNumber, formatNumber } from "@/lib/utils";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -55,11 +55,11 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
         <span className="text-muted-foreground">Unidades Vendidas:</span>
         <span className="text-right font-medium tabular-nums text-foreground">
-          {d.unidadesVendidas?.toLocaleString("en-US") ?? "0"}
+          {d.unidadesVendidas != null ? formatNumber(d.unidadesVendidas) : "0"}
         </span>
         <span className="text-muted-foreground">Stock Físico Unidades:</span>
         <span className="text-right font-medium tabular-nums text-foreground">
-          {d.stockFisico?.toLocaleString("en-US") ?? "0"}
+          {d.stockFisico != null ? formatNumber(d.stockFisico) : "0"}
         </span>
         <span className="text-muted-foreground">Venta Neta Producto:</span>
         <span className="text-right font-medium tabular-nums text-foreground">

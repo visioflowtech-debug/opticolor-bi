@@ -12,6 +12,7 @@ import type { NameType, ValueType, Payload } from "recharts/types/component/Defa
 import type { GeneroExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { formatNumber } from "@/lib/utils";
 
 interface Props {
   data: GeneroExamen[];
@@ -46,13 +47,13 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">Cantidad</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {new Intl.NumberFormat("en-US").format(item.total_examenes)}
+            {formatNumber(item.total_examenes)}
           </span>
         </div>
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">% del Total</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {pct.toFixed(1)}%
+            {formatNumber(pct, { decimals: 1 })}%
           </span>
         </div>
       </div>
@@ -79,7 +80,7 @@ function GeneroLegend({ data }: { data: GeneroExamen[] }) {
               {item.genero_label}
             </span>
             <span className="shrink-0 font-semibold tabular-nums">
-              {pct.toFixed(1)}%
+              {formatNumber(pct, { decimals: 1 })}%
             </span>
           </li>
         );
