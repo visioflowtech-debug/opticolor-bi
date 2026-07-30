@@ -22,8 +22,6 @@ const EMPTY_KPIS = {
   recaudadoUsd: 0,
   saldoPendienteUsd: 0,
   pedidosLiquidar: 0,
-  pctCobroInmediato: 0,
-  pctNivelAbono: 0,
 };
 
 export default async function CarteraPage({
@@ -54,7 +52,7 @@ export default async function CarteraPage({
       )}
 
       {/* ── Fila 1: KPIs ────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title="Monto Ordenes"
           value={formatCompactCurrency(kpis.montoPedidosUsd, { currency: "USD" })}
@@ -80,28 +78,16 @@ export default async function CarteraPage({
           fullValue={kpis.pedidosLiquidar.toLocaleString("en-US")}
           iconName="clipboard-list"
         />
-        <KpiCard
-          title="% Primer Abono"
-          value={`${kpis.pctCobroInmediato.toFixed(1)}%`}
-          fullValue={`${kpis.pctCobroInmediato.toFixed(2)}%`}
-          iconName="percent"
-        />
-        <KpiCard
-          title="% Pago Total"
-          value={`${kpis.pctNivelAbono.toFixed(1)}%`}
-          fullValue={`${kpis.pctNivelAbono.toFixed(2)}%`}
-          iconName="percent"
-        />
       </div>
 
       {/* ── Fila 2: GAP de Cobro ────────── */}
-      <Suspense fallback={<ChartSkeleton title="Tendencia de la Cartera · GAP de Cobro" height="h-72" />}>
+      <Suspense fallback={<ChartSkeleton title="Tendencia de la Cartera (GAP de Cobro)" height="h-72" />}>
         <GapCobroChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
       </Suspense>
 
       {/* ── Fila 3: Mix de Ventas y Cartera por Sucursal ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ChartSkeleton title="Mix de Ventas · Participación y Monto Neto" height="h-64" />}>
+        <Suspense fallback={<ChartSkeleton title="Mix de Ventas: Participación y Monto Neto" height="h-64" />}>
           <MixVentasChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
 

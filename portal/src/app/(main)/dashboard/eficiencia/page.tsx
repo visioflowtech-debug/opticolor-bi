@@ -81,13 +81,13 @@ export default async function EficienciaPage({
       </div>
 
       {/* ── Fila 2: Tendencia de Órdenes ────────── */}
-      <Suspense fallback={<ChartSkeleton title="Tendencia de Órdenes · Últimos 12 Meses" height="h-72" />}>
+      <Suspense fallback={<ChartSkeleton title="Tendencia de Órdenes" height="h-72" />}>
         <TendenciaOrdenesChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
       </Suspense>
 
       {/* ── Fila 3: Detalle por Tipo y Órdenes por Sucursal ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<ChartSkeleton title="Detalle de Órdenes por Tipo de Lente" height="h-[500px]" />}>
+        <Suspense fallback={<ChartSkeleton title="Detalle de Órdenes por Tipo" height="h-[500px]" />}>
           <TipoLenteChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
         </Suspense>
 

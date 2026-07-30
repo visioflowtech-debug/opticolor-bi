@@ -16,7 +16,7 @@ export async function GapCobroChartWrapper({ startDate, endDate, sucursales }: W
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Tendencia de la Cartera · GAP de Cobro
+          Tendencia de la Cartera (GAP de Cobro)
         </CardTitle>
       </CardHeader>
       <CardContent>

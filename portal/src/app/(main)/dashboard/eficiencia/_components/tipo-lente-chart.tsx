@@ -69,7 +69,7 @@ export function TipoLenteChart({ data, error }: Props) {
       <Card className="overflow-hidden rounded-2xl shadow-md h-full">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Detalle de Órdenes por Tipo de Lente
+            Detalle de Órdenes por Tipo
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -96,7 +96,7 @@ export function TipoLenteChart({ data, error }: Props) {
       <Card className="overflow-hidden rounded-2xl shadow-md h-full">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Detalle de Órdenes por Tipo de Lente
+            Detalle de Órdenes por Tipo
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -156,7 +156,7 @@ export function TipoLenteChart({ data, error }: Props) {
       <div className="flex-1 flex flex-col min-h-0">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-semibold text-muted-foreground">
-            Detalle de Órdenes por Tipo de Lente
+            Detalle de Órdenes por Tipo
           </CardTitle>
         </CardHeader>
         <CardContent className="flex-1 flex flex-col min-h-0">

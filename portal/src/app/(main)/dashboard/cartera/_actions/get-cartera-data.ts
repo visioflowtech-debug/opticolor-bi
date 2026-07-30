@@ -14,8 +14,6 @@ export type CarteraKpiData = {
   recaudadoUsd: number;
   saldoPendienteUsd: number;
   pedidosLiquidar: number;
-  pctCobroInmediato: number;
-  pctNivelAbono: number;
 };
 
 export type GapCobro = {
@@ -78,8 +76,6 @@ const fetchCarteraKPIs = unstable_cache(
       recaudadoRes,
       saldoPendienteRes,
       pedidosLiquidarRes,
-      pctCobroInmediatoRes,
-      pctNivelAbonoRes,
     ] = await Promise.all([
       // C-2.1 Monto Pedidos
       req().query(`
@@ -99,42 +95,30 @@ const fetchCarteraKPIs = unstable_cache(
 
       // C-2.3 Saldo Pendiente — histórico total vigente de la sucursal, SIN filtro de
       // fecha (paridad con la medida DAX de Power BI: esta tarjeta no está conectada
-      // al slicer de fecha, solo al de sucursal — ver diagnóstico de discrepancia).
+      // al slicer de fecha, solo al de sucursal). Lee directo de Fact_Pedidos, NO de
+      // la vista KPI_Inf3_Saldo_Pendiente — esa vista filtra WHERE saldo_pendiente > 0
+      // (columna en Bs), lo que excluye filas con saldo_pendiente_usd > 0 pero cuyo
+      // equivalente en Bs es <= 0 (confirmado con evidencia: 14 filas, $294.41 USD
+      // excluidas indebidamente). El DAX real suma sin ningún filtro.
       req().query(`
         SELECT ROUND(COALESCE(SUM(saldo_pendiente_usd), 0), 2) AS valor
-        FROM dbo.KPI_Inf3_Saldo_Pendiente
+        FROM dbo.Fact_Pedidos
         WHERE 1=1
           ${buildSucursalFilter()}
       `),
 
       // C-2.4 Pedidos por Liquidar — histórico total vigente de la sucursal, SIN
-      // filtro de fecha (misma paridad con Power BI que Saldo Pendiente).
+      // filtro de fecha (misma paridad con Power BI que Saldo Pendiente). Lee directo
+      // de Fact_Pedidos filtrando por saldo_pendiente_usd > 0, NO de la vista
+      // KPI_Inf3_Pedidos_Liquidar (mismo filtro en Bs que Saldo Pendiente — confirmado
+      // con evidencia: el error es bidireccional, 14 filas con saldo Bs<=0 pero
+      // saldo_pendiente_usd>0 que la vista excluía indebidamente, y ~72-104 filas con
+      // saldo Bs>0 residual/redondeo pero saldo_pendiente_usd<=0 que la vista incluía
+      // indebidamente — el efecto neto es una reducción del conteo, no un aumento).
       req().query(`
         SELECT COUNT(DISTINCT id_pedido) AS valor
-        FROM dbo.KPI_Inf3_Pedidos_Liquidar
-        WHERE 1=1
-          ${buildSucursalFilter()}
-      `),
-
-      // C-2.5 % Primer Abono — conteo de órdenes con pago inicial en el período exacto
-      req().query(`
-        SELECT ISNULL(
-          COUNT(CASE WHEN monto_pagado > 0 THEN 1 END) * 100.0 / NULLIF(COUNT(id_pedido), 0),
-          0
-        ) AS valor
-        FROM dbo.KPI_Inf3_Monto_Pedidos
-        WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter()}
-      `),
-
-      // C-2.6 % Pago Total — conteo de órdenes completamente liquidadas en el período exacto
-      req().query(`
-        SELECT ISNULL(
-          COUNT(CASE WHEN saldo_pendiente <= 0 THEN 1 END) * 100.0 / NULLIF(COUNT(id_pedido), 0),
-          0
-        ) AS valor
-        FROM dbo.KPI_Inf3_Monto_Pedidos
-        WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
+        FROM dbo.Fact_Pedidos
+        WHERE saldo_pendiente_usd > 0
           ${buildSucursalFilter()}
       `),
     ]);
@@ -144,8 +128,6 @@ const fetchCarteraKPIs = unstable_cache(
       recaudadoUsd:      Number((recaudadoRes.recordset        as ValorRow[])[0]?.valor ?? 0),
       saldoPendienteUsd: Number((saldoPendienteRes.recordset   as ValorRow[])[0]?.valor ?? 0),
       pedidosLiquidar:   Number((pedidosLiquidarRes.recordset  as ValorRow[])[0]?.valor ?? 0),
-      pctCobroInmediato: Math.round(Number((pctCobroInmediatoRes.recordset as ValorRow[])[0]?.valor ?? 0) * 100) / 100,
-      pctNivelAbono:     Math.round(Number((pctNivelAbonoRes.recordset     as ValorRow[])[0]?.valor ?? 0) * 100) / 100,
     };
   },
   ["dash-cartera-kpis"],

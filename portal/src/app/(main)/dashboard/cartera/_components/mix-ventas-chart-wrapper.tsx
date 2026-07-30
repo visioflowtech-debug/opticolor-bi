@@ -16,7 +16,7 @@ export async function MixVentasChartWrapper({ startDate, endDate, sucursales }: 
     <Card className="overflow-hidden rounded-2xl shadow-md h-full flex flex-col">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Mix de Ventas · Participación y Monto Neto
+          Mix de Ventas: Participación y Monto Neto
         </CardTitle>
       </CardHeader>
       <CardContent className="h-full flex-1 flex flex-col min-h-0">

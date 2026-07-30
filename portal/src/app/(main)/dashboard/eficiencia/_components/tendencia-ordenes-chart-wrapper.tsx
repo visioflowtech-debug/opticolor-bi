@@ -16,7 +16,7 @@ export async function TendenciaOrdenesChartWrapper({ startDate, endDate, sucursa
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Tendencia de Órdenes · Últimos 12 Meses
+          Tendencia de Órdenes
         </CardTitle>
       </CardHeader>
       <CardContent>
