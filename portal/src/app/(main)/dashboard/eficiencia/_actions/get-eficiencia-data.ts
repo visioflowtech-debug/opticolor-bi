@@ -51,30 +51,52 @@ type SucursalRow     = { nombre_sucursal: string; volumen_ordenes: number };
 
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
-const fetchEficienciaKPIs = unstable_cache(
-  async (params: FetchParams): Promise<EficienciaKpis> => {
-    const { startDate, endDate, sucursales, allowedSucursales } = params;
+type HoyParams = { sucursales: string | null; allowedSucursales: string };
+
+// C-3.1 Órdenes Hoy — cache PROPIO, separado del resto de los KPIs del período.
+// Antes vivía adentro de fetchEficienciaKPIs: aunque su SQL nunca usa
+// startDate/endDate, unstable_cache arma la clave de caché a partir de TODOS los
+// argumentos recibidos por la función envuelta — startDate/endDate viajaban como
+// argumentos igual, así que cada combinación de fechas que el usuario filtraba
+// generaba su propia entrada de caché, cada una con el valor de "Órdenes Hoy"
+// que tenía en el momento en que esa combinación se cacheó por primera vez (una
+// foto vieja, no el valor actual). Clave fija (solo sucursal/RLS) + revalidate
+// corto (1 min, no 1 hora) — el valor cambia todo el día, a diferencia del resto.
+const fetchOrdenesHoy = unstable_cache(
+  async (params: HoyParams): Promise<number> => {
+    const { sucursales, allowedSucursales } = params;
     const pool = await getConnection();
 
-    const req = () =>
-      pool
-        .request()
-        .input("startDate",         startDate)
-        .input("endDate",           endDate)
-        .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales);
-
-    const [ordenesHoyRes, periodoStatsRes] = await Promise.all([
-      // C-3.1 Órdenes Hoy — pedidos únicos con zona horaria Venezuela (GMT-4)
-      req().query(`
+    const res = await pool
+      .request()
+      .input("sucursales",        sucursales)
+      .input("allowedSucursales", allowedSucursales)
+      .query(`
         SELECT COUNT(DISTINCT id_pedido) AS valor
         FROM dbo.Fact_Eficiencia_Ordenes
         WHERE CAST(fecha_pedido AS DATE) = CAST(SWITCHOFFSET(TODATETIMEOFFSET(GETDATE(), '+00:00'), '-04:00') AS DATE)
           ${buildSucursalFilter()}
-      `),
+      `);
 
-      // C-3.2 Volumen + C-3.3 Promedio Diario — COUNTA semántico (filas, no pedidos únicos)
-      req().query(`
+    return Number((res.recordset as ValorRow[])[0]?.valor ?? 0);
+  },
+  ["dash-eficiencia-ordenes-hoy"],
+  { revalidate: 60, tags: ["dash-eficiencia-ordenes-hoy"] }
+);
+
+const fetchEficienciaKPIs = unstable_cache(
+  async (params: FetchParams): Promise<Omit<EficienciaKpis, "ordenesHoy">> => {
+    const { startDate, endDate, sucursales, allowedSucursales } = params;
+    const pool = await getConnection();
+
+    // C-3.2 Volumen + C-3.3 Promedio Diario — COUNTA semántico (filas, no pedidos únicos)
+    const periodoStatsRes = await pool
+      .request()
+      .input("startDate",         startDate)
+      .input("endDate",           endDate)
+      .input("sucursales",        sucursales)
+      .input("allowedSucursales", allowedSucursales)
+      .query(`
         SELECT
           COUNT(f.id_pedido)                                                              AS volumen_ordenes,
           ISNULL(SUM(f.monto_total_usd), 0)                                              AS monto_total_usd,
@@ -82,14 +104,12 @@ const fetchEficienciaKPIs = unstable_cache(
         FROM dbo.Fact_Eficiencia_Ordenes f
         WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${buildSucursalFilter("f")}
-      `),
-    ]);
+      `);
 
     const stats = (periodoStatsRes.recordset as PeriodoStatsRow[])[0]
       ?? { volumen_ordenes: 0, promedio_ordenes_diarias: 0, monto_total_usd: 0 };
 
     return {
-      ordenesHoy:     Number((ordenesHoyRes.recordset as ValorRow[])[0]?.valor ?? 0),
       volumenOrdenes: Number(stats.volumen_ordenes ?? 0),
       promedioDiario: Math.floor(Number(stats.promedio_ordenes_diarias ?? 0)),
       montoTotalUsd:  Math.round(Number(stats.monto_total_usd ?? 0) * 100) / 100,
@@ -106,8 +126,12 @@ export async function getEficienciaKPIs(
     const auth = await getAuthContext();
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
-    const data = await fetchEficienciaKPIs({ ...params, allowedSucursales });
-    return { success: true, data };
+    const { sucursales } = params;
+    const [ordenesHoy, periodoStats] = await Promise.all([
+      fetchOrdenesHoy({ sucursales, allowedSucursales }),
+      fetchEficienciaKPIs({ ...params, allowedSucursales }),
+    ]);
+    return { success: true, data: { ordenesHoy, ...periodoStats } };
   } catch (err) {
     console.error("[ERROR][getEficienciaKPIs]", err);
     return { success: false, error: "Error al obtener KPIs de eficiencia." };

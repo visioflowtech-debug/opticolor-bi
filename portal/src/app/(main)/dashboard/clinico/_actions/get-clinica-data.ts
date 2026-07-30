@@ -99,38 +99,56 @@ function buildMesLabel(periodo: string): string {
 
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
+type HoyParams = { sucursales: string | null; allowedSucursales: string; excludedClinica: string };
+
+// C-4.3 Exámenes Hoy — cache PROPIO, separado del resto de los KPIs del período.
+// Antes vivía adentro de fetchClinicaKPIs: aunque su SQL nunca usa
+// startDate/endDate, unstable_cache arma la clave de caché a partir de TODOS los
+// argumentos recibidos por la función envuelta — startDate/endDate viajaban como
+// argumentos igual, así que cada combinación de fechas que el usuario filtraba
+// generaba su propia entrada de caché, cada una con el valor de "Exámenes Hoy"
+// que tenía en el momento en que esa combinación se cacheó por primera vez (una
+// foto vieja, no el valor actual). Clave fija (solo sucursal/RLS/exclusión) +
+// revalidate corto (1 min, no 1 hora) — el valor cambia todo el día.
+const fetchExamenesHoy = unstable_cache(
+  async (params: HoyParams): Promise<number> => {
+    const { sucursales, allowedSucursales, excludedClinica } = params;
+    const pool = await getConnection();
+
+    const res = await pool
+      .request()
+      .input("sucursales",        sucursales)
+      .input("allowedSucursales", allowedSucursales)
+      .input("excludedClinica",   excludedClinica)
+      .query(`
+        SELECT COUNT(DISTINCT fe.id_examen) AS valor
+        FROM dbo.Fact_Examenes fe
+        WHERE CAST(fe.fecha_examen_completa AS DATE) = CAST(SWITCHOFFSET(TODATETIMEOFFSET(GETDATE(), '+00:00'), '-04:00') AS DATE)
+          AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
+          ${buildSucursalFilter("fe")}
+      `);
+
+    return Number((res.recordset as ValorRow[])[0]?.valor ?? 0);
+  },
+  ["dash-clinico-examenes-hoy"],
+  { revalidate: 60, tags: ["dash-clinico-examenes-hoy"] }
+);
+
 const fetchClinicaKPIs = unstable_cache(
-  async (params: FetchParams): Promise<ClinicaKpis> => {
+  async (params: FetchParams): Promise<Omit<ClinicaKpis, "examenesHoy">> => {
     const { startDate, endDate, sucursales, allowedSucursales, excludedClinica } = params;
     const pool = await getConnection();
 
-    const req = () =>
-      pool
-        .request()
-        .input("startDate",         startDate)
-        .input("endDate",           endDate)
-        .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("excludedClinica",   excludedClinica);
-
-    const [examenesHoyRes, periodoStatsRes] = await Promise.all([
-      // C-4.3: Exámenes Hoy — fuente transaccional, sin lag ETL de ~3h
-      pool
-        .request()
-        .input("sucursales",        sucursales)
-        .input("allowedSucursales", allowedSucursales)
-        .input("excludedClinica",   excludedClinica)
-        .query(`
-          SELECT COUNT(DISTINCT fe.id_examen) AS valor
-          FROM dbo.Fact_Examenes fe
-          WHERE CAST(fe.fecha_examen_completa AS DATE) = CAST(SWITCHOFFSET(TODATETIMEOFFSET(GETDATE(), '+00:00'), '-04:00') AS DATE)
-            AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-            ${buildSucursalFilter("fe")}
-        `),
-
-      // KPIs período — Fact_Examenes es ahora la fuente directa y única de verdad
-      req().query(`
-        SELECT 
+    // KPIs período — Fact_Examenes es ahora la fuente directa y única de verdad
+    const periodoStatsRes = await pool
+      .request()
+      .input("startDate",         startDate)
+      .input("endDate",           endDate)
+      .input("sucursales",        sucursales)
+      .input("allowedSucursales", allowedSucursales)
+      .input("excludedClinica",   excludedClinica)
+      .query(`
+        SELECT
           COUNT(DISTINCT fe.id_examen) AS [totalExamenes],
           COUNT(DISTINCT CASE WHEN fe.estado_conversion = 'Convertido' THEN fe.id_examen END) AS [convertidos],
           COUNT(DISTINCT CASE WHEN fe.estado_conversion != 'Convertido' OR fe.estado_conversion IS NULL THEN fe.id_examen END) AS [noConvertidos],
@@ -141,21 +159,16 @@ const fetchClinicaKPIs = unstable_cache(
           AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
           AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
           ${buildSucursalFilter("fe")}
-      `),
-    ]);
+      `);
 
     const stats = (periodoStatsRes.recordset as PeriodoStatsRow[])[0]
       ?? { totalExamenes: 0, convertidos: 0, noConvertidos: 0, pctConversion: 0, promedioDiario: 0 };
-    const totalExamenes = Number(stats.totalExamenes ?? 0);
-    const convertidos   = Number(stats.convertidos ?? 0);
-    const pctConversion = Number(stats.pctConversion ?? 0);
 
     return {
-      examenesHoy:    Number((examenesHoyRes.recordset as ValorRow[])[0]?.valor ?? 0),
-      totalExamenes,
-      pctConversion,
+      totalExamenes:  Number(stats.totalExamenes ?? 0),
+      pctConversion:  Number(stats.pctConversion ?? 0),
       promedioDiario: Math.round(Number(stats.promedioDiario ?? 0) * 100) / 100,
-      convertidos,
+      convertidos:    Number(stats.convertidos ?? 0),
       noConvertidos:  Number(stats.noConvertidos ?? 0),
     };
   },
@@ -171,8 +184,12 @@ export async function getClinicaKPIs(
     if (!auth) return { success: false, error: "No autorizado" };
     const allowedSucursales = await getUserAllowedSucursales(auth.userId);
     const excludedClinica = getExcludedClinicaIds();
-    const data = await fetchClinicaKPIs({ ...params, allowedSucursales, excludedClinica });
-    return { success: true, data };
+    const { sucursales } = params;
+    const [examenesHoy, periodoStats] = await Promise.all([
+      fetchExamenesHoy({ sucursales, allowedSucursales, excludedClinica }),
+      fetchClinicaKPIs({ ...params, allowedSucursales, excludedClinica }),
+    ]);
+    return { success: true, data: { examenesHoy, ...periodoStats } };
   } catch (err) {
     console.error("[ERROR][getClinicaKPIs]", err);
     return { success: false, error: "Error al obtener KPIs de clínica." };
