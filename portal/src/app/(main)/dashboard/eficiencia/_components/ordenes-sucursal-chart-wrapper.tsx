@@ -5,10 +5,12 @@ interface WrapperProps {
   startDate: string;
   endDate: string;
   sucursales: string | null;
+  tipoLenteFilter: string | null;
+  marcaFilter: string | null;
 }
 
-export async function OrdenesSucursalChartWrapper({ startDate, endDate, sucursales }: WrapperProps) {
-  const result = await getOrdenesSucursal({ startDate, endDate, sucursales });
+export async function OrdenesSucursalChartWrapper({ startDate, endDate, sucursales, tipoLenteFilter, marcaFilter }: WrapperProps) {
+  const result = await getOrdenesSucursal({ startDate, endDate, sucursales, tipoLenteFilter, marcaFilter });
   const data = result.data ?? [];
 
   return (

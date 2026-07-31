@@ -40,7 +40,7 @@ function ChartTooltip({
   return (
     <div className="rounded-xl border bg-background/95 p-3 shadow-xl backdrop-blur-sm min-w-[200px]">
       <p className="mb-3 text-[12px] font-bold uppercase tracking-wide text-foreground border-b border-border pb-2">
-        {data.tipo_lente_descripcion}
+        {data.tipo_lente_agrupado}
       </p>
       <div className="flex flex-col gap-2 text-xs">
         <div className="flex items-center justify-between gap-6">
@@ -107,7 +107,7 @@ export function TipoLenteChart({ data, error }: Props) {
             {displayData.map((item, index) => (
               <div key={index} className="flex items-center gap-3 w-full">
                 <span className="w-24 shrink-0 truncate text-[11px] font-semibold text-muted-foreground">
-                  {item.tipo_lente_descripcion}
+                  {item.tipo_lente_agrupado}
                 </span>
                 <div className="min-w-0 flex-1 h-3 bg-muted rounded-full overflow-hidden">
                   <div
@@ -179,7 +179,7 @@ export function TipoLenteChart({ data, error }: Props) {
                     strokeOpacity={0.6}
                   />
                   <XAxis
-                    dataKey="tipo_lente_descripcion"
+                    dataKey="tipo_lente_agrupado"
                     type="category"
                     //tickFormatter={truncateText}
                     tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}

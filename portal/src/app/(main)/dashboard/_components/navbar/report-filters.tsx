@@ -2,11 +2,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Layers, MapPin, Tag } from "lucide-react";
+import { Glasses, Layers, MapPin, Tag } from "lucide-react";
 
 import { DateRangePicker } from "@/components/date-range-picker";
 import type { MiSucursal } from "../../_actions/get-mis-sucursales";
 import { getMarcasGrupos } from "../../inventario/_actions/get-inventario-filters";
+import {
+  getMarcaOpciones,
+  getTipoLenteOpciones,
+} from "../../eficiencia/_actions/get-eficiencia-data";
 import { MultiSelectFilter } from "./multi-select-filter";
 
 interface Props {
@@ -21,17 +25,23 @@ export function ReportFilters({ sucursales }: Props) {
   const sucursalParam = searchParams.get("sucursal");
   const marcaParam = searchParams.get("marca");
   const grupoParam = searchParams.get("grupo");
+  const tipoLenteParam = searchParams.get("tipoLente");
 
   const isInventario = pathname.startsWith("/dashboard/inventario");
+  const isEficiencia = pathname.startsWith("/dashboard/eficiencia");
 
   // Arrays de selección derivados de los params de la URL
   const sucursalesSelected = sucursalParam ? sucursalParam.split(",").filter(Boolean) : [];
   const marcasSelected = marcaParam ? marcaParam.split(",").filter(Boolean) : [];
   const gruposSelected = grupoParam ? grupoParam.split(",").filter(Boolean) : [];
+  const tiposLenteSelected = tipoLenteParam ? tipoLenteParam.split(",").filter(Boolean) : [];
 
-  // Opciones de Marca y Grupo — se cargan solo en la ruta de inventario
+  // Opciones de Marca y Grupo — se cargan solo en la ruta de inventario.
+  // El mismo estado `marcas` también se usa en Eficiencia (mutuamente excluyente
+  // por ruta) para las marcas con órdenes reales de Fact_Eficiencia_Ordenes_Marca.
   const [marcas, setMarcas] = useState<string[]>([]);
   const [grupos, setGrupos] = useState<string[]>([]);
+  const [tiposLente, setTiposLente] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isInventario) return;
@@ -44,6 +54,27 @@ export function ReportFilters({ sucursales }: Props) {
       })
       .catch(() => {/* fail silently */});
   }, [isInventario]);
+
+  // Eficiencia — opciones de Tipo de Lente, catálogo fijo (sin cascada de su lado)
+  useEffect(() => {
+    if (!isEficiencia) return;
+    getTipoLenteOpciones()
+      .then(({ data }) => {
+        if (data) setTiposLente(data);
+      })
+      .catch(() => {/* fail silently */});
+  }, [isEficiencia]);
+
+  // Eficiencia — opciones de Marca, con cascada: se re-consultan cada vez que
+  // cambia la selección de Tipo de Lente (sin selección = las 15 marcas reales).
+  useEffect(() => {
+    if (!isEficiencia) return;
+    getMarcaOpciones(tipoLenteParam || null)
+      .then(({ data }) => {
+        if (data) setMarcas(data.map((m) => m.marca));
+      })
+      .catch(() => {/* fail silently */});
+  }, [isEficiencia, tipoLenteParam]);
 
   const handleSucursalChange = useCallback(
     (vals: string[]) => {
@@ -75,6 +106,22 @@ export function ReportFilters({ sucursales }: Props) {
     [pathname, router, searchParams],
   );
 
+  // Cascada Tipo de Lente → Marca: al cambiar el Tipo de Lente, se limpia la
+  // Marca seleccionada — las marcas elegidas bajo el tipo anterior pueden no
+  // existir en el nuevo (ej. Progresivo y Bifocal no comparten las mismas 15
+  // marcas), así que arrancar de "todas las marcas" del nuevo tipo es más seguro
+  // que dejar una selección que silenciosamente ya no aplica a nada.
+  const handleTipoLenteChange = useCallback(
+    (vals: string[]) => {
+      const params = new URLSearchParams(searchParams.toString());
+      if (vals.length === 0) params.delete("tipoLente");
+      else params.set("tipoLente", vals.join(","));
+      params.delete("marca");
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+    },
+    [pathname, router, searchParams],
+  );
+
   const sucursalOptions = sucursales.map((s) => ({
     value: String(s.id_sucursal),
     label: s.nombre_sucursal,
@@ -82,6 +129,7 @@ export function ReportFilters({ sucursales }: Props) {
 
   const marcaOptions = marcas.map((m) => ({ value: m, label: m }));
   const grupoOptions = grupos.map((g) => ({ value: g, label: g }));
+  const tipoLenteOptions = tiposLente.map((t) => ({ value: t, label: t }));
 
   return (
     <div className="flex w-full items-center gap-2 overflow-x-auto pb-0.5 xl:overflow-visible xl:flex-nowrap md:w-auto">
@@ -101,8 +149,22 @@ export function ReportFilters({ sucursales }: Props) {
         />
       </div>
 
-      {/* ── Dinámicos: solo en /dashboard/inventario, carga lazy ─────────── */}
-      {isInventario && marcas.length > 0 && (
+      {/* ── Dinámicos: solo en /dashboard/eficiencia, carga lazy ──────────
+          Tipo de Lente va antes que Marca porque acota sus opciones (cascada). ── */}
+      {isEficiencia && tiposLente.length > 0 && (
+        <div className="shrink-0 min-w-[130px] md:min-w-[150px] xl:min-w-[180px]">
+          <MultiSelectFilter
+            options={tipoLenteOptions}
+            selected={tiposLenteSelected}
+            onChange={handleTipoLenteChange}
+            placeholder="Todos los tipos de lente"
+            icon={<Glasses className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+          />
+        </div>
+      )}
+
+      {/* ── Dinámicos: /dashboard/inventario y /dashboard/eficiencia, carga lazy ── */}
+      {(isInventario || isEficiencia) && marcas.length > 0 && (
         <div className="shrink-0 min-w-[130px] md:min-w-[150px] xl:min-w-[180px]">
           <MultiSelectFilter
             options={marcaOptions}

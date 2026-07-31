@@ -12,9 +12,16 @@ import { TendenciaOrdenesChartWrapper } from "./_components/tendencia-ordenes-ch
 import { TipoLenteChartWrapper } from "./_components/tipo-lente-chart-wrapper";
 import { OrdenesSucursalChartWrapper } from "./_components/ordenes-sucursal-chart-wrapper";
 import { DetalleCristalesTableWrapper } from "./_components/detalle-cristales-table-wrapper";
+import { DetalleMarcaTableWrapper } from "./_components/detalle-marca-table-wrapper";
 import { ChartSkeleton, TableSkeleton } from "../_components/skeletons";
 
-type SearchParams = Promise<{ from?: string; to?: string; sucursal?: string }>;
+type SearchParams = Promise<{
+  from?: string;
+  to?: string;
+  sucursal?: string;
+  tipoLente?: string;
+  marca?: string;
+}>;
 
 const EMPTY_KPIS = {
   ordenesHoy: 0,
@@ -28,7 +35,7 @@ export default async function EficienciaPage({
 }: {
   searchParams: SearchParams;
 }) {
-  const { from, to, sucursal } = await searchParams;
+  const { from, to, sucursal, tipoLente, marca } = await searchParams;
 
   // `from`/`to` ya llegan en formato "yyyy-MM-dd" desde el date-range-picker —
   // NO se deben reparsear con `new Date(...)`: un string solo-fecha se interpreta
@@ -37,8 +44,10 @@ export default async function EficienciaPage({
   const startDate = from ?? format(startOfMonth(new Date()), "yyyy-MM-dd");
   const endDate = to ?? format(new Date(), "yyyy-MM-dd");
   const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
+  const tipoLenteFilter = tipoLente && tipoLente !== "all" ? tipoLente : null;
+  const marcaFilter = marca && marca !== "all" ? marca : null;
 
-  const result = await getEficienciaKPIs({ startDate, endDate, sucursales });
+  const result = await getEficienciaKPIs({ startDate, endDate, sucursales, tipoLenteFilter, marcaFilter });
   const kpis = result.data ?? EMPTY_KPIS;
 
   return (
@@ -77,24 +86,60 @@ export default async function EficienciaPage({
 
       {/* ── Fila 2: Tendencia de Órdenes ────────── */}
       <Suspense fallback={<ChartSkeleton title="Tendencia de Órdenes" height="h-72" />}>
-        <TendenciaOrdenesChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+        <TendenciaOrdenesChartWrapper
+          startDate={startDate}
+          endDate={endDate}
+          sucursales={sucursales}
+          tipoLenteFilter={tipoLenteFilter}
+          marcaFilter={marcaFilter}
+        />
       </Suspense>
 
       {/* ── Fila 3: Detalle por Tipo y Órdenes por Sucursal ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Suspense fallback={<ChartSkeleton title="Detalle de Órdenes por Tipo" height="h-[500px]" />}>
-          <TipoLenteChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+          <TipoLenteChartWrapper
+            startDate={startDate}
+            endDate={endDate}
+            sucursales={sucursales}
+            tipoLenteFilter={tipoLenteFilter}
+            marcaFilter={marcaFilter}
+          />
         </Suspense>
 
         <Suspense fallback={<ChartSkeleton title="Órdenes Ejecutadas por Sucursal" height="h-[500px]" />}>
-          <OrdenesSucursalChartWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
+          <OrdenesSucursalChartWrapper
+            startDate={startDate}
+            endDate={endDate}
+            sucursales={sucursales}
+            tipoLenteFilter={tipoLenteFilter}
+            marcaFilter={marcaFilter}
+          />
         </Suspense>
       </div>
 
-      {/* ── Fila 4: Detalle de Cristales ────────── */}
-      <Suspense fallback={<TableSkeleton title="Detalle de Órdenes de Cristales por Tipo" rows={5} />}>
-        <DetalleCristalesTableWrapper startDate={startDate} endDate={endDate} sucursales={sucursales} />
-      </Suspense>
+      {/* ── Fila 4: Detalle de Cristales y Detalle por Marca ────────── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Suspense fallback={<TableSkeleton title="Detalle de Órdenes de Cristales por Tipo" rows={5} />}>
+          <DetalleCristalesTableWrapper
+            startDate={startDate}
+            endDate={endDate}
+            sucursales={sucursales}
+            tipoLenteFilter={tipoLenteFilter}
+            marcaFilter={marcaFilter}
+          />
+        </Suspense>
+
+        <Suspense fallback={<TableSkeleton title="Detalle de Órdenes por Marca" rows={5} />}>
+          <DetalleMarcaTableWrapper
+            startDate={startDate}
+            endDate={endDate}
+            sucursales={sucursales}
+            tipoLenteFilter={tipoLenteFilter}
+            marcaFilter={marcaFilter}
+          />
+        </Suspense>
+      </div>
     </div>
   );
 }

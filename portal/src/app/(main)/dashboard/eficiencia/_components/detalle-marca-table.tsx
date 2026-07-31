@@ -11,18 +11,18 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatCurrency, formatNumber } from "@/lib/utils";
-import type { TipoLenteDetalle } from "../_actions/get-eficiencia-data";
+import type { MarcaDetalle } from "../_actions/get-eficiencia-data";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search } from "lucide-react";
 
 interface Props {
-  data: TipoLenteDetalle[];
+  data: MarcaDetalle[];
   error?: string | null;
 }
 
-export function DetalleCristalesTable({ data, error }: Props) {
+export function DetalleMarcaTable({ data, error }: Props) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -31,7 +31,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
   if (!data.length && !searchQuery) {
     return (
       <div className="flex h-32 items-center justify-center text-sm text-muted-foreground border rounded-xl bg-card">
-        No hay datos de cristales en el período seleccionado
+        No hay datos de marca en el período seleccionado
       </div>
     );
   }
@@ -39,9 +39,9 @@ export function DetalleCristalesTable({ data, error }: Props) {
   // Ordenar datos
   const sortedData = [...data].sort((a, b) => b.volumen_ordenes - a.volumen_ordenes);
 
-  // Filtrar por descripción
+  // Filtrar por marca
   const filteredData = sortedData.filter((item) =>
-    item.tipo_lente_agrupado.toLowerCase().includes(searchQuery.toLowerCase())
+    item.marca.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   // Totales basados en datos filtrados
@@ -64,13 +64,13 @@ export function DetalleCristalesTable({ data, error }: Props) {
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Detalle de Órdenes de Cristales por Tipo
+          Detalle de Órdenes por Marca
         </CardTitle>
         <div className="relative w-full max-w-xs sm:ml-auto">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar cristal..."
+            placeholder="Buscar marca..."
             className="pl-8 h-9 text-xs"
             value={searchQuery}
             onChange={(e) => {
@@ -87,23 +87,23 @@ export function DetalleCristalesTable({ data, error }: Props) {
 
         {filteredData.length === 0 ? (
           <div className="flex h-32 items-center justify-center text-sm text-muted-foreground border rounded-xl bg-card">
-            No se encontraron cristales para "{searchQuery}"
+            No se encontraron marcas para "{searchQuery}"
           </div>
         ) : (
           <div className="w-full overflow-x-auto pb-2">
             <Table className="min-w-[520px]">
               <TableHeader>
                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                  <TableHead className="font-semibold text-xs uppercase tracking-wider">Tipo de Lente</TableHead>
+                  <TableHead className="font-semibold text-xs uppercase tracking-wider">Marca</TableHead>
                   <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">Volumen de Órdenes</TableHead>
                   <TableHead className="text-right font-semibold text-xs uppercase tracking-wider">Monto Total</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedData.map((item) => (
-                  <TableRow key={item.tipo_lente_agrupado} className="group transition-colors">
+                  <TableRow key={item.marca} className="group transition-colors">
                     <TableCell className="font-medium text-sm text-muted-foreground">
-                      {item.tipo_lente_agrupado}
+                      {item.marca}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-sm">
                       {formatNumber(item.volumen_ordenes)}
