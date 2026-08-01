@@ -82,7 +82,7 @@ const fetchCarteraKPIs = unstable_cache(
         SELECT ISNULL(SUM(monto_total_usd), 0) AS valor
         FROM dbo.KPI_Inf3_Monto_Pedidos
         WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter()}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-2.2 Recaudado en Pedidos — dinero abonado sobre órdenes nacidas en el período
@@ -90,7 +90,7 @@ const fetchCarteraKPIs = unstable_cache(
         SELECT ISNULL(SUM(monto_pagado_usd), 0) AS valor
         FROM dbo.KPI_Inf3_Recaudado_Pedidos
         WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter()}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-2.3 Saldo Pendiente — histórico total vigente de la sucursal, SIN filtro de
@@ -104,7 +104,7 @@ const fetchCarteraKPIs = unstable_cache(
         SELECT ROUND(COALESCE(SUM(saldo_pendiente_usd), 0), 2) AS valor
         FROM dbo.Fact_Pedidos
         WHERE 1=1
-          ${buildSucursalFilter()}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-2.4 Pedidos por Liquidar — histórico total vigente de la sucursal, SIN
@@ -119,7 +119,7 @@ const fetchCarteraKPIs = unstable_cache(
         SELECT COUNT(DISTINCT id_pedido) AS valor
         FROM dbo.Fact_Pedidos
         WHERE saldo_pendiente_usd > 0
-          ${buildSucursalFilter()}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
     ]);
 
@@ -175,7 +175,7 @@ const fetchGapCobro = unstable_cache(
         ISNULL(SUM(saldo_pendiente_usd), 0) AS saldo_pendiente_usd
       FROM dbo.KPI_Inf3_Monto_Pedidos
       WHERE CAST(fecha_pedido_completa AS DATE) >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
-        ${buildSucursalFilter()}
+        ${buildSucursalFilter("", sucursales, allowedSucursales)}
       GROUP BY mes_pedido_nombre, anio_pedido, mes_pedido_nro
       ORDER BY anio_pedido ASC, mes_pedido_nro ASC
     `);
@@ -226,7 +226,7 @@ const fetchMixVentas = unstable_cache(
         COUNT(DISTINCT id_factura)        AS facturas
       FROM dbo.Fact_Ventas_por_Categoria
       WHERE CAST(fecha_factura AS DATE) BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter()}
+        ${buildSucursalFilter("", sucursales, allowedSucursales)}
       GROUP BY categoria_agrupada
       ORDER BY venta_neta_usd DESC
     `);
@@ -276,7 +276,7 @@ const fetchCarteraSucursal = unstable_cache(
       FROM dbo.KPI_Inf3_Saldo_Pendiente k
       LEFT JOIN dbo.Dim_Sucursales ds ON k.id_sucursal = ds.id_sucursal
       WHERE CAST(k.fecha_pedido_completa AS DATE) <= @endDate
-        ${buildSucursalFilter("k")}
+        ${buildSucursalFilter("k", sucursales, allowedSucursales)}
       GROUP BY ds.nombre_sucursal
       ORDER BY saldo_pendiente_usd DESC
     `);
@@ -332,7 +332,7 @@ const fetchClientesDeudores = unstable_cache(
       LEFT JOIN dbo.Dim_Clientes     dc ON fp.id_cliente   = dc.id_cliente
       INNER JOIN dbo.Dim_Sucursales  ds ON fp.id_sucursal  = ds.id_sucursal
       WHERE 1=1
-        ${buildSucursalFilter("fp")}
+        ${buildSucursalFilter("fp", sucursales, allowedSucursales)}
       GROUP BY ds.nombre_sucursal, dc.nombre_completo
       HAVING ISNULL(SUM(fp.saldo_pendiente_usd), 0) > 0
       ORDER BY saldo_pendiente_usd DESC

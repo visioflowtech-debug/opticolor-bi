@@ -113,7 +113,7 @@ const fetchResumenKPIs = unstable_cache(
           ISNULL(ROUND(SUM(monto_neto_sin_iva_usd), 2), 0) AS ventaNetaSinIvaUsd
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-1.6 — Venta Neta YTD: query independiente — año en curso GMT-4, sin OR contaminante
@@ -123,7 +123,7 @@ const fetchResumenKPIs = unstable_cache(
           ISNULL(ROUND(SUM(monto_neto_sin_iva_usd), 2), 0) AS ventaNetaSinIvaUsd
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @ytdStart AND @ytdEnd
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-1.2 — Proyección: regla de negocio confirmada con el autor del DAX —
@@ -153,7 +153,7 @@ const fetchResumenKPIs = unstable_cache(
         END AS valor
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
         WHERE anio_factura = @AnioHoyGMT4 AND mes_factura_nro = @MesHoyGMT4
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-1.3 — Total Cobrado: Fact_Recaudo (reemplaza Dash_Recaudo_Agregado, sin columna _usd)
@@ -161,7 +161,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT ISNULL(ROUND(SUM(importe_neto_usd), 2), 0) AS valor
         FROM dbo.Fact_Recaudo
         WHERE fecha_completa BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-1.5 — Órdenes: DISTINCT id_pedido en el rango (Fact_Pedidos)
@@ -169,7 +169,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT COUNT(DISTINCT id_pedido) AS cantidadPedidos
         FROM dbo.Fact_Pedidos
         WHERE CAST(fecha_pedido_completa AS DATE) BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-1.4 — Cantidad Facturas: DISTINCTCOUNT(Fact_Ventas[id_factura]) — alimenta
@@ -180,7 +180,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT COUNT(DISTINCT id_factura) AS valor
         FROM dbo.Fact_Ventas
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
       // C-1.8 — Clientes Nuevos: KPI_Inf1_Clientes_Nuevos (DAX real) — UNION de
@@ -191,7 +191,7 @@ const fetchResumenKPIs = unstable_cache(
         SELECT COUNT(DISTINCT id_cliente) AS valor
         FROM dbo.KPI_Inf1_Clientes_Nuevos
         WHERE fecha_evento BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
     ]);
 
@@ -271,7 +271,7 @@ const fetchVentasDiarias = unstable_cache(
         COUNT(DISTINCT id_factura)                                                    AS trafico
       FROM dbo.KPI_Inf1_Venta_Neta
       WHERE anio_factura = YEAR(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00'))
-        ${buildSucursalFilter("")}
+        ${buildSucursalFilter("", sucursales, allowedSucursales)}
       GROUP BY anio_factura, mes_factura_nro, periodo_factura
       ORDER BY anio_factura, mes_factura_nro ASC
     `);
@@ -343,7 +343,7 @@ const fetchTopSucursales = unstable_cache(
           ISNULL(ROUND(SUM(monto_neto_usd), 2), 0)  AS ventaNetaUsd
         FROM dbo.KPI_Inf1_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
         GROUP BY id_sucursal
       ) vn
       INNER JOIN dbo.Dim_Sucursales ds ON ds.id_sucursal = vn.idSucursal
@@ -357,7 +357,7 @@ const fetchTopSucursales = unstable_cache(
           END, 2), 0) AS estimado
         FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
         GROUP BY id_sucursal
       ) pv ON pv.id_sucursal = vn.idSucursal
       ORDER BY vn.ventaNetaUsd DESC
@@ -413,7 +413,7 @@ const fetchMediosPago = unstable_cache(
         ISNULL(SUM(importe_neto_usd), 0)     AS montoUsd
       FROM dbo.Fact_Recaudo
       WHERE fecha_completa BETWEEN @startDate AND @endDate
-        ${buildSucursalFilter("")}
+        ${buildSucursalFilter("", sucursales, allowedSucursales)}
       GROUP BY metodo_pago
       ORDER BY montoUsd DESC
     `);

@@ -125,7 +125,7 @@ const fetchExamenesHoy = unstable_cache(
         FROM dbo.Fact_Examenes fe
         WHERE CAST(fe.fecha_examen_completa AS DATE) = CAST(SWITCHOFFSET(TODATETIMEOFFSET(GETDATE(), '+00:00'), '-04:00') AS DATE)
           AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-          ${buildSucursalFilter("fe")}
+          ${buildSucursalFilter("fe", sucursales, allowedSucursales)}
       `);
 
     return Number((res.recordset as ValorRow[])[0]?.valor ?? 0);
@@ -158,7 +158,7 @@ const fetchClinicaKPIs = unstable_cache(
         WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
           AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
           AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-          ${buildSucursalFilter("fe")}
+          ${buildSucursalFilter("fe", sucursales, allowedSucursales)}
       `);
 
     const stats = (periodoStatsRes.recordset as PeriodoStatsRow[])[0]
@@ -222,7 +222,7 @@ const fetchTendenciaExamen = unstable_cache(
       FROM dbo.Fact_Examenes fe
       WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
         AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-        ${buildSucursalFilter("fe")}
+        ${buildSucursalFilter("fe", sucursales, allowedSucursales)}
       GROUP BY CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120)
       ORDER BY periodo ASC
     `);
@@ -276,7 +276,7 @@ const fetchVolumenConversion = unstable_cache(
       FROM dbo.Fact_Examenes fe
       WHERE fe.fecha_examen_completa >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
         AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-        ${buildSucursalFilter("fe")}
+        ${buildSucursalFilter("fe", sucursales, allowedSucursales)}
       GROUP BY CONVERT(VARCHAR(7), fe.fecha_examen_completa, 120)
       ORDER BY periodo ASC
     `);
@@ -346,7 +346,7 @@ const fetchGeneroExamen = unstable_cache(
       WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
         AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-        ${buildSucursalFilter("fe")}
+        ${buildSucursalFilter("fe", sucursales, allowedSucursales)}
       GROUP BY
         CASE
           WHEN dc.genero_label IS NULL OR RTRIM(LTRIM(dc.genero_label)) = '' THEN 'NO DEFINIDO (PENDIENTE)'
@@ -416,7 +416,7 @@ const fetchEdadExamen = unstable_cache(
       WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
         AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-        ${buildSucursalFilter("fe")}
+        ${buildSucursalFilter("fe", sucursales, allowedSucursales)}
       GROUP BY
         CASE
           WHEN c.edad IS NULL OR c.edad <= 0 OR c.edad > 110 THEN 'No Indica'
@@ -485,7 +485,7 @@ const fetchTopSucursalesExamen = unstable_cache(
       WHERE fe.fecha_examen_completa >= CAST(@startDate AS DATE)
         AND fe.fecha_examen_completa < DATEADD(DAY, 1, CAST(@endDate AS DATE))
         AND fe.id_sucursal NOT IN (SELECT CAST(value AS int) FROM STRING_SPLIT(@excludedClinica, ','))
-        ${buildSucursalFilter("fe")}
+        ${buildSucursalFilter("fe", sucursales, allowedSucursales)}
       GROUP BY s.nombre_sucursal
       ORDER BY total_examenes DESC
     `);

@@ -1,4 +1,3 @@
-import { format, startOfMonth } from "date-fns";
 import { Suspense } from "react";
 
 import {
@@ -6,6 +5,7 @@ import {
   formatCurrency,
   formatNumber,
 } from "@/lib/utils";
+import { getDefaultDateRangeGMT4 } from "@/lib/date-utils";
 
 import { getResumenKPIs } from "./_actions/get-resumen-data";
 import { KpiCard } from "./_components/kpi-card";
@@ -40,8 +40,9 @@ export default async function ResumenComercialPage({
   // NO se deben reparsear con `new Date(...)`: un string solo-fecha se interpreta
   // como medianoche UTC, y volver a formatearlo con la zona horaria local del
   // servidor puede correr la fecha un día completo hacia atrás (ver Prompt 2-4).
-  const startDate = from ?? format(startOfMonth(new Date()), "yyyy-MM-dd");
-  const endDate = to ?? format(new Date(), "yyyy-MM-dd");
+  const defaultRange = getDefaultDateRangeGMT4();
+  const startDate = from ?? defaultRange.startDate;
+  const endDate = to ?? defaultRange.endDate;
   const sucursales = sucursal && sucursal !== "all" ? sucursal : null;
 
   const result = await getResumenKPIs({ startDate, endDate, sucursales });

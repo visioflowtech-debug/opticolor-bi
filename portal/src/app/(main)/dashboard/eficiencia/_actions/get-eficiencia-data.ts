@@ -3,7 +3,7 @@
 import { unstable_cache } from "next/cache";
 
 import { getConnection } from "@/lib/db";
-import { buildSucursalFilter } from "@/lib/sql-helpers";
+import { buildSucursalFilter, buildNamedInFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { getUserAllowedSucursales } from "@/lib/security";
 import { MAP_MES_NAME_TO_ABBR as MES_ABBR } from "@/lib/date-utils";
@@ -88,22 +88,20 @@ const fetchOrdenesHoy = unstable_cache(
     const { sucursales, allowedSucursales, tipoLenteFilter, marcaFilter } = params;
     const pool = await getConnection();
 
-    const tipoLenteSql = !isAll(tipoLenteFilter)
-      ? "AND f.tipo_lente_agrupado IN (SELECT value FROM STRING_SPLIT(@tipoLenteFilter, ','))"
-      : "";
+    const tipoLenteF = buildNamedInFilter("f.tipo_lente_agrupado", "tipoLente", tipoLenteFilter);
     const marcaJoin = !isAll(marcaFilter)
       ? "INNER JOIN dbo.Fact_Eficiencia_Ordenes_Marca fem ON fem.id_orden_cristal = f.id_orden_cristal"
       : "";
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND fem.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("fem.Marca", "marca", marcaFilter);
+    const tipoLenteSql = tipoLenteF.sql;
+    const marcaSql = marcaF.sql;
 
     let r = pool
       .request()
       .input("sucursales",        sucursales)
       .input("allowedSucursales", allowedSucursales);
-    if (tipoLenteFilter) r = r.input("tipoLenteFilter", tipoLenteFilter);
-    if (marcaFilter)     r = r.input("marcaFilter",     marcaFilter);
+    for (const [name, value] of tipoLenteF.entries) r = r.input(name, value);
+    for (const [name, value] of marcaF.entries)     r = r.input(name, value);
 
     const res = await r.query(`
         SELECT COUNT(DISTINCT f.id_pedido) AS valor
@@ -112,7 +110,7 @@ const fetchOrdenesHoy = unstable_cache(
         WHERE CAST(f.fecha_pedido AS DATE) = CAST(SWITCHOFFSET(TODATETIMEOFFSET(GETDATE(), '+00:00'), '-04:00') AS DATE)
           ${tipoLenteSql}
           ${marcaSql}
-          ${buildSucursalFilter("f")}
+          ${buildSucursalFilter("f", sucursales, allowedSucursales)}
       `);
 
     return Number((res.recordset as ValorRow[])[0]?.valor ?? 0);
@@ -126,15 +124,13 @@ const fetchEficienciaKPIs = unstable_cache(
     const { startDate, endDate, sucursales, allowedSucursales, tipoLenteFilter, marcaFilter } = params;
     const pool = await getConnection();
 
-    const tipoLenteSql = !isAll(tipoLenteFilter)
-      ? "AND f.tipo_lente_agrupado IN (SELECT value FROM STRING_SPLIT(@tipoLenteFilter, ','))"
-      : "";
+    const tipoLenteF = buildNamedInFilter("f.tipo_lente_agrupado", "tipoLente", tipoLenteFilter);
     const marcaJoin = !isAll(marcaFilter)
       ? "INNER JOIN dbo.Fact_Eficiencia_Ordenes_Marca fem ON fem.id_orden_cristal = f.id_orden_cristal"
       : "";
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND fem.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("fem.Marca", "marca", marcaFilter);
+    const tipoLenteSql = tipoLenteF.sql;
+    const marcaSql = marcaF.sql;
 
     let r = pool
       .request()
@@ -142,8 +138,8 @@ const fetchEficienciaKPIs = unstable_cache(
       .input("endDate",           endDate)
       .input("sucursales",        sucursales)
       .input("allowedSucursales", allowedSucursales);
-    if (tipoLenteFilter) r = r.input("tipoLenteFilter", tipoLenteFilter);
-    if (marcaFilter)     r = r.input("marcaFilter",     marcaFilter);
+    for (const [name, value] of tipoLenteF.entries) r = r.input(name, value);
+    for (const [name, value] of marcaF.entries)     r = r.input(name, value);
 
     // C-3.2 Volumen + C-3.3 Promedio Diario — COUNTA semántico (filas, no pedidos únicos)
     const periodoStatsRes = await r.query(`
@@ -156,7 +152,7 @@ const fetchEficienciaKPIs = unstable_cache(
         WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${tipoLenteSql}
           ${marcaSql}
-          ${buildSucursalFilter("f")}
+          ${buildSucursalFilter("f", sucursales, allowedSucursales)}
       `);
 
     const stats = (periodoStatsRes.recordset as PeriodoStatsRow[])[0]
@@ -208,22 +204,20 @@ const fetchTendenciaOrden = unstable_cache(
     const { sucursales, allowedSucursales, tipoLenteFilter, marcaFilter } = params;
     const pool = await getConnection();
 
-    const tipoLenteSql = !isAll(tipoLenteFilter)
-      ? "AND f.tipo_lente_agrupado IN (SELECT value FROM STRING_SPLIT(@tipoLenteFilter, ','))"
-      : "";
+    const tipoLenteF = buildNamedInFilter("f.tipo_lente_agrupado", "tipoLente", tipoLenteFilter);
     const marcaJoin = !isAll(marcaFilter)
       ? "INNER JOIN dbo.Fact_Eficiencia_Ordenes_Marca fem ON fem.id_orden_cristal = f.id_orden_cristal"
       : "";
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND fem.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("fem.Marca", "marca", marcaFilter);
+    const tipoLenteSql = tipoLenteF.sql;
+    const marcaSql = marcaF.sql;
 
     let req = pool
       .request()
       .input("sucursales",        sucursales)
       .input("allowedSucursales", allowedSucursales);
-    if (tipoLenteFilter) req = req.input("tipoLenteFilter", tipoLenteFilter);
-    if (marcaFilter)     req = req.input("marcaFilter",     marcaFilter);
+    for (const [name, value] of tipoLenteF.entries) req = req.input(name, value);
+    for (const [name, value] of marcaF.entries)     req = req.input(name, value);
 
     const res = await req.query(`
       SELECT
@@ -236,7 +230,7 @@ const fetchTendenciaOrden = unstable_cache(
       WHERE CAST(f.fecha_pedido AS DATE) >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
         ${tipoLenteSql}
         ${marcaSql}
-        ${buildSucursalFilter("f")}
+        ${buildSucursalFilter("f", sucursales, allowedSucursales)}
       GROUP BY YEAR(f.fecha_pedido), f.periodo
       ORDER BY f.periodo ASC
     `);
@@ -277,15 +271,13 @@ const fetchTipoLente = unstable_cache(
     const { startDate, endDate, sucursales, allowedSucursales, tipoLenteFilter, marcaFilter } = params;
     const pool = await getConnection();
 
-    const tipoLenteSql = !isAll(tipoLenteFilter)
-      ? "AND f.tipo_lente_agrupado IN (SELECT value FROM STRING_SPLIT(@tipoLenteFilter, ','))"
-      : "";
+    const tipoLenteF = buildNamedInFilter("f.tipo_lente_agrupado", "tipoLente", tipoLenteFilter);
     const marcaJoin = !isAll(marcaFilter)
       ? "INNER JOIN dbo.Fact_Eficiencia_Ordenes_Marca fem ON fem.id_orden_cristal = f.id_orden_cristal"
       : "";
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND fem.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("fem.Marca", "marca", marcaFilter);
+    const tipoLenteSql = tipoLenteF.sql;
+    const marcaSql = marcaF.sql;
 
     let req = pool
       .request()
@@ -293,8 +285,8 @@ const fetchTipoLente = unstable_cache(
       .input("endDate",           endDate)
       .input("sucursales",        sucursales)
       .input("allowedSucursales", allowedSucursales);
-    if (tipoLenteFilter) req = req.input("tipoLenteFilter", tipoLenteFilter);
-    if (marcaFilter)     req = req.input("marcaFilter",     marcaFilter);
+    for (const [name, value] of tipoLenteF.entries) req = req.input(name, value);
+    for (const [name, value] of marcaF.entries)     req = req.input(name, value);
 
     const res = await req.query(`
       SELECT
@@ -306,7 +298,7 @@ const fetchTipoLente = unstable_cache(
       WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
         ${tipoLenteSql}
         ${marcaSql}
-        ${buildSucursalFilter("f")}
+        ${buildSucursalFilter("f", sucursales, allowedSucursales)}
       GROUP BY f.tipo_lente_agrupado
       ORDER BY volumen_ordenes DESC
     `);
@@ -343,15 +335,13 @@ const fetchOrdenesSucursal = unstable_cache(
     const { startDate, endDate, sucursales, allowedSucursales, tipoLenteFilter, marcaFilter } = params;
     const pool = await getConnection();
 
-    const tipoLenteSql = !isAll(tipoLenteFilter)
-      ? "AND f.tipo_lente_agrupado IN (SELECT value FROM STRING_SPLIT(@tipoLenteFilter, ','))"
-      : "";
+    const tipoLenteF = buildNamedInFilter("f.tipo_lente_agrupado", "tipoLente", tipoLenteFilter);
     const marcaJoin = !isAll(marcaFilter)
       ? "INNER JOIN dbo.Fact_Eficiencia_Ordenes_Marca fem ON fem.id_orden_cristal = f.id_orden_cristal"
       : "";
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND fem.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("fem.Marca", "marca", marcaFilter);
+    const tipoLenteSql = tipoLenteF.sql;
+    const marcaSql = marcaF.sql;
 
     let req = pool
       .request()
@@ -359,8 +349,8 @@ const fetchOrdenesSucursal = unstable_cache(
       .input("endDate",           endDate)
       .input("sucursales",        sucursales)
       .input("allowedSucursales", allowedSucursales);
-    if (tipoLenteFilter) req = req.input("tipoLenteFilter", tipoLenteFilter);
-    if (marcaFilter)     req = req.input("marcaFilter",     marcaFilter);
+    for (const [name, value] of tipoLenteF.entries) req = req.input(name, value);
+    for (const [name, value] of marcaF.entries)     req = req.input(name, value);
 
     const res = await req.query(`
       SELECT
@@ -372,7 +362,7 @@ const fetchOrdenesSucursal = unstable_cache(
       WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
         ${tipoLenteSql}
         ${marcaSql}
-        ${buildSucursalFilter("f")}
+        ${buildSucursalFilter("f", sucursales, allowedSucursales)}
       GROUP BY ds.nombre_sucursal
       ORDER BY volumen_ordenes DESC
     `);
@@ -442,12 +432,13 @@ const fetchMarcaOpciones = unstable_cache(
   async (tipoLenteFilter: string | null): Promise<MarcaOpcion[]> => {
     const pool = await getConnection();
 
-    const tipoLenteSql = !isAll(tipoLenteFilter)
-      ? "WHERE tipo_lente_agrupado IN (SELECT value FROM STRING_SPLIT(@tipoLenteFilter, ','))"
+    const tipoLenteF = buildNamedInFilter("tipo_lente_agrupado", "tipoLente", tipoLenteFilter);
+    const tipoLenteSql = tipoLenteF.entries.length > 0
+      ? `WHERE tipo_lente_agrupado IN (${tipoLenteF.entries.map(([name]) => `@${name}`).join(", ")})`
       : "";
 
     let req = pool.request();
-    if (tipoLenteFilter) req = req.input("tipoLenteFilter", tipoLenteFilter);
+    for (const [name, value] of tipoLenteF.entries) req = req.input(name, value);
 
     const res = await req.query(`
       SELECT DISTINCT id_marca, Marca AS marca
@@ -490,12 +481,10 @@ const fetchDetalleOrdenesPorMarca = unstable_cache(
     const { startDate, endDate, sucursales, allowedSucursales, tipoLenteFilter, marcaFilter } = params;
     const pool = await getConnection();
 
-    const tipoLenteSql = !isAll(tipoLenteFilter)
-      ? "AND fem.tipo_lente_agrupado IN (SELECT value FROM STRING_SPLIT(@tipoLenteFilter, ','))"
-      : "";
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND fem.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
+    const tipoLenteF = buildNamedInFilter("fem.tipo_lente_agrupado", "tipoLente", tipoLenteFilter);
+    const marcaF = buildNamedInFilter("fem.Marca", "marca", marcaFilter);
+    const tipoLenteSql = tipoLenteF.sql;
+    const marcaSql = marcaF.sql;
 
     let req = pool
       .request()
@@ -503,8 +492,8 @@ const fetchDetalleOrdenesPorMarca = unstable_cache(
       .input("endDate",           endDate)
       .input("sucursales",        sucursales)
       .input("allowedSucursales", allowedSucursales);
-    if (tipoLenteFilter) req = req.input("tipoLenteFilter", tipoLenteFilter);
-    if (marcaFilter)     req = req.input("marcaFilter",     marcaFilter);
+    for (const [name, value] of tipoLenteF.entries) req = req.input(name, value);
+    for (const [name, value] of marcaF.entries)     req = req.input(name, value);
 
     const res = await req.query(`
       SELECT
@@ -516,7 +505,7 @@ const fetchDetalleOrdenesPorMarca = unstable_cache(
       WHERE CAST(fem.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
         ${tipoLenteSql}
         ${marcaSql}
-        ${buildSucursalFilter("fem")}
+        ${buildSucursalFilter("fem", sucursales, allowedSucursales)}
       GROUP BY fem.Marca
       ORDER BY volumen_ordenes DESC
     `);

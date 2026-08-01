@@ -3,7 +3,7 @@
 import { unstable_cache } from "next/cache";
 
 import { getConnection } from "@/lib/db";
-import { buildSucursalFilter } from "@/lib/sql-helpers";
+import { buildSucursalFilter, buildNamedInFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { getUserAllowedSucursales } from "@/lib/security";
 
@@ -58,9 +58,6 @@ type VentaFusedRow = {
   ventaNeta: number;
 };
 
-// Helper: Blindaje de Filtros Vacíos/Globales ("TODOS", "%")
-const isAll = (val: string | null | undefined) => !val || val.toUpperCase() === 'TODOS' || val === '%';
-
 // ─── 1. KPIs ─────────────────────────────────────────────────────────────────
 
 const fetchInventarioKPIs = unstable_cache(
@@ -71,12 +68,10 @@ const fetchInventarioKPIs = unstable_cache(
 
 
     // Filtros dimensionales compartidos — alias dp presente en stock (fi LEFT JOIN dp) y ventas (dvr LEFT JOIN dp)
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND dp.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
-    const grupoSql = !isAll(grupoFilter)
-      ? "AND dp.Segmento_Comercial IN (SELECT value FROM STRING_SPLIT(@grupoFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
+    const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaSql = marcaF.sql;
+    const grupoSql = grupoF.sql;
 
     const req = () => {
       let r = pool
@@ -85,8 +80,8 @@ const fetchInventarioKPIs = unstable_cache(
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
         .input("allowedSucursales", allowedSucursales);
-      if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
-      if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
+      for (const [name, value] of marcaF.entries) r = r.input(name, value);
+      for (const [name, value] of grupoF.entries) r = r.input(name, value);
       return r;
     };
 
@@ -101,7 +96,7 @@ const fetchInventarioKPIs = unstable_cache(
         FROM dbo.Fact_Inventario fi
         LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
         WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
-          ${buildSucursalFilter("fi")}
+          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
           ${marcaSql}
           ${grupoSql}
       `),
@@ -115,7 +110,7 @@ const fetchInventarioKPIs = unstable_cache(
         FROM dbo.Fact_Ventas_Detalle fvd
         LEFT JOIN dbo.Dim_Productos dp ON fvd.id_producto = dp.SK_Producto
         WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
-          ${buildSucursalFilter("fvd")}
+          ${buildSucursalFilter("fvd", sucursales, allowedSucursales)}
           ${marcaSql}
           ${grupoSql}
       `),
@@ -129,7 +124,7 @@ const fetchInventarioKPIs = unstable_cache(
         SELECT COUNT(DISTINCT id_factura) AS cantidadFacturas
         FROM dbo.Fact_Ventas
         WHERE fecha_factura BETWEEN @startDate AND @endDate
-          ${buildSucursalFilter("")}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
     ]);
 
@@ -177,12 +172,10 @@ const fetchMarcasDetalle = unstable_cache(
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND dp.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
-    const grupoSql = !isAll(grupoFilter)
-      ? "AND dp.Segmento_Comercial IN (SELECT value FROM STRING_SPLIT(@grupoFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
+    const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaSql = marcaF.sql;
+    const grupoSql = grupoF.sql;
 
     const req = () => {
       let r = pool
@@ -191,8 +184,8 @@ const fetchMarcasDetalle = unstable_cache(
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
         .input("allowedSucursales", allowedSucursales);
-      if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
-      if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
+      for (const [name, value] of marcaF.entries) r = r.input(name, value);
+      for (const [name, value] of grupoF.entries) r = r.input(name, value);
       return r;
     };
 
@@ -207,7 +200,7 @@ const fetchMarcasDetalle = unstable_cache(
         WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
           ${marcaSql}
           ${grupoSql}
-          ${buildSucursalFilter("fi")}
+          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
         GROUP BY dp.Marca
         ORDER BY SUM(fi.cantidad_disponible) DESC
       `),
@@ -222,7 +215,7 @@ const fetchMarcasDetalle = unstable_cache(
         WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${marcaSql}
           ${grupoSql}
-          ${buildSucursalFilter("fvd")}
+          ${buildSucursalFilter("fvd", sucursales, allowedSucursales)}
         GROUP BY dp.Marca
         ORDER BY SUM(fvd.total_linea_usd) DESC
       `),
@@ -288,12 +281,10 @@ const fetchGruposMix = unstable_cache(
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND dp.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
-    const grupoSql = !isAll(grupoFilter)
-      ? "AND dp.Segmento_Comercial IN (SELECT value FROM STRING_SPLIT(@grupoFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
+    const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaSql = marcaF.sql;
+    const grupoSql = grupoF.sql;
 
     const req = () => {
       let r = pool
@@ -302,8 +293,8 @@ const fetchGruposMix = unstable_cache(
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
         .input("allowedSucursales", allowedSucursales);
-      if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
-      if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
+      for (const [name, value] of marcaF.entries) r = r.input(name, value);
+      for (const [name, value] of grupoF.entries) r = r.input(name, value);
       return r;
     };
 
@@ -325,7 +316,7 @@ const fetchGruposMix = unstable_cache(
         AND dp.Segmento_Comercial IS NOT NULL AND LTRIM(RTRIM(dp.Segmento_Comercial)) <> ''
         ${marcaSql}
         ${grupoSql}
-        ${buildSucursalFilter("fvd")}
+        ${buildSucursalFilter("fvd", sucursales, allowedSucursales)}
       GROUP BY dp.Segmento_Comercial
       ORDER BY SUM(fvd.total_linea_usd) DESC
     `);
@@ -365,12 +356,10 @@ const fetchDispersionData = unstable_cache(
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
-    const marcaSql = !isAll(marcaFilter)
-      ? "AND dp.Marca IN (SELECT value FROM STRING_SPLIT(@marcaFilter, ','))"
-      : "";
-    const grupoSql = !isAll(grupoFilter)
-      ? "AND dp.Segmento_Comercial IN (SELECT value FROM STRING_SPLIT(@grupoFilter, ','))"
-      : "";
+    const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
+    const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaSql = marcaF.sql;
+    const grupoSql = grupoF.sql;
 
     const req = () => {
       let r = pool
@@ -379,8 +368,8 @@ const fetchDispersionData = unstable_cache(
         .input("endDate",      endDate)
         .input("sucursales",   sucursales)
         .input("allowedSucursales", allowedSucursales);
-      if (marcaFilter) r = r.input("marcaFilter", marcaFilter);
-      if (grupoFilter) r = r.input("grupoFilter", grupoFilter);
+      for (const [name, value] of marcaF.entries) r = r.input(name, value);
+      for (const [name, value] of grupoF.entries) r = r.input(name, value);
       return r;
     };
 
@@ -395,7 +384,7 @@ const fetchDispersionData = unstable_cache(
         WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
           ${marcaSql}
           ${grupoSql}
-          ${buildSucursalFilter("fi")}
+          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
         GROUP BY dp.Segmento_Comercial
       `),
 
@@ -409,7 +398,7 @@ const fetchDispersionData = unstable_cache(
         WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
           ${marcaSql}
           ${grupoSql}
-          ${buildSucursalFilter("fvd")}
+          ${buildSucursalFilter("fvd", sucursales, allowedSucursales)}
         GROUP BY dp.Segmento_Comercial
       `),
     ]);
