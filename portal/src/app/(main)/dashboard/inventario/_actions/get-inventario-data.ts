@@ -37,6 +37,14 @@ export type GrupoMix = {
   porcentaje: number; // 1 decimal
 };
 
+export type RotacionSucursal = {
+  idSucursal: number;
+  nombreSucursal: string;
+  unidadesVendidas: number;
+  stockFisico: number;
+  pctRotacion: number; // 0-100+, ya multiplicado por 100 (ej. 61.3 = 61.3%)
+};
+
 import { ReportParams } from "@/types/dashboard";
 
 export type Params = ReportParams;
@@ -452,5 +460,109 @@ export async function getDispersionData(
   } catch (err) {
     console.error("[ERROR][getDispersionData]", err);
     return { success: false, error: "Error al obtener datos de dispersión por grupo." };
+  }
+}
+
+// ─── 5. Ranking de Rotación por Sucursal (Top 20) ─────────────────────────────
+// % Rotación = Unidades Vendidas / Stock Físico. A diferencia de las tarjetas KPI
+// de Stock Físico/Capital Invertido (100% sin filtro de fecha), este gráfico SÍ
+// reacciona al filtro de fecha — pero solo del lado de Unidades Vendidas, mismo
+// patrón ya usado en fetchMarcasDetalle/fetchDispersionData/fetchGruposMix: la
+// fecha filtra el lado de Fact_Ventas_Detalle, nunca el de Fact_Inventario (que
+// es un acumulado histórico sin serie temporal, no una foto por rango). Marca y
+// Grupo sí aplican a ambos lados, igual que en el resto del módulo. Confirmado
+// con Gerardo/usuario: Stock Físico acá SÍ excluye Segmento_Comercial
+// 'LENTES'/'TRATAMIENTOS' (mismo criterio que la tarjeta KPI ya migrada).
+
+type RotacionStockRow = { id_sucursal: number; nombre_sucursal: string; stockFisico: number };
+type RotacionVentasRow = { id_sucursal: number; unidadesVendidas: number };
+
+const fetchRotacionSucursal = unstable_cache(
+  async (params: FetchParams): Promise<RotacionSucursal[]> => {
+    const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
+    const pool = await getConnection();
+
+    const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
+    const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+
+    const req = () => {
+      let r = pool
+        .request()
+        .input("startDate",    startDate)
+        .input("endDate",      endDate)
+        .input("sucursales",   sucursales)
+        .input("allowedSucursales", allowedSucursales);
+      for (const [name, value] of marcaF.entries) r = r.input(name, value);
+      for (const [name, value] of grupoF.entries) r = r.input(name, value);
+      return r;
+    };
+
+    const [stockRes, ventasRes] = await Promise.all([
+      req().query(`
+        SELECT
+          fi.id_sucursal,
+          ms.nombre_sucursal,
+          ISNULL(SUM(fi.cantidad_disponible), 0) AS stockFisico
+        FROM dbo.Fact_Inventario fi
+        LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
+        LEFT JOIN dbo.Maestro_Sucursales ms ON fi.id_sucursal = ms.id_sucursal
+        WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
+          ${marcaF.sql}
+          ${grupoF.sql}
+          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
+        GROUP BY fi.id_sucursal, ms.nombre_sucursal
+      `),
+
+      req().query(`
+        SELECT
+          fvd.id_sucursal,
+          ISNULL(SUM(fvd.cantidad), 0) AS unidadesVendidas
+        FROM dbo.Fact_Ventas_Detalle fvd
+        LEFT JOIN dbo.Dim_Productos dp ON fvd.id_producto = dp.SK_Producto
+        WHERE CAST(fvd.fecha_factura AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
+          ${marcaF.sql}
+          ${grupoF.sql}
+          ${buildSucursalFilter("fvd", sucursales, allowedSucursales)}
+        GROUP BY fvd.id_sucursal
+      `),
+    ]);
+
+    const stockRows = stockRes.recordset as RotacionStockRow[];
+    const ventasMap = new Map(
+      (ventasRes.recordset as RotacionVentasRow[]).map((r) => [Number(r.id_sucursal), Number(r.unidadesVendidas ?? 0)]),
+    );
+
+    const merged: RotacionSucursal[] = stockRows.map((r) => {
+      const stockFisico = Number(r.stockFisico ?? 0);
+      const unidadesVendidas = ventasMap.get(Number(r.id_sucursal)) ?? 0;
+      // % Rotación = DIVIDE(Unidades Vendidas, Stock Físico, 0) — 0 si no hay stock, nunca división por cero
+      const pctRotacion = stockFisico > 0 ? Math.round((unidadesVendidas / stockFisico) * 10000) / 100 : 0;
+      return {
+        idSucursal:       Number(r.id_sucursal),
+        nombreSucursal:   String(r.nombre_sucursal ?? ""),
+        unidadesVendidas,
+        stockFisico,
+        pctRotacion,
+      };
+    });
+
+    return merged.sort((a, b) => b.pctRotacion - a.pctRotacion).slice(0, 20);
+  },
+  ["dash-inventario-rotacion-sucursal"],
+  { revalidate: 3600, tags: ["dash-inventario-rotacion-sucursal"] }
+);
+
+export async function getRotacionSucursal(
+  params: Params,
+): Promise<{ success: boolean; data?: RotacionSucursal[]; error?: string }> {
+  try {
+    const auth = await getAuthContext();
+    if (!auth) return { success: false, error: "No autorizado" };
+    const allowedSucursales = await getUserAllowedSucursales(auth.userId);
+    const data = await fetchRotacionSucursal({ ...params, allowedSucursales });
+    return { success: true, data };
+  } catch (err) {
+    console.error("[ERROR][getRotacionSucursal]", err);
+    return { success: false, error: "Error al obtener ranking de rotación por sucursal." };
   }
 }

@@ -19,6 +19,7 @@ import { DetalleTableWrapper } from "./_components/detalle-table-wrapper";
 import { DispersionChartWrapper } from "./_components/dispersion-chart-wrapper";
 import { RankingMarcasChartWrapper } from "./_components/ranking-marcas-chart-wrapper";
 import { TreemapChartWrapper } from "./_components/treemap-chart-wrapper";
+import { RotacionSucursalChartWrapper } from "./_components/rotacion-sucursal-chart-wrapper";
 import { ChartSkeleton, TableSkeleton } from "../_components/skeletons";
 
 type SearchParams = Promise<{
@@ -115,10 +116,10 @@ export default async function InventarioPage({
         </div>
       </div>
 
-      {/* ── Fila 2: Tabla Detalle (izq) | Dispersión (der) ────────────────────── */}
+      {/* ── Fila 2: Ranking de Rotación por Sucursal (izq) | Dispersión (der) ─── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<TableSkeleton title="Detalle Operativo de cobertura de inventario" rows={8} />}>
-          <DetalleTableWrapper
+        <Suspense fallback={<ChartSkeleton title="Ranking de Rotación por Sucursal" height="h-[650px]" />}>
+          <RotacionSucursalChartWrapper
             startDate={startDate}
             endDate={endDate}
             sucursales={sucursales}
@@ -152,6 +153,19 @@ export default async function InventarioPage({
 
         <Suspense fallback={<ChartSkeleton title="Mix de Venta por Grupo Comercial" height="h-[500px]" />}>
           <TreemapChartWrapper
+            startDate={startDate}
+            endDate={endDate}
+            sucursales={sucursales}
+            marcaFilter={marcaFilter}
+            grupoFilter={grupoFilter}
+          />
+        </Suspense>
+      </div>
+
+      {/* ── Fila 4: Tabla Detalle Operativo (ancho completo) ──────────────────── */}
+      <div className="grid grid-cols-1 gap-6">
+        <Suspense fallback={<TableSkeleton title="Detalle Operativo de cobertura de inventario" rows={8} />}>
+          <DetalleTableWrapper
             startDate={startDate}
             endDate={endDate}
             sucursales={sucursales}

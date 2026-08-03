@@ -96,8 +96,6 @@ export function RankingMarcasChart({ data }: Props) {
     );
   }
 
-  const limit = isMobile ? 10 : 18;
-
   // Ordenar por ventaNetaUsd desc para el ranking
   const sortedData = [...data].sort((a, b) => b.ventaNetaUsd - a.ventaNetaUsd);
   const maxVenta = Math.max(...sortedData.map((d) => d.ventaNetaUsd), 1);
@@ -169,10 +167,7 @@ export function RankingMarcasChart({ data }: Props) {
   }
 
   // Vista Escritorio/Tablet (!isMobile): Limita rígidamente a un Top 10 estricto
-  const chartData = sortedData.slice(0, 10).map((m) => ({
-    ...m,
-    labelTrunc: truncateText(m.marca, limit),
-  }));
+  const chartData = sortedData.slice(0, 10);
 
   return (
     <div className="flex flex-col h-full w-full justify-between min-h-0">
@@ -193,11 +188,12 @@ export function RankingMarcasChart({ data }: Props) {
 
               <YAxis
                 type="category"
-                dataKey="labelTrunc"
-                width={60}
-                tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+                dataKey="marca"
+                tickFormatter={(v) => truncateText(v, isMobile ? 10 : 15)}
+                tick={{ fontSize: 11, fill: "var(--muted-foreground)", textAnchor: "end", style: { whiteSpace: "nowrap" } }}
                 tickLine={false}
                 axisLine={false}
+                width={120}
               />
 
               <XAxis
