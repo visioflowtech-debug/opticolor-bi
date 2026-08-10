@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -53,58 +54,6 @@ function RotacionTooltip({ active, payload }: RotacionTooltipProps) {
         </span>
       </div>
     </div>
-  );
-}
-
-// Etiqueta de porcentaje dentro de la barra — fondo oscuro, texto blanco
-// centrado, según la captura confirmada. Si la barra es demasiado angosta
-// para contener la píldora, la etiqueta se mueve afuera a la derecha para
-// no verse cortada ni superpuesta.
-interface RotacionBarLabelProps {
-  x?: unknown;
-  y?: unknown;
-  width?: unknown;
-  height?: unknown;
-  value?: unknown;
-}
-
-function RotacionBarLabel(props: RotacionBarLabelProps) {
-  const x = Number(props.x ?? 0);
-  const y = Number(props.y ?? 0);
-  const width = Number(props.width ?? 0);
-  const height = Number(props.height ?? 0);
-  const value = Number(props.value ?? 0);
-  const text = `${formatNumber(value, { decimals: value < 10 ? 1 : 0 })}%`;
-  const pillWidth = Math.max(36, text.length * 6.5 + 14);
-  const pillHeight = 16;
-  const cy = y + height / 2;
-  const fitsInside = width > pillWidth + 6;
-
-  const pillX = fitsInside ? x + width - pillWidth - 3 : x + width + 4;
-  const textX = pillX + pillWidth / 2;
-
-  return (
-    <g>
-      <rect
-        x={pillX}
-        y={cy - pillHeight / 2}
-        width={pillWidth}
-        height={pillHeight}
-        rx={8}
-        fill={fitsInside ? "rgba(15, 23, 42, 0.75)" : "transparent"}
-      />
-      <text
-        x={textX}
-        y={cy}
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={11}
-        fontWeight={600}
-        fill={fitsInside ? "#ffffff" : "var(--foreground)"}
-      >
-        {text}
-      </text>
-    </g>
   );
 }
 
@@ -168,8 +117,16 @@ export function RotacionSucursalChart({ data }: Props) {
             fill="var(--chart-1)"
             radius={[0, 4, 4, 0]}
             maxBarSize={18}
-            label={(props) => <RotacionBarLabel {...props} />}
-          />
+          >
+            <LabelList
+              dataKey="pctRotacion"
+              position="right"
+              formatter={(v: unknown) =>
+                `${formatNumber(Number(v), { decimals: Number(v) < 10 ? 1 : 0 })}%`
+              }
+              style={{ fontSize: 11, fill: "var(--foreground)" }}
+            />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </SafeChartContainer>

@@ -5,6 +5,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  LabelList,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,7 +14,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { MarcaItem } from "../_actions/get-inventario-data";
-import { formatCurrency, formatCompactNumber, formatNumber, truncateText } from "@/lib/utils";
+import { formatCurrency, formatNumber, truncateText } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import {
@@ -96,9 +97,9 @@ export function RankingMarcasChart({ data }: Props) {
     );
   }
 
-  // Ordenar por ventaNetaUsd desc para el ranking
-  const sortedData = [...data].sort((a, b) => b.ventaNetaUsd - a.ventaNetaUsd);
-  const maxVenta = Math.max(...sortedData.map((d) => d.ventaNetaUsd), 1);
+  // Ordenar por unidadesVendidas desc para el ranking
+  const sortedData = [...data].sort((a, b) => b.unidadesVendidas - a.unidadesVendidas);
+  const maxUnidades = Math.max(...sortedData.map((d) => d.unidadesVendidas), 1);
 
   const incrementLimit = () => setModalLimit((prev) => prev + 10);
   const resetLimit = () => setModalLimit(10);
@@ -117,7 +118,7 @@ export function RankingMarcasChart({ data }: Props) {
       <div className="flex flex-col h-full w-full justify-between min-h-0">
         <div className="w-full flex flex-col gap-4 py-2 min-h-0 flex-1">
           {sortedData.slice(0, visibleCount).map((brand, index) => {
-            const pct = (brand.ventaNetaUsd / maxVenta) * 100;
+            const pct = (brand.unidadesVendidas / maxUnidades) * 100;
             return (
               <div key={brand.marca} className="flex flex-col gap-1.5 text-xs">
                 <div className="flex items-center justify-between font-medium">
@@ -128,7 +129,7 @@ export function RankingMarcasChart({ data }: Props) {
                     <span className="text-foreground font-normal truncate">{brand.marca}</span>
                   </div>
                   <span className="tabular-nums text-muted-foreground">
-                    {formatCurrency(brand.ventaNetaUsd, { currency: "USD" })} ({formatNumber(brand.unidadesVendidas)} und)
+                    {formatNumber(brand.unidadesVendidas)} und
                   </span>
                 </div>
                 <div className="w-full h-3 rounded-full bg-secondary overflow-hidden">
@@ -198,11 +199,11 @@ export function RankingMarcasChart({ data }: Props) {
 
               <XAxis
                 type="number"
-                dataKey="ventaNetaUsd"
+                dataKey="unidadesVendidas"
                 tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(v) => formatCompactNumber(v)}
+                tickFormatter={(v) => formatNumber(v)}
               />
 
               <Tooltip
@@ -211,12 +212,19 @@ export function RankingMarcasChart({ data }: Props) {
               />
 
               <Bar
-                dataKey="ventaNetaUsd"
+                dataKey="unidadesVendidas"
                 fill="var(--chart-1)"
                 radius={[0, 4, 4, 0]}
                 maxBarSize={22}
                 opacity={0.9}
-              />
+              >
+                <LabelList
+                  dataKey="unidadesVendidas"
+                  position="right"
+                  formatter={(v: unknown) => formatNumber(Number(v))}
+                  style={{ fontSize: 11, fill: "var(--foreground)" }}
+                />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </SafeChartContainer>
@@ -239,13 +247,13 @@ export function RankingMarcasChart({ data }: Props) {
                   Ranking de Marcas · Todas las marcas
                 </DialogTitle>
                 <DialogDescription className="sr-only">
-                  Listado progresivo de todas las marcas ordenadas por venta neta.
+                  Listado progresivo de todas las marcas ordenadas por unidades vendidas.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-4 py-4 min-h-0">
                 {sortedData.slice(0, modalLimit).map((brand, index) => {
-                  const pct = (brand.ventaNetaUsd / maxVenta) * 100;
+                  const pct = (brand.unidadesVendidas / maxUnidades) * 100;
                   return (
                     <div key={brand.marca} className="flex flex-col gap-1.5 text-xs">
                       <div className="flex items-center justify-between w-full text-sm py-1">
@@ -257,12 +265,9 @@ export function RankingMarcasChart({ data }: Props) {
                           <span className="text-foreground font-normal truncate">{brand.marca}</span>
                         </div>
 
-                        {/* Bloque Derecho: Métricas Financieras (USD y Unidades uniformes) */}
+                        {/* Bloque Derecho: Unidades Vendidas */}
                         <div className="text-right font-medium text-muted-foreground shrink-0">
-                          {formatCurrency(brand.ventaNetaUsd, { currency: "USD" })}{" "}
-                          <span className="text-muted-foreground font-normal text-xs ml-1">
-                            ({formatNumber(brand.unidadesVendidas)} und)
-                          </span>
+                          {formatNumber(brand.unidadesVendidas)} und
                         </div>
                       </div>
                       <div className="w-full h-3 rounded-full bg-secondary overflow-hidden">
