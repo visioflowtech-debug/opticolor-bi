@@ -69,7 +69,7 @@ export default async function EficienciaPage({
           highlight
         />
         <KpiCard
-          title="Volumen de Órdenes"
+          title="Órdenes a Laboratorio"
           value={formatNumber(kpis.volumenOrdenes)}
           iconName="package"
         />
@@ -79,7 +79,7 @@ export default async function EficienciaPage({
           iconName="trending-up"
         />
         <KpiCard
-          title="Monto Total Órdenes"
+          title="Monto Total Órdenes USD"
           value={formatCurrency(kpis.montoTotalUsd, { currency: "USD" })}
           iconName="dollar-sign"
         />
@@ -121,7 +121,7 @@ export default async function EficienciaPage({
 
       {/* ── Fila 4: Detalle de Cristales y Detalle por Marca ────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <Suspense fallback={<TableSkeleton title="Detalle de Órdenes de Cristales por Tipo" rows={5} />}>
+        <Suspense fallback={<TableSkeleton title="Detalle de Órdenes por Tipo de Lente" rows={5} />}>
           <DetalleCristalesTableWrapper
             startDate={startDate}
             endDate={endDate}

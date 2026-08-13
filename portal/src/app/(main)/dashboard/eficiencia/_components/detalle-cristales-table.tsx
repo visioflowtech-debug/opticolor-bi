@@ -64,7 +64,7 @@ export function DetalleCristalesTable({ data, error }: Props) {
     <Card className="overflow-hidden rounded-2xl shadow-md">
       <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <CardTitle className="text-sm font-semibold text-muted-foreground">
-          Detalle de Órdenes de Cristales por Tipo
+          Detalle de Órdenes por Tipo de Lente
         </CardTitle>
         <div className="relative w-full max-w-xs sm:ml-auto">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
