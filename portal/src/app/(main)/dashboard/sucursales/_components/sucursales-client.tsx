@@ -125,7 +125,7 @@ export default function SucursalesClient({ data }: SucursalesClientProps) {
 
       {/* Modal de detalles */}
       <Dialog open={!!selectedSucursal} onOpenChange={(open) => !open && setSelectedSucursal(null)}>
-        <DialogContent className="sm:max-w-[500px] gap-6">
+        <DialogContent className="sm:max-w-[500px] gap-6 max-h-[85dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
               {selectedSucursal?.nombre_sucursal}

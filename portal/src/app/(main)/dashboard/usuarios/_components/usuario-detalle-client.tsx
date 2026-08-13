@@ -483,7 +483,7 @@ export function UsuarioDetalleClient({ usuario, roles, todasSucursales, currentU
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 text-destructive opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            className="h-6 w-6 text-destructive opacity-60 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity shrink-0"
                             onClick={() =>
                               setRevocandoSucursal({
                                 id_relacion: s.id_relacion,
@@ -523,7 +523,7 @@ export function UsuarioDetalleClient({ usuario, roles, todasSucursales, currentU
                 <p className="text-sm">No hay registros de auditoría.</p>
               </div>
             ) : (
-              <div className="rounded-xl border overflow-hidden">
+              <div className="rounded-xl border overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow className="bg-muted/50 hover:bg-muted/50">
