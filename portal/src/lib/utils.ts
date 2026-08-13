@@ -41,17 +41,34 @@ export function formatCompactNumber(value: number): string {
 
 // Formateo de números enteros/conteos (no monetarios), con separador de miles
 // venezolano. Ejemplo: 60112 → "60.112". Acepta cantidad fija de decimales para
-// valores no enteros (promedios, porcentajes, UPT) — ej.
-// formatNumber(4.2857, { decimals: 1 }) → "4,3".
+// valores no enteros (promedios, porcentajes, UPT) — pero, igual que
+// formatCurrency, SIEMPRE trunca en vez de redondear (ej. formatNumber(4.59,
+// { decimals: 0 }) → "4", no "5"; formatNumber(3.9) → "3", no "4" — decisión
+// del cliente, mismo criterio ya aplicado a montos USD). Intl.NumberFormat con
+// maximumFractionDigits redondea por defecto, así que la parte decimal
+// sobrante se descarta con Math.trunc ANTES de formatear. Sin `decimals`
+// explícito, el default pasó de "lo que Intl muestre naturalmente" a 0 —
+// ningún valor no monetario del portal debe mostrar decimales.
 export function formatNumber(
   value: number,
   options?: { decimals?: number },
 ): string {
-  const decimals = options?.decimals;
+  const decimals = options?.decimals ?? 0;
+  const factor = 10 ** decimals;
+  const truncated = Math.trunc(value * factor) / factor;
   return new Intl.NumberFormat(VE_LOCALE, {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,
-  }).format(value);
+  }).format(truncated || 0);
+}
+
+// Formateo centralizado de porcentajes no monetarios — trunca a 0 decimales
+// (mismo mecanismo que formatNumber/formatCurrency) y agrega el signo `%`. El
+// valor recibido ya viene escalado como porcentaje (ej. 61.3 = 61,3%, no
+// 0.613) — misma convención que el resto del portal (pctRotacion, etc.). Evita
+// repetir `${formatNumber(v, { decimals: 0 })}%` suelto en cada componente.
+export function formatPercent(value: number): string {
+  return `${formatNumber(value, { decimals: 0 })}%`;
 }
 
 // Formateo centralizado de moneda del portal. Ver docs/DOLARIZACION-CONTEXTO.md

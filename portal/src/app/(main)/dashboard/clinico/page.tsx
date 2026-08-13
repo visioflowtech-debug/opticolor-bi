@@ -1,6 +1,6 @@
 import { Suspense } from "react";
 
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatPercent } from "@/lib/utils";
 import { getDefaultDateRangeGMT4 } from "@/lib/date-utils";
 
 import { getClinicaKPIs } from "./_actions/get-clinica-data";
@@ -66,12 +66,12 @@ export default async function ClinicaPage({
         />
         <KpiCard
           title="% Conversión"
-          value={`${formatNumber(kpis.pctConversion, { decimals: 2 })}%`}
+          value={formatPercent(kpis.pctConversion)}
           iconName="check-circle"
         />
         <KpiCard
           title="Promedio Diario"
-          value={formatNumber(kpis.promedioDiario, { decimals: 2 })}
+          value={formatNumber(kpis.promedioDiario)}
           iconName="calendar"
         />
         <KpiCard

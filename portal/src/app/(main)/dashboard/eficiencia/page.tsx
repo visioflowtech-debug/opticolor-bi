@@ -75,7 +75,7 @@ export default async function EficienciaPage({
         />
         <KpiCard
           title="Promedio Órdenes Diario"
-          value={formatNumber(kpis.promedioDiario, { decimals: 2 })}
+          value={formatNumber(kpis.promedioDiario)}
           iconName="trending-up"
         />
         <KpiCard

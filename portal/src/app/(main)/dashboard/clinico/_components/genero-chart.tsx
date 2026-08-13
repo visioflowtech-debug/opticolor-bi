@@ -12,7 +12,7 @@ import type { NameType, ValueType, Payload } from "recharts/types/component/Defa
 import type { GeneroExamen } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { formatNumber } from "@/lib/utils";
+import { formatNumber, formatPercent } from "@/lib/utils";
 
 interface Props {
   data: GeneroExamen[];
@@ -53,7 +53,7 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">% del Total</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {formatNumber(pct, { decimals: 1 })}%
+            {formatPercent(pct)}
           </span>
         </div>
       </div>
@@ -80,7 +80,7 @@ function GeneroLegend({ data }: { data: GeneroExamen[] }) {
               {item.genero_label}
             </span>
             <span className="shrink-0 font-semibold tabular-nums">
-              {formatNumber(pct, { decimals: 1 })}%
+              {formatPercent(pct)}
             </span>
           </li>
         );

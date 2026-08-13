@@ -15,7 +15,7 @@ import { TooltipProps } from "recharts";
 import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { VolumenConversion } from "../_actions/get-clinica-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCompactNumber, formatNumber } from "@/lib/utils";
+import { formatCompactNumber, formatNumber, formatPercent } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
@@ -59,7 +59,7 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6 mt-1 border-t border-border pt-2">
           <span className="text-muted-foreground">% Conversión</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {formatNumber(data.pct_conversion, { decimals: 1 })}%
+            {formatPercent(data.pct_conversion)}
           </span>
         </div>
       </div>
@@ -125,7 +125,7 @@ export function VolumenConversionChart({ data }: Props) {
               yAxisId="right"
               orientation="right"
               domain={[0, 100]}
-              tickFormatter={(value) => `${value}%`}
+              tickFormatter={(value) => formatPercent(value)}
               tick={{ fontSize: tickFontSize, fill: "var(--muted-foreground)" }}
               tickLine={false}
               axisLine={false}

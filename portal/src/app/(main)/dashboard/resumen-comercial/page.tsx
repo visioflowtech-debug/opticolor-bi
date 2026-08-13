@@ -50,9 +50,10 @@ export default async function ResumenComercialPage({
 
   // proyeccionPct: compara venta real del período filtrado vs su proyección al cierre
   // Usa la Venta Neta con IVA (ventaNetaUsd) — mismo concepto que ya usaba este
-  // cálculo antes de la migración.
+  // cálculo antes de la migración. Trunca en vez de redondear (mismo criterio
+  // ya aplicado a montos USD y valores no monetarios del portal).
   const proyeccionPct =
-    kpis.proyeccionUsd > 0 ? Math.round((kpis.ventaNetaUsd / kpis.proyeccionUsd) * 100) : 0;
+    kpis.proyeccionUsd > 0 ? Math.trunc((kpis.ventaNetaUsd / kpis.proyeccionUsd) * 100) : 0;
 
   const pendienteCobro = kpis.ventaNetaUsd - kpis.totalCobradoUsd;
 

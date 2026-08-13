@@ -14,7 +14,7 @@ import { TooltipProps } from "recharts";
 import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { TipoLenteDetalle } from "../_actions/get-eficiencia-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCompactNumber, formatNumber, truncateText } from "@/lib/utils";
+import { formatCompactNumber, formatNumber, formatPercent, truncateText } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,7 +52,7 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">% Participación</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {formatNumber(pct, { decimals: 1 })}%
+            {formatPercent(pct)}
           </span>
         </div>
       </div>

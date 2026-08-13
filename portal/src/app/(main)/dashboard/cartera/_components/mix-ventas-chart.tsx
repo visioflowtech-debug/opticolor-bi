@@ -13,7 +13,7 @@ import { TooltipProps } from "recharts";
 import type { NameType, ValueType, Payload } from "recharts/types/component/DefaultTooltipContent";
 import type { MixVenta } from "../_actions/get-cartera-data";
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCurrency, formatCompactCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatCompactCurrency, formatNumber, formatPercent } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 interface Props {
@@ -62,7 +62,7 @@ function ChartTooltip({
         <div className="flex items-center justify-between gap-6">
           <span className="text-muted-foreground">% Participación</span>
           <span className="font-semibold tabular-nums text-foreground">
-            {formatNumber(pct, { decimals: 1 })}%
+            {formatPercent(pct)}
           </span>
         </div>
       </div>

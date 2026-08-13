@@ -97,7 +97,7 @@ export default async function InventarioPage({
         <div className="relative">
           <KpiCard
             title="UPT"
-            value={formatNumber(kpis.upt, { decimals: 2 })}
+            value={formatNumber(kpis.upt)}
             subtitle="Unidades por ticket"
             iconName="bar-chart-2"
           />

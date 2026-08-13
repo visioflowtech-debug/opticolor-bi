@@ -3,7 +3,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
-import { formatCurrency, formatNumber } from "@/lib/utils";
+import { formatCurrency, formatPercent } from "@/lib/utils";
 import type { MedioPago } from "../_actions/get-resumen-data";
 
 // Rampa usando los tokens del sistema de diseño (Light/Dark mode compatible)
@@ -43,7 +43,7 @@ function DonutTooltip({
         </div>
         <div className="flex items-center justify-between gap-5">
           <span className="text-muted-foreground">Participación</span>
-          <span className="font-medium tabular-nums">{formatNumber(item.porcentaje, { decimals: 1 })}%</span>
+          <span className="font-medium tabular-nums">{formatPercent(item.porcentaje)}</span>
         </div>
       </div>
     </div>
@@ -69,7 +69,7 @@ function LegendList({ data }: { data: MedioPago[] }) {
             </span>
           </div>
           <span className="shrink-0 font-semibold tabular-nums ml-2">
-            {formatNumber(item.porcentaje, { decimals: 1 })}%
+            {formatPercent(item.porcentaje)}
           </span>
         </li>
       ))}

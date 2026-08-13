@@ -14,7 +14,7 @@ import {
 
 import { SafeChartContainer } from "@/components/ui/safe-chart-container";
 import type { RotacionSucursal } from "../_actions/get-inventario-data";
-import { formatNumber, truncateText } from "@/lib/utils";
+import { formatNumber, formatPercent, truncateText } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 
@@ -52,7 +52,7 @@ function RotacionTooltip({ active, payload }: RotacionTooltipProps) {
         </span>
         <span className="text-muted-foreground">% Rotación:</span>
         <span className="text-right font-medium tabular-nums text-foreground">
-          {formatNumber(d.pctRotacion, { decimals: 1 })}%
+          {formatPercent(d.pctRotacion)}
         </span>
       </div>
     </div>
@@ -111,7 +111,7 @@ export function RotacionSucursalChart({ data }: Props) {
               <XAxis
                 type="number"
                 domain={[0, Math.ceil(maxRotacion * 1.15)]}
-                tickFormatter={(v) => `${formatNumber(v)}%`}
+                tickFormatter={(v) => formatPercent(v)}
                 tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
                 tickLine={false}
                 axisLine={false}
@@ -131,9 +131,7 @@ export function RotacionSucursalChart({ data }: Props) {
                 <LabelList
                   dataKey="pctRotacion"
                   position="right"
-                  formatter={(v: unknown) =>
-                    `${formatNumber(Number(v), { decimals: Number(v) < 10 ? 1 : 0 })}%`
-                  }
+                  formatter={(v: unknown) => formatPercent(Number(v))}
                   style={{ fontSize: 11, fill: "var(--foreground)" }}
                 />
               </Bar>
