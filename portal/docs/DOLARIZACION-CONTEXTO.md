@@ -194,3 +194,13 @@ LucideIcon` como prop). Cualquier uso futuro de `DualKpiCard` en otro módulo de
   tooltip); se pasa a mostrar siempre el valor completo (`formatCurrency`/`formatNumber`)
   directamente. Este cambio de fuente es la base (Prompt 1); el rollout a los componentes de los
   5 reportes es un prompt aparte.
+- **Montos USD sin decimales — truncados, no redondeados:** decisión de producto — todo monto en
+  USD formateado con `formatCurrency(valor, { currency: "USD" })` muestra 0 decimales, truncando
+  la parte decimal (`Math.trunc`) en vez de redondearla (ej. `3.815.996,94` → `$3.815.996`, nunca
+  `$3.815.997`). `maximumFractionDigits: 0` en `Intl.NumberFormat` redondea por defecto, así que
+  el truncamiento se hace manualmente sobre el número ANTES de formatear — no se usa
+  `roundingMode: 'trunc'` (soportado en Node 24 local, pero no verificable contra el runtime real
+  de producción, `node:20-alpine`, en este entorno). `formatCompactCurrency` aplica el mismo
+  criterio al decimal de su forma abreviada (ej. `2,359 M` no sube a `2,4 M`) solo en su rama USD;
+  su rama Bs. (formato transitorio) sigue redondeando igual que antes, fuera del alcance de este
+  cambio. Los montos en Bs. (`formatCurrency` sin `currency` explícito) no fueron tocados.

@@ -141,12 +141,19 @@ const fetchEficienciaKPIs = unstable_cache(
     for (const [name, value] of tipoLenteF.entries) r = r.input(name, value);
     for (const [name, value] of marcaF.entries)     r = r.input(name, value);
 
-    // C-3.2 Volumen + C-3.3 Promedio Diario — COUNTA semántico (filas, no pedidos únicos)
+    // C-3.2 Volumen + C-3.3 Promedio Diario — DISTINCTCOUNT semántico (pedidos
+    // únicos, no filas). Fact_Eficiencia_Ordenes tiene grano de orden de
+    // cristal (id_orden_cristal): un pedido con más de un par de lentes genera
+    // más de una fila con el mismo id_pedido. Antes usaba COUNT (COUNTA), que
+    // contaba filas — desalineado del DAX "Volumen de Ordenes" de Power BI,
+    // migrado por Gerardo de COUNTA a DISTINCTCOUNT. Confirmado con datos
+    // reales (agosto 2026 completo): 7 pedidos con fan-out (todos de 2 filas),
+    // COUNT(*)=8398 vs COUNT(DISTINCT id_pedido)=8391.
     const periodoStatsRes = await r.query(`
         SELECT
-          COUNT(f.id_pedido)                                                              AS volumen_ordenes,
+          COUNT(DISTINCT f.id_pedido)                                                     AS volumen_ordenes,
           ISNULL(SUM(f.monto_total_usd), 0)                                              AS monto_total_usd,
-          COUNT(f.id_pedido) * 1.0 / NULLIF(COUNT(DISTINCT f.fecha_pedido), 0)          AS promedio_ordenes_diarias
+          COUNT(DISTINCT f.id_pedido) * 1.0 / NULLIF(COUNT(DISTINCT f.fecha_pedido), 0) AS promedio_ordenes_diarias
         FROM dbo.Fact_Eficiencia_Ordenes f
         ${marcaJoin}
         WHERE CAST(f.fecha_pedido AS DATE) BETWEEN CAST(@startDate AS DATE) AND CAST(@endDate AS DATE)
@@ -224,7 +231,7 @@ const fetchTendenciaOrden = unstable_cache(
         YEAR(f.fecha_pedido)                 AS anio,
         f.periodo                            AS periodo,
         DATENAME(MONTH, MIN(f.fecha_pedido)) AS mes_nombre,
-        COUNT(f.id_pedido)                   AS volumen_ordenes
+        COUNT(DISTINCT f.id_pedido)          AS volumen_ordenes
       FROM dbo.Fact_Eficiencia_Ordenes f
       ${marcaJoin}
       WHERE CAST(f.fecha_pedido AS DATE) >= DATEADD(MONTH, -12, CAST(GETDATE() AS DATE))
@@ -291,7 +298,7 @@ const fetchTipoLente = unstable_cache(
     const res = await req.query(`
       SELECT
         f.tipo_lente_agrupado               AS tipo_lente_agrupado,
-        COUNT(f.id_pedido)                   AS volumen_ordenes,
+        COUNT(DISTINCT f.id_pedido)          AS volumen_ordenes,
         ISNULL(SUM(f.monto_total_usd), 0)    AS monto_total_usd
       FROM dbo.Fact_Eficiencia_Ordenes f
       ${marcaJoin}
@@ -355,7 +362,7 @@ const fetchOrdenesSucursal = unstable_cache(
     const res = await req.query(`
       SELECT
         ds.nombre_sucursal,
-        COUNT(f.id_pedido) AS volumen_ordenes
+        COUNT(DISTINCT f.id_pedido) AS volumen_ordenes
       FROM dbo.Fact_Eficiencia_Ordenes f
       LEFT JOIN dbo.Dim_Sucursales ds ON f.id_sucursal = ds.id_sucursal
       ${marcaJoin}
@@ -498,7 +505,7 @@ const fetchDetalleOrdenesPorMarca = unstable_cache(
     const res = await req.query(`
       SELECT
         fem.Marca                            AS marca,
-        COUNT(fem.id_pedido)                 AS volumen_ordenes,
+        COUNT(DISTINCT fem.id_pedido)        AS volumen_ordenes,
         ISNULL(SUM(f.monto_total_usd), 0)    AS monto_total_usd
       FROM dbo.Fact_Eficiencia_Ordenes_Marca fem
       INNER JOIN dbo.Fact_Eficiencia_Ordenes f ON f.id_orden_cristal = fem.id_orden_cristal

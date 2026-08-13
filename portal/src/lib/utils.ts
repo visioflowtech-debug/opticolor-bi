@@ -72,21 +72,27 @@ export function formatCurrency(
   const { currency, locale = VE_LOCALE, minimumFractionDigits, maximumFractionDigits, noDecimals } =
     options ?? {};
 
-  const decimalOptions: Intl.NumberFormatOptions = {
-    minimumFractionDigits: noDecimals ? 0 : (minimumFractionDigits ?? 2),
-    maximumFractionDigits: noDecimals ? 0 : (maximumFractionDigits ?? 2),
-  };
-
   if (!currency) {
+    const decimalOptions: Intl.NumberFormatOptions = {
+      minimumFractionDigits: noDecimals ? 0 : (minimumFractionDigits ?? 2),
+      maximumFractionDigits: noDecimals ? 0 : (maximumFractionDigits ?? 2),
+    };
     return `Bs. ${new Intl.NumberFormat(locale, decimalOptions).format(amount)}`;
   }
 
+  // Montos en USD: se truncan a entero, nunca se redondean (decisión del
+  // cliente — ej. 3.815.996,94 debe mostrar 3.815.996, no 3.815.997).
+  // Intl.NumberFormat con maximumFractionDigits redondea por defecto, así
+  // que la parte decimal se descarta con Math.trunc ANTES de formatear, en
+  // vez de confiar en eso. El `|| 0` evita el caso borde `-0` (ej. -0.5
+  // truncaría a -0 y se vería como "$-0").
   return new Intl.NumberFormat(locale, {
-    ...decimalOptions,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
     style: "currency",
     currency,
     currencyDisplay: "narrowSymbol",
-  }).format(amount);
+  }).format(Math.trunc(amount) || 0);
 }
 
 // Versión compacta de formatCurrency: 271_811_337.91 → "Bs. 271,8 M" (o
@@ -101,9 +107,15 @@ export function formatCompactCurrency(
   const abs = Math.abs(value);
   const sign = value < 0 ? "-" : "";
   const currencyOptions = typeof options === "object" ? options : undefined;
-  const prefix = currencyOptions?.currency === "USD" ? "$" : "Bs. ";
-  const oneDecimal = (n: number) =>
-    new Intl.NumberFormat(VE_LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(n);
+  const isUsd = currencyOptions?.currency === "USD";
+  const prefix = isUsd ? "$" : "Bs. ";
+  // USD trunca el decimal de la abreviación (mismo criterio que
+  // formatCurrency: ej. 2,359 M no sube a 2,4 M). Bs. (formato transitorio
+  // Fase 1, fuera del alcance de este cambio) sigue redondeando como antes.
+  const oneDecimal = (n: number) => {
+    const truncated = isUsd ? Math.trunc(n * 10) / 10 : n;
+    return new Intl.NumberFormat(VE_LOCALE, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(truncated || 0);
+  };
   if (abs >= 1_000_000_000) return `${sign}${prefix}${oneDecimal(abs / 1_000_000_000)} B`;
   if (abs >= 1_000_000)     return `${sign}${prefix}${oneDecimal(abs / 1_000_000)} M`;
   if (abs >= 1_000)         return `${sign}${prefix}${oneDecimal(abs / 1_000)} K`;

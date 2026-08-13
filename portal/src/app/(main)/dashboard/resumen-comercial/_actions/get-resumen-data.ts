@@ -131,12 +131,21 @@ const fetchResumenKPIs = unstable_cache(
       // calendario actual completo. El rango elegido solo decide si esa proyección
       // se muestra (el mes actual cae dentro del rango) o se muestra 0 (el rango
       // son solo meses ya cerrados, sin tocar el mes en curso).
+      // Ajustado para replicar el DAX actualizado de Gerardo (medida "Proyección
+      // Venta Neta USD"): (1) usa Venta Neta SIN IMPUESTO USD, no la variante con
+      // IVA — por eso la fuente pasa de KPI_Inf1_Proyeccion_Venta_Neta (que solo
+      // trae monto_neto_usd) a KPI_Inf1_Venta_Neta (que sí trae
+      // monto_neto_sin_iva_usd); (2) excluye explícitamente el día de hoy
+      // (fecha_factura < @FechaHoyGMT4, no <=) — antes sumaba también las ventas
+      // parciales del día en curso. DiasTranscurridos ya truncaba correctamente
+      // (día 1 del mes -> 1, si no día - 1) y no cambia.
       req().query(`
-        DECLARE @DiaHoyGMT4  INT = DAY(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
-        DECLARE @MesHoyGMT4  INT = MONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
-        DECLARE @AnioHoyGMT4 INT = YEAR(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+        DECLARE @FechaHoyGMT4 DATE = CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE);
+        DECLARE @DiaHoyGMT4  INT = DAY(@FechaHoyGMT4);
+        DECLARE @MesHoyGMT4  INT = MONTH(@FechaHoyGMT4);
+        DECLARE @AnioHoyGMT4 INT = YEAR(@FechaHoyGMT4);
         DECLARE @DiasTranscurridos INT = CASE WHEN @DiaHoyGMT4 = 1 THEN 1 ELSE @DiaHoyGMT4 - 1 END;
-        DECLARE @UltimoDiaMes      INT = DAY(EOMONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE)));
+        DECLARE @UltimoDiaMes      INT = DAY(EOMONTH(@FechaHoyGMT4));
 
         -- "Periodo" como año*12+mes para comparar rangos de mes calendario sin ambigüedad
         DECLARE @PeriodoHoy   INT = @AnioHoyGMT4 * 12 + @MesHoyGMT4;
@@ -146,13 +155,14 @@ const fetchResumenKPIs = unstable_cache(
         SELECT CASE
           WHEN @PeriodoHoy NOT BETWEEN @PeriodoStart AND @PeriodoEnd THEN 0
           ELSE ISNULL(ROUND(
-            SUM(CAST(monto_neto_usd AS DECIMAL(18,4)))
+            SUM(CAST(monto_neto_sin_iva_usd AS DECIMAL(18,4)))
             / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0)
             * CAST(@UltimoDiaMes AS DECIMAL(18,4))
           , 2), 0)
         END AS valor
-        FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
+        FROM dbo.KPI_Inf1_Venta_Neta
         WHERE anio_factura = @AnioHoyGMT4 AND mes_factura_nro = @MesHoyGMT4
+          AND fecha_factura < @FechaHoyGMT4
           ${buildSucursalFilter("", sucursales, allowedSucursales)}
       `),
 
@@ -324,13 +334,18 @@ const fetchTopSucursales = unstable_cache(
         .input("allowedSucursales", allowedSucursales);
 
     const res = await req().query(`
-      DECLARE @DiaHoyGMT4  INT = DAY(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
-      DECLARE @MesHoyGMT4  INT = MONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
-      DECLARE @AnioHoyGMT4 INT = YEAR(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE));
+      DECLARE @FechaHoyGMT4 DATE = CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE);
+      DECLARE @DiaHoyGMT4  INT = DAY(@FechaHoyGMT4);
+      DECLARE @MesHoyGMT4  INT = MONTH(@FechaHoyGMT4);
+      DECLARE @AnioHoyGMT4 INT = YEAR(@FechaHoyGMT4);
       DECLARE @DiasTranscurridos INT = CASE WHEN @DiaHoyGMT4 = 1 THEN 1 ELSE @DiaHoyGMT4 - 1 END;
-      DECLARE @UltimoDiaMes      INT = DAY(EOMONTH(CAST(SWITCHOFFSET(SYSDATETIMEOFFSET(), '-04:00') AS DATE)));
-      DECLARE @MesStart  INT = MONTH(CAST(@startDate AS DATE));
-      DECLARE @AnioStart INT = YEAR(CAST(@startDate AS DATE));
+      DECLARE @UltimoDiaMes      INT = DAY(EOMONTH(@FechaHoyGMT4));
+
+      -- "Periodo" como año*12+mes, mismo criterio que getResumenKPIs (C-1.2)
+      -- para decidir si el mes calendario actual cae dentro del rango elegido.
+      DECLARE @PeriodoHoy   INT = @AnioHoyGMT4 * 12 + @MesHoyGMT4;
+      DECLARE @PeriodoStart INT = YEAR(CAST(@startDate AS DATE)) * 12 + MONTH(CAST(@startDate AS DATE));
+      DECLARE @PeriodoEnd   INT = YEAR(CAST(@endDate AS DATE))   * 12 + MONTH(CAST(@endDate AS DATE));
 
       SELECT
         vn.idSucursal,
@@ -348,15 +363,25 @@ const fetchTopSucursales = unstable_cache(
       ) vn
       INNER JOIN dbo.Dim_Sucursales ds ON ds.id_sucursal = vn.idSucursal
       LEFT JOIN (
+        -- Misma regla que la tarjeta "Proyección Cierre" (getResumenKPIs,
+        -- C-1.2), agrupada por sucursal: SIEMPRE extrapola el mes calendario
+        -- actual completo (nunca el rango seleccionado en sí), excluyendo el
+        -- día de hoy. El rango elegido solo decide si esa proyección se
+        -- muestra (0 si son solo meses ya cerrados) — confirmado con Gerardo
+        -- que Power BI se comporta igual en esta tabla que en la tarjeta.
         SELECT
           id_sucursal,
-          ISNULL(ROUND(CASE
-            WHEN @AnioStart < @AnioHoyGMT4 OR (@AnioStart = @AnioHoyGMT4 AND @MesStart < @MesHoyGMT4)
-              THEN SUM(monto_neto_usd)
-            ELSE SUM(CAST(monto_neto_usd AS DECIMAL(18,4))) / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0) * CAST(@UltimoDiaMes AS DECIMAL(18,4))
-          END, 2), 0) AS estimado
-        FROM dbo.KPI_Inf1_Proyeccion_Venta_Neta
-        WHERE fecha_factura BETWEEN @startDate AND @endDate
+          CASE
+            WHEN @PeriodoHoy NOT BETWEEN @PeriodoStart AND @PeriodoEnd THEN 0
+            ELSE ISNULL(ROUND(
+              SUM(CAST(monto_neto_sin_iva_usd AS DECIMAL(18,4)))
+              / NULLIF(CAST(@DiasTranscurridos AS DECIMAL(18,4)), 0)
+              * CAST(@UltimoDiaMes AS DECIMAL(18,4))
+            , 2), 0)
+          END AS estimado
+        FROM dbo.KPI_Inf1_Venta_Neta
+        WHERE anio_factura = @AnioHoyGMT4 AND mes_factura_nro = @MesHoyGMT4
+          AND fecha_factura < @FechaHoyGMT4
           ${buildSucursalFilter("", sucursales, allowedSucursales)}
         GROUP BY id_sucursal
       ) pv ON pv.id_sucursal = vn.idSucursal
