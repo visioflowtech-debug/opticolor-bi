@@ -79,7 +79,7 @@ export default async function ResumenComercialPage({
           iconName="wallet"
         />
         <KpiCard
-          title="Proyección Venta Neta USD"
+          title="Proyección Venta Neta Sin Impuesto USD"
           value={formatCurrency(kpis.proyeccionUsd, { currency: "USD" })}
           subtitle={`${proyeccionPct}% del objetivo alcanzado`}
           iconName="trending-up"
