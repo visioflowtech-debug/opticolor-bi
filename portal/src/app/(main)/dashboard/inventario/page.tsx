@@ -36,6 +36,7 @@ const EMPTY_KPIS = {
   unidadesVendidas: 0,
   ventaNetaProducto: 0,
   upt: 0,
+  fechaFoto: null,
 };
 
 export default async function InventarioPage({
@@ -65,6 +66,18 @@ export default async function InventarioPage({
   });
   const kpis = result.data ?? EMPTY_KPIS;
 
+  // Stock Físico/Capital Invertido vienen de dbo.Dash_Inventario_Agregado, una
+  // foto materializada refrescada por el ETL (no en vivo) — se muestra el
+  // timestamp del snapshot para evitar reclamos de "no coincide con Gesvisión"
+  // si alguien consulta entre ciclos del ETL.
+  const fechaFotoLabel = kpis.fechaFoto
+    ? new Intl.DateTimeFormat("es-VE", {
+        dateStyle: "short",
+        timeStyle: "short",
+        timeZone: "America/Caracas",
+      }).format(new Date(kpis.fechaFoto))
+    : null;
+
   return (
     <div className="w-full max-w-full px-4 pb-6 md:px-6 space-y-6 overflow-hidden">
       {/* Banner de error no crítico */}
@@ -72,6 +85,12 @@ export default async function InventarioPage({
         <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-2.5 text-sm text-destructive">
           {result.error ?? "No se pudieron cargar los datos de KPI. Intenta de nuevo."}
         </div>
+      )}
+
+      {fechaFotoLabel && (
+        <p className="text-xs text-muted-foreground">
+          Stock Físico y Capital Invertido — Actualizado: {fechaFotoLabel}
+        </p>
       )}
 
       {/* ── Fila 1: 4 KPI Cards ──────────────────────────────────────────────── */}

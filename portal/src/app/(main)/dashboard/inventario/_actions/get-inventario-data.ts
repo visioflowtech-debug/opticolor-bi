@@ -7,6 +7,18 @@ import { buildSucursalFilter, buildNamedInFilter } from "@/lib/sql-helpers";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { getUserAllowedSucursales } from "@/lib/security";
 
+// ─── Stock/Capital: dbo.Dash_Inventario_Agregado ──────────────────────────────
+// Tabla con MERGE por id_producto/id_sucursal (fecha_foto es un watermark por
+// fila, no un lote — por eso las 4 funciones de abajo suman stock_total sin
+// filtrar por fecha_foto, confirmado con Gerardo), reemplaza el cálculo en
+// vivo que hacía este módulo contra Fact_Inventario (496,989 filas). El
+// filtro RBAC de sucursal sigue centralizado en el único
+// lugar de siempre: `buildSucursalFilter` (src/lib/sql-helpers.ts) — cuando
+// llegue la decisión de cliente sobre excluir sucursales no-comerciales
+// (ALMACÉN=3, LAB MARACAIBO=4, LAB 2=51) del gráfico "por sucursal", el punto
+// de inserción es acá arriba (una constante nueva aplicada donde se llama a
+// buildSucursalFilter("dia", ...) más abajo), no repetido por query.
+
 // ─── Tipos exportados ─────────────────────────────────────────────────────────
 
 export type InventarioKpis = {
@@ -15,6 +27,9 @@ export type InventarioKpis = {
   unidadesVendidas: number;
   ventaNetaProducto: number;
   upt: number;
+  fechaFoto: string | null; // ISO; MAX(fecha_generacion) — momento en que corrió el SP, no fecha_foto
+                            // (fecha_foto es un watermark por fila/producto, puede quedar vieja sin
+                            // reflejar que la tabla se recalculó). null si la tabla está vacía.
 };
 
 export type MarcaItem = {
@@ -73,11 +88,14 @@ const fetchInventarioKPIs = unstable_cache(
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
-
-
-    // Filtros dimensionales compartidos — alias dp presente en stock (fi LEFT JOIN dp) y ventas (dvr LEFT JOIN dp)
+    // Filtros dimensionales — dos variantes porque el lado de stock ahora lee
+    // columnas propias de Dash_Inventario_Agregado (marca/grupo, sin alias dp)
+    // mientras que ventas/facturas siguen contra Fact_Ventas_Detalle LEFT JOIN
+    // Dim_Productos (dp.Marca/dp.Segmento_Comercial), sin cambios.
     const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
     const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaFAgg = buildNamedInFilter("marca", "marcaAgg", marcaFilter);
+    const grupoFAgg = buildNamedInFilter("grupo", "grupoAgg", grupoFilter);
     const marcaSql = marcaF.sql;
     const grupoSql = grupoF.sql;
 
@@ -90,23 +108,36 @@ const fetchInventarioKPIs = unstable_cache(
         .input("allowedSucursales", allowedSucursales);
       for (const [name, value] of marcaF.entries) r = r.input(name, value);
       for (const [name, value] of grupoF.entries) r = r.input(name, value);
+      for (const [name, value] of marcaFAgg.entries) r = r.input(name, value);
+      for (const [name, value] of grupoFAgg.entries) r = r.input(name, value);
       return r;
     };
 
     const [inventarioRes, salesRes, facturasRes] = await Promise.all([
-      // C-5.1 / C-5.2 · Stock y Capital — direct query on Fact_Inventario (acumulados históricos sin snapshot temporal)
-      // Sin filtro de fecha — confirmado que ya cumple la paridad con Power BI (no
-      // reacciona al slicer de fecha), no se le agrega ninguno.
+      // C-5.1 / C-5.2 · Stock, Capital y fecha de generación — dbo.Dash_Inventario_Agregado
+      // (MERGE por id_producto/id_sucursal, refrescada por el ETL), reemplaza el
+      // escaneo en vivo de Fact_Inventario (496,989 filas → 10.5ms de CPU vs.
+      // 969ms antes). Validado PASO A/PASO B: totales idénticos a la query
+      // anterior sobre Fact_Inventario LEFT JOIN Dim_Productos, sin filtro de
+      // sucursal. SUM(stock_total) sin filtro de fecha_foto es correcto —
+      // confirmado con Gerardo: fecha_foto es un watermark por fila, no un
+      // lote/snapshot completo, así que filtrar por ella subcontaría el stock.
+      // fecha_generacion sí es el timestamp del último corrido del SP, por eso
+      // se usa para el label "Actualizado: ..." (no fecha_foto, que puede
+      // quedar vieja en un producto sin movimiento reciente aunque la tabla se
+      // haya recalculado hoy).
+      // Sin filtro de fecha en el WHERE — confirmado que ya cumple la paridad
+      // con Power BI (no reacciona al slicer de fecha), no se le agrega ninguno.
       req().query(`
         SELECT
-          ISNULL(SUM(fi.cantidad_disponible), 0) AS stockFisico,
-          ISNULL(SUM(fi.valor_total_inventario_usd), 0) AS capitalInvertidoUsd
-        FROM dbo.Fact_Inventario fi
-        LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
-        WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
-          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
-          ${marcaSql}
-          ${grupoSql}
+          ISNULL(SUM(dia.stock_total), 0) AS stockFisico,
+          ISNULL(SUM(dia.valor_total_usd), 0) AS capitalInvertidoUsd,
+          MAX(dia.fecha_generacion) AS fechaFoto
+        FROM dbo.Dash_Inventario_Agregado dia
+        WHERE dia.grupo NOT IN ('LENTES', 'TRATAMIENTOS')
+          ${buildSucursalFilter("dia", sucursales, allowedSucursales)}
+          ${marcaFAgg.sql}
+          ${grupoFAgg.sql}
       `),
 
       // C-5.3 · Unidades Vendidas (numerador de UPT) — sin cambios, sigue sobre
@@ -136,7 +167,7 @@ const fetchInventarioKPIs = unstable_cache(
       `),
     ]);
 
-    const inv    = inventarioRes.recordset[0] ?? { stockFisico: 0, capitalInvertidoUsd: 0 };
+    const inv    = inventarioRes.recordset[0] ?? { stockFisico: 0, capitalInvertidoUsd: 0, fechaFoto: null };
     const sales  = salesRes.recordset[0] ?? { unidadesVendidas: 0, ventaNetaProducto: 0 };
     const unidadesVendidas = Number(sales.unidadesVendidas ?? 0);
     const cantidadFacturas = Number((facturasRes.recordset as { cantidadFacturas: number }[])[0]?.cantidadFacturas ?? 0);
@@ -152,6 +183,7 @@ const fetchInventarioKPIs = unstable_cache(
       unidadesVendidas,
       ventaNetaProducto:   Number(sales.ventaNetaProducto ?? 0),
       upt,
+      fechaFoto: inv.fechaFoto ? new Date(inv.fechaFoto).toISOString() : null,
     };
   },
   ["dash-inventario-kpis"],
@@ -182,6 +214,8 @@ const fetchMarcasDetalle = unstable_cache(
 
     const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
     const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaFAgg = buildNamedInFilter("marca", "marcaAgg", marcaFilter);
+    const grupoFAgg = buildNamedInFilter("grupo", "grupoAgg", grupoFilter);
     const marcaSql = marcaF.sql;
     const grupoSql = grupoF.sql;
 
@@ -194,23 +228,30 @@ const fetchMarcasDetalle = unstable_cache(
         .input("allowedSucursales", allowedSucursales);
       for (const [name, value] of marcaF.entries) r = r.input(name, value);
       for (const [name, value] of grupoF.entries) r = r.input(name, value);
+      for (const [name, value] of marcaFAgg.entries) r = r.input(name, value);
+      for (const [name, value] of grupoFAgg.entries) r = r.input(name, value);
       return r;
     };
 
+    // Stock por marca: dbo.Dash_Inventario_Agregado (pre-agregada, 2.8k-11k filas)
+    // en vez de escanear Fact_Inventario (497k filas). El lado de ventas
+    // (abajo) sigue en Fact_Ventas_Detalle — esa tabla no tiene columnas de
+    // venta, así que el cruce en JS entre stock y ventas por marca se
+    // mantiene, pero ahora opera sobre, como mucho, unos cientos de filas
+    // por lado en vez de cruzar contra un recordset de 497k.
     const [inventarioRes, salesRes] = await Promise.all([
       req().query(`
         SELECT
-          ISNULL(dp.Marca, 'SIN MARCA')                 AS marca,
-          ISNULL(SUM(fi.cantidad_disponible),  0)       AS stockFisico,
-          ISNULL(SUM(fi.valor_total_inventario_usd),  0) AS capitalInvertidoUsd
-        FROM dbo.Fact_Inventario fi
-        LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
-        WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
-          ${marcaSql}
-          ${grupoSql}
-          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
-        GROUP BY dp.Marca
-        ORDER BY SUM(fi.cantidad_disponible) DESC
+          ISNULL(marca, 'SIN MARCA')                    AS marca,
+          ISNULL(SUM(stock_total),  0)                  AS stockFisico,
+          ISNULL(SUM(valor_total_usd),  0)               AS capitalInvertidoUsd
+        FROM dbo.Dash_Inventario_Agregado
+        WHERE grupo NOT IN ('LENTES', 'TRATAMIENTOS')
+          ${marcaFAgg.sql}
+          ${grupoFAgg.sql}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
+        GROUP BY marca
+        ORDER BY SUM(stock_total) DESC
       `),
 
       req().query(`
@@ -366,6 +407,8 @@ const fetchDispersionData = unstable_cache(
 
     const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
     const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaFAgg = buildNamedInFilter("marca", "marcaAgg", marcaFilter);
+    const grupoFAgg = buildNamedInFilter("grupo", "grupoAgg", grupoFilter);
     const marcaSql = marcaF.sql;
     const grupoSql = grupoF.sql;
 
@@ -378,22 +421,25 @@ const fetchDispersionData = unstable_cache(
         .input("allowedSucursales", allowedSucursales);
       for (const [name, value] of marcaF.entries) r = r.input(name, value);
       for (const [name, value] of grupoF.entries) r = r.input(name, value);
+      for (const [name, value] of marcaFAgg.entries) r = r.input(name, value);
+      for (const [name, value] of grupoFAgg.entries) r = r.input(name, value);
       return r;
     };
 
+    // Stock por grupo: dbo.Dash_Inventario_Agregado en vez de Fact_Inventario
+    // (mismo razonamiento que fetchMarcasDetalle — ver comentario ahí).
     const [inventarioRes, salesRes] = await Promise.all([
       req().query(`
         SELECT
-          ISNULL(dp.Segmento_Comercial, 'SIN GRUPO')    AS grupo,
-          ISNULL(SUM(fi.cantidad_disponible),  0)       AS stockFisico,
-          ISNULL(SUM(fi.valor_total_inventario_usd),  0) AS capitalInvertidoUsd
-        FROM dbo.Fact_Inventario fi
-        LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
-        WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
-          ${marcaSql}
-          ${grupoSql}
-          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
-        GROUP BY dp.Segmento_Comercial
+          ISNULL(grupo, 'SIN GRUPO')                    AS grupo,
+          ISNULL(SUM(stock_total),  0)                  AS stockFisico,
+          ISNULL(SUM(valor_total_usd),  0)               AS capitalInvertidoUsd
+        FROM dbo.Dash_Inventario_Agregado
+        WHERE grupo NOT IN ('LENTES', 'TRATAMIENTOS')
+          ${marcaFAgg.sql}
+          ${grupoFAgg.sql}
+          ${buildSucursalFilter("", sucursales, allowedSucursales)}
+        GROUP BY grupo
       `),
 
       req().query(`
@@ -484,6 +530,8 @@ const fetchRotacionSucursal = unstable_cache(
 
     const marcaF = buildNamedInFilter("dp.Marca", "marca", marcaFilter);
     const grupoF = buildNamedInFilter("dp.Segmento_Comercial", "grupo", grupoFilter);
+    const marcaFAgg = buildNamedInFilter("marca", "marcaAgg", marcaFilter);
+    const grupoFAgg = buildNamedInFilter("grupo", "grupoAgg", grupoFilter);
 
     const req = () => {
       let r = pool
@@ -494,23 +542,30 @@ const fetchRotacionSucursal = unstable_cache(
         .input("allowedSucursales", allowedSucursales);
       for (const [name, value] of marcaF.entries) r = r.input(name, value);
       for (const [name, value] of grupoF.entries) r = r.input(name, value);
+      for (const [name, value] of marcaFAgg.entries) r = r.input(name, value);
+      for (const [name, value] of grupoFAgg.entries) r = r.input(name, value);
       return r;
     };
 
+    // Stock por sucursal: dbo.Dash_Inventario_Agregado (mismo razonamiento que
+    // fetchMarcasDetalle/fetchDispersionData). El lado de ventas sigue en
+    // Fact_Ventas_Detalle; el cruce en JS + Top 20 se mantiene abajo porque
+    // % Rotación depende de ambos lados a la vez (no se puede ordenar por
+    // pctRotacion en SQL sin unir ambas fuentes) — con ≤96 sucursales el costo
+    // de ese cruce/ordenamiento en memoria es despreciable.
     const [stockRes, ventasRes] = await Promise.all([
       req().query(`
         SELECT
-          fi.id_sucursal,
+          dia.id_sucursal,
           ms.nombre_sucursal,
-          ISNULL(SUM(fi.cantidad_disponible), 0) AS stockFisico
-        FROM dbo.Fact_Inventario fi
-        LEFT JOIN dbo.Dim_Productos dp ON fi.id_producto = dp.SK_Producto
-        LEFT JOIN dbo.Maestro_Sucursales ms ON fi.id_sucursal = ms.id_sucursal
-        WHERE (dp.Segmento_Comercial NOT IN ('LENTES', 'TRATAMIENTOS') OR dp.Segmento_Comercial IS NULL)
-          ${marcaF.sql}
-          ${grupoF.sql}
-          ${buildSucursalFilter("fi", sucursales, allowedSucursales)}
-        GROUP BY fi.id_sucursal, ms.nombre_sucursal
+          ISNULL(SUM(dia.stock_total), 0) AS stockFisico
+        FROM dbo.Dash_Inventario_Agregado dia
+        LEFT JOIN dbo.Maestro_Sucursales ms ON dia.id_sucursal = ms.id_sucursal
+        WHERE dia.grupo NOT IN ('LENTES', 'TRATAMIENTOS')
+          ${marcaFAgg.sql}
+          ${grupoFAgg.sql}
+          ${buildSucursalFilter("dia", sucursales, allowedSucursales)}
+        GROUP BY dia.id_sucursal, ms.nombre_sucursal
       `),
 
       req().query(`
