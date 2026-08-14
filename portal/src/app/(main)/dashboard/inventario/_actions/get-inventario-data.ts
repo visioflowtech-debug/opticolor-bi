@@ -27,9 +27,6 @@ export type InventarioKpis = {
   unidadesVendidas: number;
   ventaNetaProducto: number;
   upt: number;
-  fechaFoto: string | null; // ISO; MAX(fecha_generacion) — momento en que corrió el SP, no fecha_foto
-                            // (fecha_foto es un watermark por fila/producto, puede quedar vieja sin
-                            // reflejar que la tabla se recalculó). null si la tabla está vacía.
 };
 
 export type MarcaItem = {
@@ -85,6 +82,7 @@ type VentaFusedRow = {
 
 const fetchInventarioKPIs = unstable_cache(
   async (params: FetchParams): Promise<InventarioKpis> => {
+    console.log("[REVALIDATE][dash-inventario-kpis]", { startDate: params.startDate, endDate: params.endDate, sucursales: params.sucursales });
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
@@ -122,17 +120,12 @@ const fetchInventarioKPIs = unstable_cache(
       // sucursal. SUM(stock_total) sin filtro de fecha_foto es correcto —
       // confirmado con Gerardo: fecha_foto es un watermark por fila, no un
       // lote/snapshot completo, así que filtrar por ella subcontaría el stock.
-      // fecha_generacion sí es el timestamp del último corrido del SP, por eso
-      // se usa para el label "Actualizado: ..." (no fecha_foto, que puede
-      // quedar vieja en un producto sin movimiento reciente aunque la tabla se
-      // haya recalculado hoy).
       // Sin filtro de fecha en el WHERE — confirmado que ya cumple la paridad
       // con Power BI (no reacciona al slicer de fecha), no se le agrega ninguno.
       req().query(`
         SELECT
           ISNULL(SUM(dia.stock_total), 0) AS stockFisico,
-          ISNULL(SUM(dia.valor_total_usd), 0) AS capitalInvertidoUsd,
-          MAX(dia.fecha_generacion) AS fechaFoto
+          ISNULL(SUM(dia.valor_total_usd), 0) AS capitalInvertidoUsd
         FROM dbo.Dash_Inventario_Agregado dia
         WHERE dia.grupo NOT IN ('LENTES', 'TRATAMIENTOS')
           ${buildSucursalFilter("dia", sucursales, allowedSucursales)}
@@ -167,7 +160,7 @@ const fetchInventarioKPIs = unstable_cache(
       `),
     ]);
 
-    const inv    = inventarioRes.recordset[0] ?? { stockFisico: 0, capitalInvertidoUsd: 0, fechaFoto: null };
+    const inv    = inventarioRes.recordset[0] ?? { stockFisico: 0, capitalInvertidoUsd: 0 };
     const sales  = salesRes.recordset[0] ?? { unidadesVendidas: 0, ventaNetaProducto: 0 };
     const unidadesVendidas = Number(sales.unidadesVendidas ?? 0);
     const cantidadFacturas = Number((facturasRes.recordset as { cantidadFacturas: number }[])[0]?.cantidadFacturas ?? 0);
@@ -183,11 +176,10 @@ const fetchInventarioKPIs = unstable_cache(
       unidadesVendidas,
       ventaNetaProducto:   Number(sales.ventaNetaProducto ?? 0),
       upt,
-      fechaFoto: inv.fechaFoto ? new Date(inv.fechaFoto).toISOString() : null,
     };
   },
   ["dash-inventario-kpis"],
-  { revalidate: 3600, tags: ["dash-inventario-kpis"] }
+  { revalidate: 1800, tags: ["dash-inventario-kpis"] }
 );
 
 export async function getInventarioKPIs(
@@ -209,6 +201,7 @@ export async function getInventarioKPIs(
 
 const fetchMarcasDetalle = unstable_cache(
   async (params: FetchParams): Promise<MarcaItem[]> => {
+    console.log("[REVALIDATE][dash-inventario-marcas]", { startDate: params.startDate, endDate: params.endDate, sucursales: params.sucursales });
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
@@ -305,7 +298,7 @@ const fetchMarcasDetalle = unstable_cache(
     return Array.from(marcasMap.values()).sort((a, b) => b.unidadesVendidas - a.unidadesVendidas);
   },
   ["dash-inventario-marcas"],
-  { revalidate: 3600, tags: ["dash-inventario-marcas"] }
+  { revalidate: 1800, tags: ["dash-inventario-marcas"] }
 );
 
 export async function getMarcasDetalleData(
@@ -327,6 +320,7 @@ export async function getMarcasDetalleData(
 
 const fetchGruposMix = unstable_cache(
   async (params: FetchParams): Promise<GrupoMix[]> => {
+    console.log("[REVALIDATE][dash-inventario-grupos-mix]", { startDate: params.startDate, endDate: params.endDate, sucursales: params.sucursales });
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
@@ -380,7 +374,7 @@ const fetchGruposMix = unstable_cache(
     }));
   },
   ["dash-inventario-grupos-mix"],
-  { revalidate: 3600, tags: ["dash-inventario-grupos-mix"] }
+  { revalidate: 1800, tags: ["dash-inventario-grupos-mix"] }
 );
 
 export async function getGruposMixData(
@@ -402,6 +396,7 @@ export async function getGruposMixData(
 
 const fetchDispersionData = unstable_cache(
   async (params: FetchParams): Promise<DispersionItem[]> => {
+    console.log("[REVALIDATE][dash-inventario-dispersion]", { startDate: params.startDate, endDate: params.endDate, sucursales: params.sucursales });
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
@@ -491,7 +486,7 @@ const fetchDispersionData = unstable_cache(
     return Array.from(dispersionMap.values()).sort((a, b) => b.unidadesVendidas - a.unidadesVendidas);
   },
   ["dash-inventario-dispersion"],
-  { revalidate: 3600, tags: ["dash-inventario-dispersion"] }
+  { revalidate: 1800, tags: ["dash-inventario-dispersion"] }
 );
 
 export async function getDispersionData(
@@ -525,6 +520,7 @@ type RotacionVentasRow = { id_sucursal: number; unidadesVendidas: number };
 
 const fetchRotacionSucursal = unstable_cache(
   async (params: FetchParams): Promise<RotacionSucursal[]> => {
+    console.log("[REVALIDATE][dash-inventario-rotacion-sucursal]", { startDate: params.startDate, endDate: params.endDate, sucursales: params.sucursales });
     const { startDate, endDate, sucursales, marcaFilter, grupoFilter, allowedSucursales } = params;
     const pool = await getConnection();
 
@@ -604,7 +600,7 @@ const fetchRotacionSucursal = unstable_cache(
     return merged.sort((a, b) => b.pctRotacion - a.pctRotacion).slice(0, 20);
   },
   ["dash-inventario-rotacion-sucursal"],
-  { revalidate: 3600, tags: ["dash-inventario-rotacion-sucursal"] }
+  { revalidate: 1800, tags: ["dash-inventario-rotacion-sucursal"] }
 );
 
 export async function getRotacionSucursal(
