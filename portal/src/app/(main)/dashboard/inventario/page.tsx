@@ -101,18 +101,7 @@ export default async function InventarioPage({
             subtitle="Unidades por ticket"
             iconName="bar-chart-2"
           />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="absolute bottom-3 right-3 cursor-default text-amber-500">
-                  <AlertTriangle className="h-3.5 w-3.5" />
-                </span>
-              </TooltipTrigger>
-              <TooltipContent side="top" className="text-xs">
-                Pendiente de validación contra Gesvision
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+
         </div>
       </div>
 

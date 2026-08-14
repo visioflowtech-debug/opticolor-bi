@@ -92,7 +92,7 @@ export function KpiCard({
   const ValueEl = (
     <p
       className={cn(
-        "mt-4 text-2xl md:text-3xl font-bold tabular-nums leading-none",
+        "mt-4 text-2xl md:text-[clamp(1rem,0.3rem+11cqw,1.875rem)] font-bold tabular-nums leading-none",
         fullValue && "cursor-default underline decoration-dashed decoration-muted-foreground/40 underline-offset-4",
         highlight && "text-foreground",
       )}
@@ -104,7 +104,7 @@ export function KpiCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-2xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/50",
+        "@container overflow-hidden rounded-2xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/50",
         highlight && "border-primary/50 bg-primary/5 shadow-md",
         className,
       )}
